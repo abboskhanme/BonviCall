@@ -105,3 +105,16 @@ android-dto:
 
 shell-backend:
 	docker compose exec backend bash
+
+# --- Demo data ------------------------------------------------------------
+# Drives the real API, so a clean run is also a smoke test of the enrolment
+# chain and the ingest path. Local stack only — it creates accounts with a
+# password that is written down in the repo.
+
+demo:              ## Seed a demo fleet: 5 agents, 5 devices, ~45 calls
+	docker compose exec -T backend python scripts/demo_data.py
+
+demo-reset:        ## Wipe operational data and re-seed the demo
+	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} \
+		-d $${POSTGRES_DB:-bonvicall} -q < server/scripts/reset_demo.sql
+	$(MAKE) demo
