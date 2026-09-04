@@ -2,21 +2,21 @@
  * Device health, installations and commands.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * **A device that has never reported does not appear in `GET /devices`.**
+ * **A phone that has never reported is a row, not a gap** — and now the
+ * server says so itself.
  *
- * `DeviceService.list()` inner-joins `device_health`, so an installation that
- * was bound but never sent a heartbeat is absent from the list, and
- * `GET /devices/{id}` answers 404 for it. That is the single most important
- * row on this page: R3 is an OEM battery manager killing the capture service
- * silently, and a phone that was enrolled and never spoke is the same failure
- * caught one step earlier. **Absence is the signal, so absence cannot be how
- * we render it.**
+ * `GET /devices` used to inner-join `device_health`, so an installation that
+ * was bound and never sent a heartbeat was absent from the response and
+ * `GET /devices/{id}` answered 404 for it. That was the single most alarming
+ * device in the fleet, and R3 is precisely the failure that announces itself
+ * by going quiet. The panel worked around it by merging `GET /installations`
+ * over the top.
  *
- * `useFleet` therefore merges `GET /installations` (the phones that exist)
- * with `GET /devices` (the ones that have reported) and gives the difference
- * its own state, `never_reported`. The proper fix is a LEFT OUTER JOIN on the
- * server; this join is here so the demo fleet's silent handset is visible
- * today rather than after that lands.
+ * The workaround is deleted: the join is now a LEFT OUTER JOIN and
+ * `DeviceHealthResponse.never_reported` is a first-class field. The rule it
+ * protected is kept and still tested — `never_reported` sorts above `offline`,
+ * because "was handed a phone and never started" is a person waiting for help
+ * right now, while "worked once and stopped" is not.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,6 +28,10 @@ import { moduleKey, queryKey } from '@/shared/api/queryKeys'
 import type { components } from '@/shared/api/types.gen'
 
 export type DeviceHealth = components['schemas']['DeviceHealthResponse']
+/** `GET /devices/{id}` — health PLUS the capability matrix and `capturing`,
+ *  which is the whole reason the device page exists. */
+export type DeviceDetail = components['schemas']['DeviceDetailResponse']
+export type CapabilityState = components['schemas']['CapabilityStateResponse']
 export type DeviceHealthList = components['schemas']['DeviceHealthListResponse']
 export type Installation = components['schemas']['InstallationResponse']
 export type InstallationList = components['schemas']['InstallationListResponse']
@@ -49,15 +53,12 @@ export function useDevices(): UseQueryResult<DeviceHealthList> {
   })
 }
 
-export function useDevice(installationId: string | undefined): UseQueryResult<DeviceHealth> {
+export function useDevice(installationId: string | undefined): UseQueryResult<DeviceDetail> {
   return useQuery({
     queryKey: queryKey('devices', 'detail', { installationId }),
-    queryFn: () => api.get<DeviceHealth>(`/devices/${installationId}`),
+    queryFn: () => api.get<DeviceDetail>(`/devices/${installationId}`),
     enabled: Boolean(installationId),
     refetchInterval: POLL_FAST_MS,
-    // 404 here means "bound but never reported", which is a state and not an
-    // error; `useFleet` resolves it. Retrying would just repeat the 404.
-    retry: false,
   })
 }
 
@@ -86,9 +87,7 @@ export function useInstallations(params?: {
 export type FleetState = 'never_reported' | 'revoked' | 'offline' | 'degraded' | 'healthy'
 
 export interface FleetRow {
-  installation: Installation
-  /** Absent exactly when the phone has never sent a heartbeat. */
-  health: DeviceHealth | null
+  health: DeviceHealth
   state: FleetState
   /** Uzbek-free reasons; the page turns each into a sentence. */
   problems: FleetProblem[]
@@ -111,12 +110,19 @@ export const CLOCK_SKEW_LIMIT_SEC = 120
 /** A queue this deep means uploads are not draining. */
 export const QUEUE_DEPTH_LIMIT = 50
 
-function problemsFor(installation: Installation, health: DeviceHealth | null): FleetProblem[] {
+function isRevoked(health: DeviceHealth): boolean {
+  return (
+    health.installation_status === 'revoked' ||
+    health.installation_status === 'revoked_pending_confirmation'
+  )
+}
+
+export function problemsFor(health: DeviceHealth): FleetProblem[] {
   const problems: FleetProblem[] = []
-  if (installation.status === 'revoked' || installation.status === 'revoked_pending_confirmation') {
-    problems.push('revoked')
-  }
-  if (!health) {
+  if (isRevoked(health)) problems.push('revoked')
+  if (health.never_reported) {
+    // Nothing else is knowable about a phone that has never spoken, and
+    // listing "offline" beside it would suggest we once heard from it.
     problems.push('never_reported')
     return problems
   }
@@ -131,13 +137,11 @@ function problemsFor(installation: Installation, health: DeviceHealth | null): F
   return problems
 }
 
-function stateFor(installation: Installation, health: DeviceHealth | null): FleetState {
-  if (!health) return 'never_reported'
-  if (installation.status === 'revoked' || installation.status === 'revoked_pending_confirmation') {
-    return 'revoked'
-  }
+export function stateFor(health: DeviceHealth): FleetState {
+  if (health.never_reported) return 'never_reported'
+  if (isRevoked(health)) return 'revoked'
   if (!health.is_online) return 'offline'
-  return problemsFor(installation, health).length > 0 ? 'degraded' : 'healthy'
+  return problemsFor(health).length > 0 ? 'degraded' : 'healthy'
 }
 
 /** Worst first. The default order must serve the problem, not the alphabet. */
@@ -149,27 +153,17 @@ export const FLEET_STATE_ORDER: Record<FleetState, number> = {
   healthy: 4,
 }
 
-export function buildFleet(
-  installations: Installation[] | undefined,
-  devices: DeviceHealth[] | undefined,
-): FleetRow[] {
-  const healthById = new Map((devices ?? []).map((device) => [device.installation_id, device]))
-  const rows = (installations ?? []).map((installation) => {
-    const health = healthById.get(installation.id) ?? null
-    return {
-      installation,
-      health,
-      state: stateFor(installation, health),
-      problems: problemsFor(installation, health),
-    }
-  })
+export function buildFleet(devices: DeviceHealth[] | undefined): FleetRow[] {
+  const rows = (devices ?? []).map((health) => ({
+    health,
+    state: stateFor(health),
+    problems: problemsFor(health),
+  }))
   rows.sort((a, b) => {
     const byState = FLEET_STATE_ORDER[a.state] - FLEET_STATE_ORDER[b.state]
     if (byState !== 0) return byState
     // Within a state, the one heard from longest ago comes first.
-    const aSeen = a.health?.last_heartbeat_at ?? ''
-    const bSeen = b.health?.last_heartbeat_at ?? ''
-    return aSeen.localeCompare(bSeen)
+    return (a.health.last_heartbeat_at ?? '').localeCompare(b.health.last_heartbeat_at ?? '')
   })
   return rows
 }

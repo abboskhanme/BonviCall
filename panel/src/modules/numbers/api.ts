@@ -15,7 +15,7 @@
  * holder (SPEC §3.3, D-08). Nothing here may present "the current holder" as
  * if it were the only truth.
  */
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query'
 
 import { api } from '@/shared/api/client'
@@ -60,42 +60,38 @@ export interface AgentAssignment {
 /**
  * Which lines this agent holds, or has ever held.
  *
- * **This fans out: one request per registered number.** There is no
- * `GET /assignments?agent_id=` and no `GET /agents/{id}/assignments`, so the
- * only way to answer "which number is this person's" is to read every line's
- * history and filter. At fifteen numbers that is fifteen small cached
- * requests and it is fine; at three hundred it is not, and the fix is one
- * server-side filter rather than anything here.
+ * One request. This used to fan out across every registered number, because
+ * there was no way to ask the question directly; `GET /assignments?agent_id=`
+ * now exists and the fan-out is gone.
  *
- * The result keeps CLOSED assignments too. An agent who handed their line over
- * last month still owns the calls from before the handover, and a page that
- * showed only the open assignment would make those calls look unattributed.
+ * **Closed assignments are kept deliberately.** An agent who handed their line
+ * over last month still owns the calls from before the handover — attribution
+ * uses `started_at`, so a call does not follow the number (SPEC §3.3, D-08) —
+ * and a page showing only the open assignment would make those calls look
+ * unattributed on exactly the day somebody asks about them.
  */
-export function useAgentAssignments(
-  agentId: string | undefined,
-  numbers: RegisteredNumber[] | undefined,
-): { rows: AgentAssignment[]; isError: boolean } {
-  const results = useQueries({
-    queries: (numbers ?? []).map((number) => ({
-      queryKey: queryKey('numbers', 'assignments', { numberId: number.id }),
-      queryFn: () => api.get<AssignmentList>(`/numbers/${number.id}/assignments`),
-      enabled: Boolean(agentId),
-      staleTime: 60_000,
-    })),
+export function useAgentAssignments(agentId: string | undefined): UseQueryResult<AssignmentList> {
+  return useQuery({
+    queryKey: queryKey('numbers', 'agentAssignments', { agentId }),
+    queryFn: () => api.get<AssignmentList>('/assignments', { agent_id: agentId }),
+    enabled: Boolean(agentId),
   })
+}
 
+/** Join the assignments to the lines they are about, newest holding first. */
+export function agentAssignmentRows(
+  assignments: Assignment[] | undefined,
+  numbers: RegisteredNumber[] | undefined,
+): AgentAssignment[] {
   const byId = new Map((numbers ?? []).map((number) => [number.id, number]))
   const rows: AgentAssignment[] = []
-  for (const result of results) {
-    for (const assignment of result.data?.items ?? []) {
-      if (assignment.agent_id !== agentId) continue
-      const number = byId.get(assignment.number_id)
-      if (number) rows.push({ assignment, number })
-    }
+  for (const assignment of assignments ?? []) {
+    const number = byId.get(assignment.number_id)
+    if (number) rows.push({ assignment, number })
   }
-  // Newest holding period first; an open one (valid_to === null) is newest.
+  // An open period (valid_to === null) is the newest by definition.
   rows.sort((a, b) => b.assignment.valid_from.localeCompare(a.assignment.valid_from))
-  return { rows, isError: results.some((result) => result.status === 'error') }
+  return rows
 }
 
 /**
@@ -225,39 +221,17 @@ export function useEnrolmentAttempts(
 /**
  * The callback receiver's health.
  *
- * ⚠️ **The one endpoint in the panel with no generated type.**
- * `GET /api/v1/enrolment/receiver-status` is declared `-> dict[str, str | bool]`
- * on the server, so it reaches `contract/openapi-panel-v1.json` as
- * `additionalProperties` and `types.gen.ts` has nothing to offer. That is a
- * `CONVENTIONS.md` §15 violation on the server side ("`Dict[str, Any]` in a
- * wire schema"), and the fix is a `ReceiverStatusResponse` model on the route.
- *
- * Until then this is a **validating parse**, not a hand-written interface: an
- * unexpected body yields `null` and the banner degrades to silence rather than
- * asserting a shape that may have drifted. Delete `parseReceiverStatus` and use
- * the generated type the day the route grows a response model.
+ * Generated now: the route used to be declared `-> dict[str, str | bool]` and
+ * reached the contract as `additionalProperties`, so the panel had to parse it
+ * defensively. It has a real `ReceiverStatusResponse` model, so the hand-rolled
+ * guard is gone and a field rename is a compile error again.
  */
-export interface ReceiverStatus {
-  enrolmentPossible: boolean
-  receiverName: string
-  status: string
-}
+export type ReceiverStatus = components['schemas']['ReceiverStatusResponse']
 
-export function parseReceiverStatus(body: unknown): ReceiverStatus | null {
-  if (typeof body !== 'object' || body === null) return null
-  const record = body as Record<string, unknown>
-  if (typeof record.enrolment_possible !== 'boolean') return null
-  return {
-    enrolmentPossible: record.enrolment_possible,
-    receiverName: typeof record.receiver_name === 'string' ? record.receiver_name : '',
-    status: typeof record.status === 'string' ? record.status : '',
-  }
-}
-
-export function useReceiverStatus(enabled: boolean): UseQueryResult<ReceiverStatus | null> {
+export function useReceiverStatus(enabled: boolean): UseQueryResult<ReceiverStatus> {
   return useQuery({
     queryKey: queryKey('enrolment', 'receiver'),
-    queryFn: async () => parseReceiverStatus(await api.get<unknown>('/enrolment/receiver-status')),
+    queryFn: () => api.get<ReceiverStatus>('/enrolment/receiver-status'),
     enabled,
   })
 }

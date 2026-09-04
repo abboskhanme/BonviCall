@@ -31,16 +31,21 @@ import { LoadingState, ErrorState } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
 import { RevokeDeviceModal } from './RevokeDeviceModal'
+import type { CapabilityState } from './api'
 import {
-  buildFleet,
+  problemsFor,
+  stateFor,
   useCommands,
   useDevice,
   useInstallations,
   useIssueCommand,
-  type DeviceHealth,
+  type DeviceDetail,
   type Installation,
 } from './api'
 import {
+  CAPABILITY_LABEL,
+  CAPABILITY_STATE_LABEL,
+  CAPABILITY_STATE_TONE,
   CAPTURE_ROUTE_LABEL,
   COMMAND_KIND_LABEL,
   COMMAND_STATUS_LABEL,
@@ -110,30 +115,84 @@ function CommandHistory({ installationId }: { installationId: string }) {
   )
 }
 
+/**
+ * The capability matrix — the question "which permission is missing on this
+ * handset" answered without phoning the salesperson.
+ *
+ * `granted_not_working` is rendered as loudly as `denied`, because that is R3
+ * itself: Android reports the permission as granted and an OEM layer refuses
+ * it anyway. A matrix that showed it as a shade of "granted" would hide the
+ * only state this page was built to catch.
+ */
+function CapabilityMatrix({ capabilities }: { capabilities: CapabilityState[] }) {
+  if (capabilities.length === 0) {
+    return (
+      <Section title={t('devices.sectionCapabilities')}>
+        <p className="text-sm text-muted">{t('devices.noCapabilities')}</p>
+      </Section>
+    )
+  }
+  return (
+    <Section
+      title={t('devices.sectionCapabilities')}
+      description={t('devices.capabilitiesSubtitle')}
+    >
+      <TableWrap>
+        <Table>
+          <THead>
+            <tr>
+              <TH>{t('devices.capName')}</TH>
+              <TH>{t('devices.capState')}</TH>
+              <TH>{t('devices.capChanged')}</TH>
+              <TH>{t('devices.capDetail')}</TH>
+            </tr>
+          </THead>
+          <TBody>
+            {capabilities.map((capability) => (
+              <TR key={capability.capability}>
+                <TD>{t(CAPABILITY_LABEL[capability.capability])}</TD>
+                <TD>
+                  <Badge tone={CAPABILITY_STATE_TONE[capability.state]}>
+                    {t(CAPABILITY_STATE_LABEL[capability.state])}
+                  </Badge>
+                </TD>
+                <TD
+                  className="whitespace-nowrap text-muted"
+                  title={formatInstantTitle(capability.changed_at)}
+                >
+                  {relativeText(capability.changed_at)}
+                </TD>
+                <TD className="text-xs text-muted">{capability.detail ?? EM_DASH}</TD>
+              </TR>
+            ))}
+          </TBody>
+        </Table>
+      </TableWrap>
+    </Section>
+  )
+}
+
 function DeviceBody({
   installation,
   health,
 }: {
-  installation: Installation
-  health: DeviceHealth | null
+  installation: Installation | null
+  health: DeviceDetail
 }) {
   const can = useAuth((state) => state.can)
   const agentsQuery = useAgentDirectory(can(Perm.AGENTS_READ))
-  const agentName = agentNameLookup(agentsQuery.data?.items)(installation.agent_id)
-  const issue = useIssueCommand(installation.id)
+  const agentName = agentNameLookup(agentsQuery.data?.items)(health.agent_id)
+  const issue = useIssueCommand(health.installation_id)
   const [revoking, setRevoking] = useState(false)
 
-  const [row] = buildFleet([installation], health ? [health] : [])
-  const state = row?.state ?? 'never_reported'
-  const problems = row?.problems ?? []
+  const state = stateFor(health)
+  const problems = problemsFor(health)
 
   return (
     <div className="flex flex-col gap-4">
       <Section
         title={
-          health
-            ? `${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() || t('devices.unknownModel')
-            : t('devices.unknownModel')
+          `${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() || t('devices.unknownModel')
         }
         description={agentName ?? undefined}
         actions={
@@ -172,11 +231,23 @@ function DeviceBody({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={FLEET_STATE_TONE[state]}>{t(FLEET_STATE_LABEL[state])}</Badge>
-            <Badge tone="neutral">{t(INSTALLATION_STATUS_LABEL[installation.status])}</Badge>
-            <Badge tone="neutral">{t(FUNNEL_STAGE_LABEL[installation.funnel_stage])}</Badge>
+            <Badge tone="neutral">
+              {t(INSTALLATION_STATUS_LABEL[health.installation_status])}
+            </Badge>
+            {installation ? (
+              <Badge tone="neutral">{t(FUNNEL_STAGE_LABEL[installation.funnel_stage])}</Badge>
+            ) : null}
+            {/* `capturing` is the server's own answer to "is this phone
+                actually recording right now", and it is the one line an admin
+                came to the page for. */}
+            {health.capturing !== undefined && health.capturing !== null ? (
+              <Badge tone={health.capturing ? 'good' : 'bad'}>
+                {t(health.capturing ? 'devices.capturingYes' : 'devices.capturingNo')}
+              </Badge>
+            ) : null}
             {agentName ? (
               <Link
-                to={`/agents/${installation.agent_id}`}
+                to={`/agents/${health.agent_id}`}
                 className="text-xs text-accent underline-offset-2 hover:underline"
               >
                 {t('devices.openAgent')}
@@ -200,8 +271,10 @@ function DeviceBody({
         </div>
       </Section>
 
-      {health === null ? (
-        /* The whole reason this page does not just 404. */
+      {health.never_reported ? (
+        /* Bound and never heard from. The server answers 200 with this flag
+           now rather than 404, so the page can say what happened instead of
+           implying the device does not exist. */
         <Card className="border-bad/40 bg-bad/5 p-4">
           <p className="text-sm font-medium text-text">{t('devices.neverReportedTitle')}</p>
           <p className="mt-1 text-xs text-muted">{t('devices.neverReportedHint')}</p>
@@ -310,7 +383,7 @@ function DeviceBody({
               <Field
                 label={t('agentDetail.verification')}
                 value={
-                  installation.verification_method
+                  installation?.verification_method
                     ? t(VERIFICATION_METHOD_LABEL[installation.verification_method])
                     : null
                 }
@@ -320,13 +393,15 @@ function DeviceBody({
         </>
       )}
 
-      <CommandHistory installationId={installation.id} />
+      <CapabilityMatrix capabilities={health.capabilities ?? []} />
+
+      <CommandHistory installationId={health.installation_id} />
 
       {can(Perm.INSTALLATIONS_REVOKE) ? (
         <RevokeDeviceModal
           open={revoking}
           onOpenChange={setRevoking}
-          installationId={installation.id}
+          installationId={health.installation_id}
         />
       ) : null}
     </div>
@@ -362,14 +437,10 @@ export function DeviceDetailPage() {
 
       {!settled ? (
         <LoadingState rows={6} />
-      ) : installation === null ? (
-        // No installation either: this really is "no such device".
-        <ErrorState
-          error={installationsQuery.error ?? deviceQuery.error}
-          onRetry={() => void installationsQuery.refetch()}
-        />
+      ) : deviceQuery.data === undefined ? (
+        <ErrorState error={deviceQuery.error} onRetry={() => void deviceQuery.refetch()} />
       ) : (
-        <DeviceBody installation={installation} health={deviceQuery.data ?? null} />
+        <DeviceBody installation={installation} health={deviceQuery.data} />
       )}
     </Page>
   )

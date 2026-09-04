@@ -126,6 +126,29 @@ describe('route gate', () => {
     expect(ROUTES.map((route) => route.path)).not.toContain('/i/:code')
   })
 
+  it('keeps a sales user out of every oversight surface', () => {
+    // `sales` holds exactly `calls:read:own`, `audio:play:own` and
+    // `devices:read:own` — verified against the live server. The oversight
+    // pages answer 403 for them, and the gate must not let a pasted URL
+    // render a page whose every request will fail.
+    signIn([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.DEVICES_READ_OWN])
+
+    for (const path of ['/alerts', '/reports/gap', '/audit', '/agents', '/users', '/settings']) {
+      const view = renderAt(path)
+      expect(heading(t('page.dashboard'))).not.toBeNull()
+      view.unmount()
+    }
+  })
+
+  it('lets a sales user open their own calls, which the server then narrows', () => {
+    // Own-scope passes the gate; `CallService.list()` filters the rows. The
+    // panel must not re-implement that rule (CONVENTIONS.md §11).
+    signIn([Perm.CALLS_READ_OWN])
+    renderAt('/calls')
+
+    expect(heading(t('page.calls'))).not.toBeNull()
+  })
+
   it('gates every non-public route except the dashboard', () => {
     // The dashboard is "any authenticated user" (SPEC §5.2) and the two public
     // pages carry no gate by definition. Everything else must declare one, or a

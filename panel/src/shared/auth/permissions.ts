@@ -65,7 +65,11 @@ export const Perm = {
   APPVERSIONS_READ: 'appversions:read',
   APPVERSIONS_WRITE: 'appversions:write',
 
-  MONITOR_READ: 'monitor:read',
+  // Removed 2026-09-05 with the TV board, at the client's request:
+  // `monitor:read` and the `viewer` role are gone from
+  // server/src/core/permissions.py, so a constant for them here would gate on
+  // a permission `GET /auth/me` can never return — which reads as "nobody has
+  // it" rather than "this does not exist".
 
   EXPORT_READ: 'export:read',
   EXPORT_AUDIO: 'export:audio',

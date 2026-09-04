@@ -26,8 +26,8 @@ export function LoginPage() {
 
   // Where the user was when the session ended, so a mid-session expiry returns
   // them to the page they were reading. With no such page, `landingPath` picks
-  // one: the dashboard for everybody who has a tile on it, and `/monitor` for a
-  // `viewer`, whose dashboard would be five tiles of 403.
+  // one. Since the TV board was removed that is always the dashboard, but the
+  // question is still asked in one place rather than hard-coded at two.
   const state = location.state as FromState | null
   const target = state?.from?.pathname ?? landingPath()
 

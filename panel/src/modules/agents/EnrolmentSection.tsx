@@ -59,7 +59,7 @@ function ReceiverBanner() {
   const status = query.data
   // No banner while unknown: a scary line that turns out to be a loading state
   // is worse than a moment of nothing.
-  if (!status || status.enrolmentPossible) return null
+  if (!status || status.enrolment_possible) return null
   return (
     <Card className="flex items-start gap-3 border-bad/40 bg-bad/5 p-3">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
@@ -244,9 +244,9 @@ export function EnrolmentSection({
 
           <StageProgress stage={stage} />
 
-          {/* The instruction, not the noun. "permitted" tells an admin nothing
-              they can act on; "ruxsatlar berildi, endi raqamni tasdiqlash
-              kerak" does. */}
+          {/* The instruction, not the noun. The stage NAME tells an admin
+              nothing they can act on; `FUNNEL_STAGE_HINT` says what to do
+              next. §14 keeps the wording itself in uz.json. */}
           <p className={stuck ? 'text-sm font-medium text-warn' : 'text-sm text-text'}>
             {t(FUNNEL_STAGE_HINT[stage])}
           </p>

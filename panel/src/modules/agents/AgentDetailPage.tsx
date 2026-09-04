@@ -33,7 +33,7 @@ import {
   INSTALLATION_STATUS_LABEL,
   VERIFICATION_METHOD_LABEL,
 } from '@/modules/devices/labels'
-import { useAgentAssignments, useNumbers } from '@/modules/numbers/api'
+import { agentAssignmentRows, useAgentAssignments, useNumbers } from '@/modules/numbers/api'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { relativeText } from '@/shared/lib/relativeText'
@@ -52,15 +52,19 @@ import { useAgent, type Agent } from './api'
 function DeviceSection({ agentId }: { agentId: string }) {
   const can = useAuth((state) => state.can)
   const mayRead = can(Perm.DEVICES_READ) || can(Perm.DEVICES_READ_OWN)
-  const installationsQuery = useInstallations(mayRead ? { agentId } : undefined)
   const devicesQuery = useDevices()
+  const installationsQuery = useInstallations(mayRead ? { agentId } : undefined)
 
   if (!mayRead) return null
 
-  // Merged, so a phone that was bound and never reported is a ROW rather than
-  // an absence — see `modules/devices/api.ts`. That is the device an admin
-  // most needs to see, and it is the one `GET /devices` leaves out.
-  const fleet = buildFleet(installationsQuery.data?.items, devicesQuery.data?.items)
+  // `/devices` carries `never_reported` now, so a phone that was bound and
+  // never spoke arrives in this list rather than being absent from it.
+  const fleet = buildFleet(devicesQuery.data?.items).filter(
+    (row) => row.health.agent_id === agentId,
+  )
+  const installationById = new Map(
+    (installationsQuery.data?.items ?? []).map((item) => [item.id, item]),
+  )
 
   return (
     <Section title={t('agentDetail.deviceTitle')} description={t('agentDetail.deviceSubtitle')}>
@@ -68,57 +72,65 @@ function DeviceSection({ agentId }: { agentId: string }) {
         <p className="text-sm text-muted">{t('agentDetail.noDevice')}</p>
       ) : (
         <div className="space-y-3">
-          {fleet.map(({ installation, health, state, problems }) => (
-            <div key={installation.id} className="rounded-md border border-border p-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <Smartphone className="size-4 shrink-0 text-muted" aria-hidden />
-                <span className="text-sm font-medium text-text">
-                  {health ? `${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() : t('agentDetail.unknownDevice')}
-                </span>
-                <Badge tone={FLEET_STATE_TONE[state]}>{t(FLEET_STATE_LABEL[state])}</Badge>
-                <Badge tone="neutral">
-                  {t(INSTALLATION_STATUS_LABEL[installation.status])}
-                </Badge>
-                <Link
-                  to={`/devices/${installation.id}`}
-                  className="ms-auto text-xs text-accent underline-offset-2 hover:underline"
-                >
-                  {t('agentDetail.openDevice')}
-                </Link>
+          {fleet.map(({ health, state, problems }) => {
+            const installation = installationById.get(health.installation_id)
+            return (
+              <div key={health.installation_id} className="rounded-md border border-border p-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Smartphone className="size-4 shrink-0 text-muted" aria-hidden />
+                  <span className="text-sm font-medium text-text">
+                    {`${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() ||
+                      t('devices.unknownModel')}
+                  </span>
+                  <Badge tone={FLEET_STATE_TONE[state]}>{t(FLEET_STATE_LABEL[state])}</Badge>
+                  <Badge tone="neutral">
+                    {t(INSTALLATION_STATUS_LABEL[health.installation_status])}
+                  </Badge>
+                  <Link
+                    to={`/devices/${health.installation_id}`}
+                    className="ms-auto text-xs text-accent underline-offset-2 hover:underline"
+                  >
+                    {t('agentDetail.openDevice')}
+                  </Link>
+                </div>
+
+                <FieldGrid className="mt-3">
+                  <Field
+                    label={t('devices.colLastSeen')}
+                    value={
+                      health.last_heartbeat_at
+                        ? relativeText(health.last_heartbeat_at)
+                        : t('devices.never')
+                    }
+                    title={
+                      health.last_heartbeat_at
+                        ? formatInstantTitle(health.last_heartbeat_at)
+                        : undefined
+                    }
+                  />
+                  <Field label={t('devices.colAppVersion')} value={health.app_version} />
+                  <Field
+                    label={t('agentDetail.verification')}
+                    value={
+                      installation?.verification_method
+                        ? t(VERIFICATION_METHOD_LABEL[installation.verification_method])
+                        : null
+                    }
+                  />
+                </FieldGrid>
+
+                {problems.length > 0 ? (
+                  <ul className="mt-3 flex flex-wrap gap-1">
+                    {problems.map((problem) => (
+                      <li key={problem}>
+                        <Badge tone="warn">{t(FLEET_PROBLEM_LABEL[problem])}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
-
-              <FieldGrid className="mt-3">
-                <Field
-                  label={t('devices.colLastSeen')}
-                  value={health?.last_heartbeat_at ? relativeText(health.last_heartbeat_at) : null}
-                  title={
-                    health?.last_heartbeat_at
-                      ? formatInstantTitle(health.last_heartbeat_at)
-                      : undefined
-                  }
-                />
-                <Field label={t('devices.colAppVersion')} value={health?.app_version ?? null} />
-                <Field
-                  label={t('agentDetail.verification')}
-                  value={
-                    installation.verification_method
-                      ? t(VERIFICATION_METHOD_LABEL[installation.verification_method])
-                      : null
-                  }
-                />
-              </FieldGrid>
-
-              {problems.length > 0 ? (
-                <ul className="mt-3 flex flex-wrap gap-1">
-                  {problems.map((problem) => (
-                    <li key={problem}>
-                      <Badge tone="warn">{t(FLEET_PROBLEM_LABEL[problem])}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </Section>
@@ -136,10 +148,9 @@ function AgentCard({ agent }: { agent: Agent }) {
   const [archiving, setArchiving] = useState(false)
 
   const numbersQuery = useNumbers()
-  const { rows, isError: historyFailed } = useAgentAssignments(
-    mayReadNumbers ? agent.id : undefined,
-    mayReadNumbers ? numbersQuery.data?.items : undefined,
-  )
+  const assignmentsQuery = useAgentAssignments(mayReadNumbers ? agent.id : undefined)
+  const rows = agentAssignmentRows(assignmentsQuery.data?.items, numbersQuery.data?.items)
+  const historyFailed = assignmentsQuery.status === 'error' || numbersQuery.status === 'error'
   const openRow = rows.find((row) => row.assignment.valid_to === null) ?? null
 
   const installationsQuery = useInstallations(

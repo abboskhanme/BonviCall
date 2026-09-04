@@ -4,12 +4,12 @@
  * Three things are pinned, and each one is a rule somebody could undo without
  * noticing:
  *
- *  1. **There is no `<audio>` element.** N43 needs Range on a token-protected
- *     endpoint, which `<audio src>` cannot request; the Service Worker bridge
- *     (T153) is not built yet. A plain `<audio src>` dropped in meanwhile would
- *     play and then fail to seek — a bug that looks like a feature. This test
- *     fails the moment one appears, which is the point.
- *  2. **A call with no recording shows the reason** (UC-14).
+ *  1. **A player appears ONLY for a recording that is actually playable**, and
+ *     its `src` is same-origin. The two other states must never get one: an
+ *     expired recording answers 410, and a control somebody can press to
+ *     receive an error teaches them the system is broken when it is not.
+ *  2. **A call with no recording shows the reason** (UC-14), and a
+ *     retention-expired one says it EXISTED — see the audio-state tests.
  *  3. **The note button is not rendered without `calls:note`** (CONVENTIONS.md
  *     §11 — the server still decides, but the panel does not show a door it
  *     knows is locked).
@@ -109,6 +109,27 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
+/**
+ * The call as JSON, and anything under `/audio` as bytes.
+ *
+ * The audio request is a real one: the bridge fetches it with the header and
+ * turns it into a blob, exactly as it does on an insecure origin.
+ */
+function respondJson(call: Call) {
+  fetchMock.mockImplementation((input) => {
+    const url = String(input)
+    if (url.includes('/audio')) {
+      return Promise.resolve(
+        new Response(new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/ogg' }), {
+          status: 200,
+          headers: { 'Content-Type': 'audio/ogg' },
+        }),
+      )
+    }
+    return Promise.resolve(jsonResponse(200, call))
+  })
+}
+
 function signIn(permissions: string[]) {
   useAuth.setState({
     status: 'authenticated',
@@ -147,8 +168,11 @@ function renderPage() {
 beforeEach(() => {
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  // jsdom implements neither, and the blob route needs both.
+  URL.createObjectURL = vi.fn(() => 'blob:test-audio')
+  URL.revokeObjectURL = vi.fn()
   tokenStore.set('test-token')
-  signIn([Perm.CALLS_READ, Perm.CALLS_NOTE])
+  signIn([Perm.CALLS_READ, Perm.CALLS_NOTE, Perm.AUDIO_PLAY, Perm.AUDIO_DOWNLOAD])
 })
 
 afterEach(() => {
@@ -158,32 +182,35 @@ afterEach(() => {
 
 describe('call card', () => {
   it('renders the metadata in Asia/Tashkent and the number in local form', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, makeCall()))
+    respondJson(makeCall())
 
-    const { container } = renderPage()
+    renderPage()
 
     expect(await screen.findByText('+998 90 111 22 33')).toBeInTheDocument()
     expect(screen.getByText('Dilshod')).toBeInTheDocument()
     // 09:03 UTC is 14:03 in Tashkent, whatever the reader's browser thinks.
     expect(screen.getAllByText('05/09/2026 14:03').length).toBeGreaterThan(0)
     expect(screen.getAllByText('02:00').length).toBeGreaterThan(0)
-    expect(container.querySelectorAll('audio')).toHaveLength(0)
   })
 
-  it('shows a labelled placeholder instead of a player that cannot seek', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, makeCall({ has_audio: true })))
+  it('renders a player for a playable recording, with a same-origin src', async () => {
+    respondJson(makeCall())
 
     const { container } = renderPage()
 
-    expect(await screen.findByText(t('callDetail.playerPending'))).toBeInTheDocument()
-    // The whole reason the placeholder exists: <audio src> cannot send the
-    // Authorization header the endpoint requires, so it would seek-fail.
-    expect(container.querySelector('audio')).toBeNull()
-    expect(container.querySelector('source')).toBeNull()
+    await screen.findByTestId('audio-ready')
+    const audio = container.querySelector('audio')
+    expect(audio).not.toBeNull()
+    // Same-origin or the browser withholds Content-Range and seek breaks. In
+    // this environment there is no Service Worker, so the bridge falls back to
+    // fetch + blob: — which is the path a LAN http:// demo takes for real.
+    const src = audio?.getAttribute('src') ?? ''
+    expect(src.startsWith('blob:') || src.startsWith('/api/v1/calls/')).toBe(true)
+    expect(src).not.toMatch(/^https?:\/\//)
   })
 
   it('states why there is no recording (UC-14)', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, callWithoutAudio('no_permission')))
+    respondJson(callWithoutAudio('no_permission'))
 
     renderPage()
 
@@ -196,7 +223,7 @@ describe('call card', () => {
   })
 
   it('says a retention-deleted recording EXISTED, and says nobody is at fault', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, callWithExpiredAudio()))
+    respondJson(callWithExpiredAudio())
 
     renderPage()
 
@@ -212,13 +239,35 @@ describe('call card', () => {
   it('keeps the capture route visible after retention removed the file', async () => {
     // The per-model capture rate is the M0 baseline and UC-23 compares against
     // it, so "which mechanism ran on this handset" must survive the deletion.
-    fetchMock.mockResolvedValue(jsonResponse(200, callWithExpiredAudio()))
+    respondJson(callWithExpiredAudio())
 
     renderPage()
 
     expect(
       await screen.findByText(t('calls.captureRoute.oem_file_harvest')),
     ).toBeInTheDocument()
+  })
+
+  it('offers NO player for a recording retention has removed', async () => {
+    respondJson(callWithExpiredAudio())
+
+    const { container } = renderPage()
+
+    await screen.findByText(t('calls.audio.expired'))
+    // Pressing it would answer 410 `audio_expired`, and somebody who does
+    // that concludes the system is broken when it is working exactly as
+    // designed.
+    expect(container.querySelector('audio')).toBeNull()
+    expect(screen.queryByTestId('audio-ready')).toBeNull()
+  })
+
+  it('offers NO player for a recording that never existed', async () => {
+    respondJson(callWithoutAudio('oem_recorder_off'))
+
+    const { container } = renderPage()
+
+    await screen.findByText(t('calls.noAudioReason.oem_recorder_off'))
+    expect(container.querySelector('audio')).toBeNull()
   })
 
   it('renders the Uzbek sentence for a 404, which is also the wrong-owner answer', async () => {
@@ -236,7 +285,7 @@ describe('call card', () => {
 
 describe('note permission', () => {
   it('offers the edit button to a holder of calls:note', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, makeCall()))
+    respondJson(makeCall())
 
     renderPage()
 
@@ -247,7 +296,7 @@ describe('note permission', () => {
 
   it('does not render the control at all without it', async () => {
     signIn([Perm.CALLS_READ])
-    fetchMock.mockResolvedValue(jsonResponse(200, makeCall()))
+    respondJson(makeCall())
 
     renderPage()
 

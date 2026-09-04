@@ -6,18 +6,16 @@
  * (UC-21), so this page's error state is also the "not yours" state — and it
  * says the same thing for both, which is the point of the server's choice.
  *
- * **There is no audio player yet, and the placeholder is deliberate.** N43
- * requires HTTP Range on the audio endpoint and the endpoint requires an
- * `Authorization` header, which `<audio src>` cannot send. The Service Worker
- * bridge that supplies it (`public/audio-sw.js`, T153) is being built in
- * parallel; a plain `<audio src>` dropped in meanwhile would appear to work,
- * play from the start, and then fail to seek — a bug that looks like a working
- * feature is worse than a labelled gap. `GET /calls/{id}/audio` is not in
- * `contract/openapi-panel-v1.json` yet either.
+ * **The player never uses a bare `<audio src>`.** N43 requires HTTP Range on
+ * the audio endpoint and the endpoint requires an `Authorization` header,
+ * which `<audio src>` cannot send — so a plain src would play from the start
+ * and then fail to seek, a bug that looks like a working feature. The Service
+ * Worker bridge in `public/audio-sw.js` adds the header in flight; see
+ * `./audio.ts` for both routes and why the fallback is required too.
  */
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Lock, Pencil } from 'lucide-react'
+import { ArrowLeft, Pencil } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
@@ -36,6 +34,7 @@ import { Field, FieldGrid, Section } from '@/shared/ui/detail'
 import { Modal, ModalField, ModalFields } from '@/shared/ui/Modal'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 
+import { AudioPlayer } from './AudioPlayer'
 import { useCall, useUpdateCallNote, type Call } from './api'
 import {
   audioState,
@@ -86,15 +85,11 @@ function AudioSection({ call }: { call: Call }) {
           )}
         </Badge>
 
+        {/* A player ONLY when the recording is actually playable. The other
+            two states get words, not a control that would answer 410 or
+            simply do nothing. */}
         {state.kind === 'available' ? (
-          /* Not an <audio src>: see this file's header. */
-          <div className="flex items-start gap-3 rounded-md border border-dashed border-border bg-surface-2 p-4">
-            <Lock className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-            <div>
-              <p className="text-sm font-medium text-text">{t('callDetail.playerPending')}</p>
-              <p className="mt-1 text-xs text-muted">{t('callDetail.playerPendingHint')}</p>
-            </div>
-          </div>
+          <AudioPlayer callId={call.id} url={audio.url} />
         ) : null}
 
         {state.kind === 'expired' ? (

@@ -66,36 +66,30 @@ const numbers = {
 }
 
 /** Aziz holds one line now and held another until March — the case the
- *  time-boxed model exists for. */
-const assignmentsByNumber: Record<string, unknown> = {
-  [NUMBER_ID]: {
-    items: [
-      {
-        id: 'assign-open',
-        number_id: NUMBER_ID,
-        agent_id: AGENT_ID,
-        valid_from: '2026-03-01T00:00:00+05:00',
-        valid_to: null,
-        note: null,
-        created_at: '2026-03-01T00:00:00+05:00',
-      },
-    ],
-    total: 1,
-  },
-  [OLD_NUMBER_ID]: {
-    items: [
-      {
-        id: 'assign-closed',
-        number_id: OLD_NUMBER_ID,
-        agent_id: AGENT_ID,
-        valid_from: '2025-06-01T00:00:00+05:00',
-        valid_to: '2026-03-01T00:00:00+05:00',
-        note: 'raqam almashtirildi',
-        created_at: '2025-06-01T00:00:00+05:00',
-      },
-    ],
-    total: 1,
-  },
+ *  time-boxed model exists for. One request answers both (`GET /assignments
+ *  ?agent_id=`), which replaced a fan-out over every registered number. */
+const agentAssignments = {
+  items: [
+    {
+      id: 'assign-open',
+      number_id: NUMBER_ID,
+      agent_id: AGENT_ID,
+      valid_from: '2026-03-01T00:00:00+05:00',
+      valid_to: null,
+      note: null,
+      created_at: '2026-03-01T00:00:00+05:00',
+    },
+    {
+      id: 'assign-closed',
+      number_id: OLD_NUMBER_ID,
+      agent_id: AGENT_ID,
+      valid_from: '2025-06-01T00:00:00+05:00',
+      valid_to: '2026-03-01T00:00:00+05:00',
+      note: 'raqam almashtirildi',
+      created_at: '2025-06-01T00:00:00+05:00',
+    },
+  ],
+  total: 2,
 }
 
 function installations(stage: string) {
@@ -153,10 +147,8 @@ function world(options: WorldOptions = {}) {
 
     if (url.includes(`/api/v1/agents/${AGENT_ID}`)) return reply(agent)
     if (url.includes('/api/v1/agents')) return reply({ items: [agent], total: 1 })
-    if (url.includes('/api/v1/numbers/') && url.includes('/assignments')) {
-      const id = url.split('/numbers/')[1]?.split('/')[0] ?? ''
-      if (options.noNumber) return reply({ items: [], total: 0 })
-      return reply(assignmentsByNumber[id] ?? { items: [], total: 0 })
+    if (url.includes('/api/v1/assignments')) {
+      return reply(options.noNumber ? { items: [], total: 0 } : agentAssignments)
     }
     if (url.includes('/api/v1/numbers')) return reply(numbers)
     if (url.includes('/api/v1/installations')) return reply(installations(options.stage ?? 'permitted'))
@@ -244,8 +236,9 @@ describe('enrolment progress', () => {
     renderPage()
 
     expect(await screen.findByText(t('funnel.hint.permitted'))).toBeInTheDocument()
-    // The stage name alone — "Ruxsatlar berildi" — is a noun an admin cannot
-    // act on. The hint is the whole point of this section.
+    // The stage name alone is a noun an admin cannot act on; the hint is a
+    // sentence they can. Asserting they DIFFER is what stops somebody
+    // "simplifying" the hint into a copy of the label.
     expect(t('funnel.hint.permitted')).not.toBe(t('funnel.permitted'))
   })
 

@@ -1,7 +1,7 @@
 /**
- * Page layout (CONVENTIONS-CLIENT.md §3). No hard `max-width`: the `viewer`
- * board is a television and a 1280px column in the middle of a 4K screen is
- * the reason that rule exists.
+ * Page layout (CONVENTIONS-CLIENT.md §3). No hard `max-width`: the rule
+ * outlived the TV board it was written for — a device list with eleven columns
+ * on a 27-inch monitor is the case that still needs it.
  */
 import type { ReactNode } from 'react'
 

@@ -129,6 +129,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agent Assignments
+         * @description Every line an agent has held, in one request.
+         *
+         *     The agent detail page renders this as a timeline — the one place the
+         *     time-boxed mapping becomes visible to a person.
+         */
+        get: operations["list_agent_assignments_api_v1_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments/{assignment_id}": {
         parameters: {
             query?: never;
@@ -436,7 +459,12 @@ export interface paths {
         };
         /**
          * Get Device
-         * @description One device. Another agent's phone is 404, like every other scoped read.
+         * @description One device, **with its capability matrix** (UC-17's device page).
+         *
+         *     The response model is the detail one, not the list one: declaring the list
+         *     model here silently stripped ``capabilities`` and ``capturing``, which are
+         *     the two things the page exists to show. Another agent's phone is 404, like
+         *     every other scoped read.
          */
         get: operations["get_device_api_v1_devices__installation_id__get"];
         put?: never;
@@ -1251,6 +1279,11 @@ export interface components {
              * @description Removed by retention; playback answers 410 (UC-26).
              */
             expired_at?: string | null;
+            /**
+             * Url
+             * @description Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43).
+             */
+            url?: string | null;
         };
         /**
          * CallDirection
@@ -1397,6 +1430,41 @@ export interface components {
          * @enum {string}
          */
         CallType: "internal" | "external" | "unknown";
+        /**
+         * Capability
+         * @description One row per installation per capability (UC-03, §7.8).
+         *
+         *     Every one of these is verified by exercising it, never by reading a
+         *     permission flag — that is what makes ``granted_not_working`` expressible.
+         * @enum {string}
+         */
+        Capability: "phone_state" | "call_log" | "microphone" | "contacts" | "notifications" | "call_phone" | "battery_exemption" | "storage_access" | "oem_autostart" | "foreground_service" | "oem_recorder" | "subscription_resolution";
+        /**
+         * CapabilityState
+         * @description ``granted_not_working`` is the OEM-permission-manager case UC-03 names.
+         * @enum {string}
+         */
+        CapabilityState: "granted_working" | "granted_not_working" | "denied" | "denied_permanently" | "not_applicable" | "unknown";
+        /**
+         * CapabilityStateResponse
+         * @description One capability's current state, as the panel's matrix renders it.
+         */
+        CapabilityStateResponse: {
+            capability: components["schemas"]["Capability"];
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Detail */
+            detail: string | null;
+            state: components["schemas"]["CapabilityState"];
+        };
         /**
          * CaptureRoute
          * @description Which mechanism produced the recording (S1, the M0 baseline).
@@ -1685,6 +1753,103 @@ export interface components {
             /** Wifi Bytes Month */
             wifi_bytes_month: number;
         };
+        /**
+         * DeviceDetailResponse
+         * @description Device health plus its capability matrix (UC-17's device page).
+         */
+        DeviceDetailResponse: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Android Release */
+            android_release: string | null;
+            /** Api Level */
+            api_level: number | null;
+            app_variant: components["schemas"]["AppVariant"] | null;
+            /** App Version */
+            app_version: string | null;
+            /** Battery Charging */
+            battery_charging: boolean | null;
+            /** Battery Level */
+            battery_level: number | null;
+            /** Battery Optimisation Exempt */
+            battery_optimisation_exempt: boolean | null;
+            /**
+             * Capabilities
+             * @description Empty for a phone that has never reported — not missing.
+             */
+            capabilities?: components["schemas"]["CapabilityStateResponse"][];
+            /** Capture Enabled */
+            capture_enabled: boolean | null;
+            /**
+             * Capturing
+             * @description UC-03's never-false-ready rule: every required capability working, a verified installation and a live service. One function computes it, so the phone and the panel cannot disagree.
+             * @default false
+             */
+            capturing: boolean;
+            /** Cellular Bytes Month */
+            cellular_bytes_month: number | null;
+            /** Clock Skew Sec */
+            clock_skew_sec: number | null;
+            /** Device Timezone */
+            device_timezone: string | null;
+            /** Free Storage Bytes */
+            free_storage_bytes: number | null;
+            /**
+             * Installation Id
+             * Format: uuid
+             */
+            installation_id: string;
+            installation_status: components["schemas"]["InstallationStatus"];
+            /**
+             * Is Online
+             * @description Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.
+             */
+            is_online: boolean;
+            /** Last Call At */
+            last_call_at: string | null;
+            /** Last Heartbeat At */
+            last_heartbeat_at: string | null;
+            /** Manufacturer */
+            manufacturer: string | null;
+            /** Model */
+            model: string | null;
+            network_type: components["schemas"]["NetworkType"] | null;
+            /**
+             * Never Reported
+             * @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.
+             */
+            never_reported: boolean;
+            /**
+             * Number Id
+             * Format: uuid
+             */
+            number_id: string;
+            /** Parked Records */
+            parked_records: number | null;
+            /** Power Save Mode */
+            power_save_mode: boolean | null;
+            /** Queue Bytes */
+            queue_bytes: number | null;
+            /** Queue Oldest At */
+            queue_oldest_at: string | null;
+            /** Queue Records */
+            queue_records: number | null;
+            recording_route: components["schemas"]["CaptureRoute"] | null;
+            /** Recording Route Ok */
+            recording_route_ok: boolean | null;
+            /** Service Running */
+            service_running: boolean | null;
+            /** Updated At */
+            updated_at: string | null;
+            /**
+             * Ws Connected
+             * @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.
+             */
+            ws_connected?: boolean | null;
+        };
         /** DeviceHealthListResponse */
         DeviceHealthListResponse: {
             /** Items */
@@ -1745,6 +1910,11 @@ export interface components {
             /** Model */
             model: string | null;
             network_type: components["schemas"]["NetworkType"] | null;
+            /**
+             * Never Reported
+             * @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.
+             */
+            never_reported: boolean;
             /**
              * Number Id
              * Format: uuid
@@ -1936,6 +2106,13 @@ export interface components {
         GapByModelOut: {
             /** Answered Calls */
             answered_calls: number;
+            /**
+             * Api Level
+             * @description Part of the M0 baseline's identity.
+             */
+            api_level: number;
+            /** @description Capture rate is per variant, not only per model (D-06). */
+            app_variant: components["schemas"]["AppVariant"];
             /**
              * Baseline Rate
              * @description From the M0 baseline (T14).
@@ -2291,6 +2468,47 @@ export interface components {
              * @description The audio root exists and is writable.
              */
             storage: boolean;
+        };
+        /**
+         * ReceiverStatus
+         * @description No heartbeat for 3 min -> degraded, 5 min -> down + a critical alert.
+         * @enum {string}
+         */
+        ReceiverStatus: "up" | "degraded" | "down";
+        /**
+         * ReceiverStatusResponse
+         * @description The banner at the top of the rollout page (SPEC §9.4).
+         *
+         *     **If every receiver is down, nobody in the fleet can enrol**, so this is
+         *     the page's most important sentence and it says so before anyone tries. It
+         *     carries a real type for the same reason: an untyped body reaches the
+         *     contract as a free-form map, and the panel then has to parse defensively
+         *     exactly where it can least afford to guess.
+         */
+        ReceiverStatusResponse: {
+            /**
+             * Active Receivers
+             * @description More than one is a configuration change, not code.
+             * @default 0
+             */
+            active_receivers: number;
+            /**
+             * Enrolment Possible
+             * @description False means the rollout is stopped, not slow.
+             */
+            enrolment_possible: boolean;
+            /**
+             * Receiver Msisdn
+             * @description The number screen E5 shows the agent.
+             */
+            receiver_msisdn?: string | null;
+            /**
+             * Receiver Name
+             * @description Which gateway, for the admin to go and look at.
+             */
+            receiver_name?: string | null;
+            /** @description up | degraded | down. Down is 5 minutes without a heartbeat. */
+            status: components["schemas"]["ReceiverStatus"];
         };
         /**
          * ReclassifyResponse
@@ -2806,6 +3024,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_assignments_api_v1_assignments_get: {
+        parameters: {
+            query: {
+                agent_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3343,7 +3592,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeviceHealthResponse"];
+                    "application/json": components["schemas"]["DeviceDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3533,9 +3782,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string | boolean;
-                    };
+                    "application/json": components["schemas"]["ReceiverStatusResponse"];
                 };
             };
         };

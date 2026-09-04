@@ -8,10 +8,8 @@
  * because the two call sites (post-login redirect and gate refusal) should keep
  * asking one question rather than each hard-coding an answer.
  *
- * The `viewer` role and `monitor:read` still exist server-side and are being
- * removed there; until they are, a `viewer` would land on a dashboard whose
- * tiles all 403. That is a reason to finish removing the role, not a reason to
- * reintroduce a page for it.
+ * The `viewer` role and `monitor:read` are now gone from the server registry
+ * too, so there is no role left that the dashboard cannot serve.
  */
 import { Perm, type Permission } from './permissions'
 

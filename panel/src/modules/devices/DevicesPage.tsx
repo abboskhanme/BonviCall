@@ -42,7 +42,7 @@ import { EnumFilter } from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
-import { buildFleet, useDevices, useInstallations, type FleetRow, type FleetState } from './api'
+import { buildFleet, useDevices, type FleetRow, type FleetState } from './api'
 import {
   CAPTURE_ROUTE_LABEL,
   FLEET_PROBLEM_LABEL,
@@ -58,29 +58,29 @@ function parseState(raw: string | null): FleetState | undefined {
 }
 
 function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) => string | null }) {
-  const { installation, health, state, problems } = row
-  const name = agentName(installation.agent_id)
+  const { health, state, problems } = row
+  const name = agentName(health.agent_id)
 
   return (
     <TR>
       <TD className="whitespace-nowrap">
         <Link
-          to={`/devices/${installation.id}`}
+          to={`/devices/${health.installation_id}`}
           className="font-medium text-text underline-offset-2 hover:text-accent hover:underline"
         >
-          {health ? `${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() || t('devices.unknownModel') : t('devices.unknownModel')}
+          {`${health.manufacturer ?? ''} ${health.model ?? ''}`.trim() || t('devices.unknownModel')}
         </Link>
       </TD>
       <TD className="whitespace-nowrap">
         {name ? (
           <Link
-            to={`/agents/${installation.agent_id}`}
+            to={`/agents/${health.agent_id}`}
             className="text-text underline-offset-2 hover:text-accent hover:underline"
           >
             {name}
           </Link>
         ) : (
-          <span className="font-mono text-xs text-muted">{shortId(installation.agent_id)}</span>
+          <span className="font-mono text-xs text-muted">{shortId(health.agent_id)}</span>
         )}
       </TD>
       <TD>
@@ -88,14 +88,14 @@ function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) 
       </TD>
       <TD
         className="whitespace-nowrap text-muted"
-        title={health?.last_heartbeat_at ? formatInstantTitle(health.last_heartbeat_at) : undefined}
+        title={health.last_heartbeat_at ? formatInstantTitle(health.last_heartbeat_at) : undefined}
       >
-        {/* Never-reported has no timestamp to show, and rendering a dash here
-            would say "unknown" when the truth is "never". */}
-        {health?.last_heartbeat_at ? relativeText(health.last_heartbeat_at) : t('devices.never')}
+        {/* Never-reported has no timestamp, and a dash here would say
+            "unknown" when the truth is "never". */}
+        {health.last_heartbeat_at ? relativeText(health.last_heartbeat_at) : t('devices.never')}
       </TD>
       <TD className="whitespace-nowrap">
-        {health?.recording_route ? (
+        {health.recording_route ? (
           <span className={health.recording_route_ok === false ? 'text-bad' : 'text-text'}>
             {t(CAPTURE_ROUTE_LABEL[health.recording_route])}
           </span>
@@ -104,9 +104,11 @@ function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) 
         )}
       </TD>
       <TD className="whitespace-nowrap text-end font-mono tabular-nums text-muted">
-        {health ? `${health.queue_records ?? 0} · ${formatBytes(health.queue_bytes)}` : EM_DASH}
+        {health.never_reported
+          ? EM_DASH
+          : `${health.queue_records ?? 0} · ${formatBytes(health.queue_bytes)}`}
       </TD>
-      <TD className="whitespace-nowrap text-muted">{health?.app_version ?? EM_DASH}</TD>
+      <TD className="whitespace-nowrap text-muted">{health.app_version ?? EM_DASH}</TD>
       <TD>
         <ul className="flex flex-wrap gap-1">
           {problems.map((problem) => (
@@ -125,7 +127,6 @@ export function DevicesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const stateFilter = parseState(searchParams.get(PARAM_STATE))
 
-  const installationsQuery = useInstallations()
   const devicesQuery = useDevices()
   const agentsQuery = useAgentDirectory(can(Perm.AGENTS_READ))
   const agentName = agentNameLookup(agentsQuery.data?.items)
@@ -137,9 +138,10 @@ export function DevicesPage() {
     setSearchParams(next, { replace: true })
   }
 
-  // The list is driven by INSTALLATIONS, so a phone with no telemetry still
-  // appears. `useDevices` only decorates it.
-  const fleet = buildFleet(installationsQuery.data?.items, devicesQuery.data?.items)
+  // `GET /devices` LEFT OUTER JOINs `device_health` now, so a phone that has
+  // never reported arrives here with `never_reported: true` rather than being
+  // absent from the response.
+  const fleet = buildFleet(devicesQuery.data?.items)
   const visible = stateFilter ? fleet.filter((row) => row.state === stateFilter) : fleet
   const needAttention = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
 
@@ -167,7 +169,7 @@ export function DevicesPage() {
       </Card>
 
       <QueryBoundary
-        query={installationsQuery}
+        query={devicesQuery}
         isEmpty={() => visible.length === 0}
         emptyTitle={stateFilter ? t('devices.emptyFiltered') : t('devices.emptyAll')}
         emptyHint={stateFilter ? t('devices.emptyFilteredHint') : t('devices.emptyAllHint')}
@@ -191,7 +193,7 @@ export function DevicesPage() {
                 </THead>
                 <TBody>
                   {visible.map((row) => (
-                    <DeviceRow key={row.installation.id} row={row} agentName={agentName} />
+                    <DeviceRow key={row.health.installation_id} row={row} agentName={agentName} />
                   ))}
                 </TBody>
               </Table>

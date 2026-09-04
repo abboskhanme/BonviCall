@@ -14,7 +14,7 @@ import { QueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/shared/api/errors'
 
-/** `/enrolment`, `/devices`, `/alerts`, `/monitor` — a rollout is watched live. */
+/** `/enrolment`, `/devices`, `/alerts` — a rollout is watched live. */
 export const POLL_FAST_MS = 15_000
 
 /** Everywhere else. */

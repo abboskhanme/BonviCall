@@ -48,7 +48,7 @@ export default tseslint.config(
     },
   },
   {
-    // The one file allowed to call fetch().
+    // The JSON client (CONVENTIONS-CLIENT.md §2).
     files: ['src/shared/api/client.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
@@ -85,6 +85,21 @@ export default tseslint.config(
      */
     files: ['src/app/router.tsx', 'src/shared/layout/AppShell.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
+  },
+  {
+    /**
+     * The audio bridge, exempted AFTER the `src/modules/**` block above —
+     * which re-declares `no-restricted-syntax` and would otherwise win.
+     *
+     * This is the exception CONVENTIONS-CLIENT.md §4 already anticipates: a
+     * binary stream carrying a `Range` header, whose `Content-Disposition`
+     * has to be read off the response. None of that is what the JSON client
+     * models, and routing it through `api.get` would mean teaching that
+     * client about blobs and byte ranges to satisfy a rule about JSON.
+     * `public/audio-sw.js` is plain JS outside `src/` and is not linted here.
+     */
+    files: ['src/modules/calls/audio.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'vitest.setup.ts'],

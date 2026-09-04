@@ -19,6 +19,8 @@ type CommandKind = components['schemas']['CommandKind']
 type CommandStatus = components['schemas']['CommandStatus']
 type EnrolmentOutcome = components['schemas']['EnrolmentOutcome']
 type EnrolmentAttemptKind = components['schemas']['EnrolmentAttemptKind']
+type Capability = components['schemas']['Capability']
+type CapabilityStateValue = components['schemas']['CapabilityState']
 
 type Tone = 'neutral' | 'good' | 'warn' | 'bad' | 'accent'
 
@@ -184,4 +186,53 @@ export const FLEET_PROBLEM_LABEL: Record<FleetProblem, MessageKey> = {
   queue_backed_up: 'fleetProblem.queue_backed_up',
   records_parked: 'fleetProblem.records_parked',
   clock_skewed: 'fleetProblem.clock_skewed',
+}
+
+/**
+ * The capability matrix (UC-03, UC-06, N42).
+ *
+ * Each row is a permission or an OS behaviour the app needs, and the page
+ * exists so an admin can see which one is missing on a handset that is not
+ * recording — without asking the salesperson to read a settings screen aloud.
+ */
+export const CAPABILITY_LABEL: Record<Capability, MessageKey> = {
+  phone_state: 'capability.phone_state',
+  call_log: 'capability.call_log',
+  microphone: 'capability.microphone',
+  contacts: 'capability.contacts',
+  notifications: 'capability.notifications',
+  call_phone: 'capability.call_phone',
+  battery_exemption: 'capability.battery_exemption',
+  storage_access: 'capability.storage_access',
+  oem_autostart: 'capability.oem_autostart',
+  foreground_service: 'capability.foreground_service',
+  oem_recorder: 'capability.oem_recorder',
+  subscription_resolution: 'capability.subscription_resolution',
+}
+
+export const CAPABILITY_STATE_LABEL: Record<CapabilityStateValue, MessageKey> = {
+  granted_working: 'capState.granted_working',
+  granted_not_working: 'capState.granted_not_working',
+  denied: 'capState.denied',
+  denied_permanently: 'capState.denied_permanently',
+  not_applicable: 'capState.not_applicable',
+  unknown: 'capState.unknown',
+}
+
+/**
+ * `granted_not_working` is the one that matters and it is deliberately red.
+ *
+ * "The permission is granted but the thing still does not work" is exactly R3
+ * — an OEM layer quietly refusing what Android says is allowed — and it is
+ * the state somebody would otherwise read as fine. `denied_permanently` is
+ * equally red because it cannot be fixed by asking again: it needs a visit to
+ * the phone's settings.
+ */
+export const CAPABILITY_STATE_TONE: Record<CapabilityStateValue, Tone> = {
+  granted_working: 'good',
+  granted_not_working: 'bad',
+  denied: 'warn',
+  denied_permanently: 'bad',
+  not_applicable: 'neutral',
+  unknown: 'neutral',
 }

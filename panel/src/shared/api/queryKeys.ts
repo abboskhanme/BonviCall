@@ -26,7 +26,6 @@ export const QUERY_MODULES = [
   'users',
   'settings',
   'appversions',
-  'monitor',
 ] as const
 
 export type QueryModule = (typeof QUERY_MODULES)[number]
