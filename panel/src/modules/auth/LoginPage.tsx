@@ -18,7 +18,7 @@ interface FromState {
 }
 
 export function LoginPage() {
-  const { status, loginError, login, permissions } = useAuth()
+  const { status, loginError, login } = useAuth()
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,7 +29,7 @@ export function LoginPage() {
   // one: the dashboard for everybody who has a tile on it, and `/monitor` for a
   // `viewer`, whose dashboard would be five tiles of 403.
   const state = location.state as FromState | null
-  const target = state?.from?.pathname ?? landingPath(permissions)
+  const target = state?.from?.pathname ?? landingPath()
 
   if (status === 'authenticated') return <Navigate to={target} replace />
 

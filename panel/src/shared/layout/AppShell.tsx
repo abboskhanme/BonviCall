@@ -35,9 +35,7 @@ import {
   Settings,
   Smartphone,
   SunMedium,
-  Tags,
   UserCog,
-  UserPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -83,24 +81,10 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
-    to: '/enrolment',
-    labelKey: 'nav.enrolment',
-    icon: UserPlus,
-    anyOf: [Perm.ENROLMENT_READ],
-    group: 'nav.groupOperations',
-  },
-  {
     to: '/agents',
     labelKey: 'nav.agents',
     icon: Users,
     anyOf: [Perm.AGENTS_READ],
-    group: 'nav.groupOperations',
-  },
-  {
-    to: '/numbers',
-    labelKey: 'nav.numbers',
-    icon: Tags,
-    anyOf: [Perm.NUMBERS_READ],
     group: 'nav.groupOperations',
   },
   {
@@ -134,13 +118,6 @@ export const NAV: readonly NavItem[] = [
     labelKey: 'nav.storageReport',
     icon: HardDrive,
     anyOf: [Perm.REPORTS_READ],
-    group: 'nav.groupReports',
-  },
-  {
-    to: '/monitor',
-    labelKey: 'nav.monitor',
-    icon: MonitorPlay,
-    anyOf: [Perm.MONITOR_READ],
     group: 'nav.groupReports',
   },
 

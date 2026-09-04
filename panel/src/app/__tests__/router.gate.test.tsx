@@ -90,14 +90,16 @@ describe('route gate', () => {
     expect(heading(t('page.calls'))).toBeNull()
   })
 
-  it('sends a monitor-only user to the board rather than an all-403 dashboard', () => {
-    // `viewer` holds `monitor:read` and nothing else. Every dashboard tile
-    // would come back 403, so the gate's fallback must not be `/` for them.
-    signIn([Perm.MONITOR_READ])
-    renderAt('/audit')
-
-    expect(heading(t('page.monitor'))).not.toBeNull()
-    expect(heading(t('page.dashboard'))).toBeNull()
+  it('has no route for the sections the client removed', () => {
+    // Removed 2026-09-05: the TV board, the work-numbers page and the
+    // enrolment funnel. Registering a number and issuing an enrolment code are
+    // things you do to an agent, so they live on the agent's page instead; the
+    // board had no audience. Asserted rather than merely deleted, because a
+    // dead route is easy to reintroduce by copying a neighbouring one.
+    const paths = ROUTES.map((route) => route.path)
+    expect(paths).not.toContain('/monitor')
+    expect(paths).not.toContain('/numbers')
+    expect(paths).not.toContain('/enrolment')
   })
 
   it('keeps the dashboard as the fallback for everybody who has a tile on it', () => {

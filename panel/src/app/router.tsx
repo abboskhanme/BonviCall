@@ -37,9 +37,6 @@ import { CallsPage } from '@/modules/calls/CallsPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
 import { DeviceDetailPage } from '@/modules/devices/DeviceDetailPage'
 import { DevicesPage } from '@/modules/devices/DevicesPage'
-import { EnrolmentPage } from '@/modules/enrolment/EnrolmentPage'
-import { MonitorPage } from '@/modules/monitor/MonitorPage'
-import { NumbersPage } from '@/modules/numbers/NumbersPage'
 import { GapReportPage } from '@/modules/reports/GapReportPage'
 import { StorageReportPage } from '@/modules/reports/StorageReportPage'
 import { AppVersionsPage } from '@/modules/settings/AppVersionsPage'
@@ -80,10 +77,14 @@ export const ROUTES: readonly RouteSpec[] = [
   { path: '/', element: <DashboardPage /> },
 
   // ── Operations ────────────────────────────────────────────────────────
-  { path: '/enrolment', element: <EnrolmentPage />, anyOf: [Perm.ENROLMENT_READ] },
+  //
+  // Removed 2026-09-05 at the client's request: `/enrolment`, `/numbers` and
+  // the `/monitor` TV board. For a fifteen-person team, registering a work
+  // number and issuing an enrolment code are things you do *to an agent*, so
+  // they belong on the agent's own page rather than in two more top-level
+  // sections. The capability is not gone — `AgentDetailPage` owns it.
   { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
   { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
-  { path: '/numbers', element: <NumbersPage />, anyOf: [Perm.NUMBERS_READ] },
   {
     // Own-scope passes the gate and the SERVER narrows the query to the
     // caller's own installations — the house rule (CONVENTIONS.md §11), the
@@ -118,13 +119,6 @@ export const ROUTES: readonly RouteSpec[] = [
     anyOf: [Perm.APPVERSIONS_READ],
   },
 
-  // ── The TV board: authenticated, gated, and outside the shell ─────────
-  {
-    path: '/monitor',
-    element: <MonitorPage />,
-    anyOf: [Perm.MONITOR_READ],
-    fullScreen: true,
-  },
 ]
 
 function FullPageLoader() {
@@ -156,8 +150,7 @@ function Protected({ children }: { children: ReactElement }) {
  */
 export function Gate({ anyOf, children }: { anyOf?: readonly Permission[]; children: ReactElement }) {
   const canAny = useAuth((state) => state.canAny)
-  const permissions = useAuth((state) => state.permissions)
-  if (anyOf && !canAny(anyOf)) return <Navigate to={landingPath(permissions)} replace />
+  if (anyOf && !canAny(anyOf)) return <Navigate to={landingPath()} replace />
   return children
 }
 
