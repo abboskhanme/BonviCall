@@ -34,6 +34,14 @@ class DeviceHealthResponse(BaseModel):
     app_version: str | None
     app_variant: AppVariant | None
 
+    never_reported: bool = Field(
+        description=(
+            "Bound and never sent a heartbeat. Kept distinct from "
+            "``is_online: false`` because the next action differs: never "
+            "started is a person waiting for help right now; worked once and "
+            "stopped is a phone in a lift or a battery manager to argue with."
+        )
+    )
     last_heartbeat_at: datetime | None
     last_call_at: datetime | None
     is_online: bool = Field(
@@ -92,13 +100,17 @@ class CapabilityStateResponse(BaseModel):
 class DeviceDetailResponse(DeviceHealthResponse):
     """Device health plus its capability matrix (UC-17's device page)."""
 
-    capabilities: list[CapabilityStateResponse] = Field(default_factory=list)
+    capabilities: list[CapabilityStateResponse] = Field(
+        default_factory=list,
+        description="Empty for a phone that has never reported — not missing.",
+    )
     capturing: bool = Field(
+        default=False,
         description=(
             "UC-03's never-false-ready rule: every required capability working, "
             "a verified installation and a live service. One function computes "
             "it, so the phone and the panel cannot disagree."
-        )
+        ),
     )
 
 

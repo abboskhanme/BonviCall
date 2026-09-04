@@ -22,13 +22,14 @@ import sys
 
 from sqlalchemy import func, select
 
+from src.core import database
+
 # Every process entry point imports the registry before touching a model
 # (CONVENTIONS.md §10). Without this line the first FK string to resolve raises
 # NoReferencedTableError — which is exactly what this file did before the line
 # existed, and exactly the failure the registry is for.
 from src.core import models as _model_registry  # noqa: F401
 from src.core.config import get_settings
-from src.core.database import get_sessionmaker
 from src.core.enums import UserRole
 from src.core.logging import configure_logging, get_logger
 from src.core.security import MIN_PASSWORD_LENGTH, hash_password
@@ -70,7 +71,7 @@ async def seed_first_admin() -> tuple[str, str] | None:
             f"SEED_ADMIN_PASSWORD must be at least {MIN_PASSWORD_LENGTH} characters"
         )
 
-    async with get_sessionmaker()() as session:
+    async with database.get_sessionmaker()() as session:
         existing = await session.scalar(select(func.count()).select_from(UserModel))
         if existing:
             log.info("seed_skipped", reason="users already exist", count=existing)

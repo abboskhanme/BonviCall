@@ -145,3 +145,22 @@ async def test_sales_cannot_see_the_number_list(sales) -> None:
 
 async def test_without_a_token_it_is_401(client) -> None:
     assert (await client.get("/api/v1/numbers")).status_code == 401
+
+
+async def test_an_agents_whole_number_history_comes_in_one_request(
+    admin, agent_factory, registered_number_factory
+) -> None:
+    """One filtered request, not one per number: fifteen cached round trips
+    are fine and three hundred are not."""
+    agent = await agent_factory()
+    await registered_number_factory(agent=agent, e164="+998901112201")
+    second = await registered_number_factory()
+    await admin.post(
+        f"/api/v1/numbers/{second.id}/assignments", json={"agent_id": str(agent.id)}
+    )
+    other = await agent_factory()
+    await registered_number_factory(agent=other)
+
+    body = (await admin.get(f"/api/v1/assignments?agent_id={agent.id}")).json()
+    assert body["total"] == 2
+    assert all(item["agent_id"] == str(agent.id) for item in body["items"])

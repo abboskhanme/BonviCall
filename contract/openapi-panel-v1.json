@@ -720,6 +720,18 @@
             ],
             "description": "Removed by retention; playback answers 410 (UC-26).",
             "title": "Expired At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43).",
+            "title": "Url"
           }
         },
         "required": [
@@ -1042,6 +1054,79 @@
         ],
         "title": "CallType",
         "type": "string"
+      },
+      "Capability": {
+        "description": "One row per installation per capability (UC-03, §7.8).\n\nEvery one of these is verified by exercising it, never by reading a\npermission flag — that is what makes ``granted_not_working`` expressible.",
+        "enum": [
+          "phone_state",
+          "call_log",
+          "microphone",
+          "contacts",
+          "notifications",
+          "call_phone",
+          "battery_exemption",
+          "storage_access",
+          "oem_autostart",
+          "foreground_service",
+          "oem_recorder",
+          "subscription_resolution"
+        ],
+        "title": "Capability",
+        "type": "string"
+      },
+      "CapabilityState": {
+        "description": "``granted_not_working`` is the OEM-permission-manager case UC-03 names.",
+        "enum": [
+          "granted_working",
+          "granted_not_working",
+          "denied",
+          "denied_permanently",
+          "not_applicable",
+          "unknown"
+        ],
+        "title": "CapabilityState",
+        "type": "string"
+      },
+      "CapabilityStateResponse": {
+        "description": "One capability's current state, as the panel's matrix renders it.",
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CapabilityState"
+          }
+        },
+        "required": [
+          "capability",
+          "state",
+          "checked_at",
+          "changed_at",
+          "detail"
+        ],
+        "title": "CapabilityStateResponse",
+        "type": "object"
       },
       "CaptureRoute": {
         "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
@@ -1678,6 +1763,388 @@
         "title": "DataUsageRowOut",
         "type": "object"
       },
+      "DeviceDetailResponse": {
+        "description": "Device health plus its capability matrix (UC-17's device page).",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "android_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Android Release"
+          },
+          "api_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Level"
+          },
+          "app_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "battery_charging": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Charging"
+          },
+          "battery_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Level"
+          },
+          "battery_optimisation_exempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Optimisation Exempt"
+          },
+          "capabilities": {
+            "description": "Empty for a phone that has never reported — not missing.",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityStateResponse"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "capture_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Enabled"
+          },
+          "capturing": {
+            "default": false,
+            "description": "UC-03's never-false-ready rule: every required capability working, a verified installation and a live service. One function computes it, so the phone and the panel cannot disagree.",
+            "title": "Capturing",
+            "type": "boolean"
+          },
+          "cellular_bytes_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cellular Bytes Month"
+          },
+          "clock_skew_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Skew Sec"
+          },
+          "device_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Timezone"
+          },
+          "free_storage_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Storage Bytes"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "installation_status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "is_online": {
+            "description": "Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.",
+            "title": "Is Online",
+            "type": "boolean"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Call At"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "never_reported": {
+            "description": "Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.",
+            "title": "Never Reported",
+            "type": "boolean"
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "parked_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parked Records"
+          },
+          "power_save_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Save Mode"
+          },
+          "queue_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Bytes"
+          },
+          "queue_oldest_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Oldest At"
+          },
+          "queue_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Records"
+          },
+          "recording_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recording_route_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Route Ok"
+          },
+          "service_running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Running"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "ws_connected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.",
+            "title": "Ws Connected"
+          }
+        },
+        "required": [
+          "installation_id",
+          "agent_id",
+          "number_id",
+          "installation_status",
+          "manufacturer",
+          "model",
+          "android_release",
+          "api_level",
+          "app_version",
+          "app_variant",
+          "never_reported",
+          "last_heartbeat_at",
+          "last_call_at",
+          "is_online",
+          "battery_level",
+          "battery_charging",
+          "battery_optimisation_exempt",
+          "power_save_mode",
+          "free_storage_bytes",
+          "queue_records",
+          "queue_bytes",
+          "queue_oldest_at",
+          "parked_records",
+          "clock_skew_sec",
+          "device_timezone",
+          "network_type",
+          "cellular_bytes_month",
+          "service_running",
+          "capture_enabled",
+          "recording_route",
+          "recording_route_ok",
+          "updated_at"
+        ],
+        "title": "DeviceDetailResponse",
+        "type": "object"
+      },
       "DeviceHealthListResponse": {
         "properties": {
           "items": {
@@ -1907,6 +2374,11 @@
               }
             ]
           },
+          "never_reported": {
+            "description": "Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.",
+            "title": "Never Reported",
+            "type": "boolean"
+          },
           "number_id": {
             "format": "uuid",
             "title": "Number Id",
@@ -2036,6 +2508,7 @@
           "api_level",
           "app_version",
           "app_variant",
+          "never_reported",
           "last_heartbeat_at",
           "last_call_at",
           "is_online",
@@ -2467,6 +2940,15 @@
             "title": "Answered Calls",
             "type": "integer"
           },
+          "api_level": {
+            "description": "Part of the M0 baseline's identity.",
+            "title": "Api Level",
+            "type": "integer"
+          },
+          "app_variant": {
+            "$ref": "#/components/schemas/AppVariant",
+            "description": "Capture rate is per variant, not only per model (D-06)."
+          },
           "baseline_rate": {
             "anyOf": [
               {
@@ -2522,6 +3004,8 @@
         "required": [
           "manufacturer",
           "model",
+          "api_level",
+          "app_variant",
           "answered_calls",
           "calls_with_audio",
           "capture_rate",
@@ -3273,6 +3757,66 @@
           "storage"
         ],
         "title": "ReadyResponse",
+        "type": "object"
+      },
+      "ReceiverStatus": {
+        "description": "No heartbeat for 3 min -> degraded, 5 min -> down + a critical alert.",
+        "enum": [
+          "up",
+          "degraded",
+          "down"
+        ],
+        "title": "ReceiverStatus",
+        "type": "string"
+      },
+      "ReceiverStatusResponse": {
+        "description": "The banner at the top of the rollout page (SPEC §9.4).\n\n**If every receiver is down, nobody in the fleet can enrol**, so this is\nthe page's most important sentence and it says so before anyone tries. It\ncarries a real type for the same reason: an untyped body reaches the\ncontract as a free-form map, and the panel then has to parse defensively\nexactly where it can least afford to guess.",
+        "properties": {
+          "active_receivers": {
+            "default": 0,
+            "description": "More than one is a configuration change, not code.",
+            "title": "Active Receivers",
+            "type": "integer"
+          },
+          "enrolment_possible": {
+            "description": "False means the rollout is stopped, not slow.",
+            "title": "Enrolment Possible",
+            "type": "boolean"
+          },
+          "receiver_msisdn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number screen E5 shows the agent.",
+            "title": "Receiver Msisdn"
+          },
+          "receiver_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which gateway, for the admin to go and look at.",
+            "title": "Receiver Name"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReceiverStatus",
+            "description": "up | degraded | down. Down is 5 minutes without a heartbeat."
+          }
+        },
+        "required": [
+          "enrolment_possible",
+          "status"
+        ],
+        "title": "ReceiverStatusResponse",
         "type": "object"
       },
       "ReclassifyResponse": {
@@ -4302,6 +4846,50 @@
         "summary": "Acknowledge Alert",
         "tags": [
           "Alerts"
+        ]
+      }
+    },
+    "/api/v1/assignments": {
+      "get": {
+        "description": "Every line an agent has held, in one request.\n\nThe agent detail page renders this as a timeline — the one place the\ntime-boxed mapping becomes visible to a person.",
+        "operationId": "list_agent_assignments_api_v1_assignments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agent Assignments",
+        "tags": [
+          "Numbers"
         ]
       }
     },
@@ -5641,7 +6229,7 @@
     },
     "/api/v1/devices/{installation_id}": {
       "get": {
-        "description": "One device. Another agent's phone is 404, like every other scoped read.",
+        "description": "One device, **with its capability matrix** (UC-17's device page).\n\nThe response model is the detail one, not the list one: declaring the list\nmodel here silently stripped ``capabilities`` and ``capturing``, which are\nthe two things the page exists to show. Another agent's phone is 404, like\nevery other scoped read.",
         "operationId": "get_device_api_v1_devices__installation_id__get",
         "parameters": [
           {
@@ -5660,7 +6248,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeviceHealthResponse"
+                  "$ref": "#/components/schemas/DeviceDetailResponse"
                 }
               }
             },
@@ -5959,18 +6547,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ]
-                  },
-                  "title": "Response Receiver Status Api V1 Enrolment Receiver Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ReceiverStatusResponse"
                 }
               }
             },

@@ -173,6 +173,16 @@ class CallAudioSummary(BaseModel):
     duration_mismatch: bool = Field(
         default=False, description="The file's length disagrees with the call log (UC-14)."
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Path to stream from, present only when the recording is available. "
+            "A path and never a signed or public URL (N20): the endpoint is "
+            "token-protected, and the panel reaches it through the Service "
+            "Worker bridge because a plain <audio src> cannot send an "
+            "Authorization header (T153, N43)."
+        ),
+    )
     expired_at: datetime | None = Field(
         default=None, description="Removed by retention; playback answers 410 (UC-26)."
     )

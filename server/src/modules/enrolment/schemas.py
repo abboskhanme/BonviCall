@@ -208,6 +208,33 @@ class DeviceRefreshIn(BaseModel):
     refresh_token: str
 
 
+class ReceiverStatusResponse(BaseModel):
+    """The banner at the top of the rollout page (SPEC §9.4).
+
+    **If every receiver is down, nobody in the fleet can enrol**, so this is
+    the page's most important sentence and it says so before anyone tries. It
+    carries a real type for the same reason: an untyped body reaches the
+    contract as a free-form map, and the panel then has to parse defensively
+    exactly where it can least afford to guess.
+    """
+
+    enrolment_possible: bool = Field(
+        description="False means the rollout is stopped, not slow."
+    )
+    receiver_name: str | None = Field(
+        default=None, description="Which gateway, for the admin to go and look at."
+    )
+    receiver_msisdn: str | None = Field(
+        default=None, description="The number screen E5 shows the agent."
+    )
+    status: ReceiverStatus = Field(
+        description="up | degraded | down. Down is 5 minutes without a heartbeat."
+    )
+    active_receivers: int = Field(
+        default=0, description="More than one is a configuration change, not code."
+    )
+
+
 class CallbackEventIn(BaseModel):
     """``POST /api/service/v1/callback-events`` — from the receiver (§9.4).
 

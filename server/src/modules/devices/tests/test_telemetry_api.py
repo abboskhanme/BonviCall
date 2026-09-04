@@ -614,3 +614,25 @@ async def test_the_offline_sweep_names_the_agent(
     )
     assert alert.agent_id == installation.agent_id
     assert alert.installation_id == installation.id
+
+
+async def test_a_phone_that_never_reported_still_raises_device_offline(
+    db, installation_factory
+) -> None:
+    """The same blind spot as the device list, in the sweep.
+
+    An inner join meant the one phone nobody has ever heard from raised no
+    alert at all — the device nobody hears from is the device nobody is told
+    about, which is the exact inversion of what this sweep is for.
+    """
+    from src.modules.devices.service import DeviceService
+
+    silent = await installation_factory()  # bound, no health row at all
+    offline = await DeviceService(db).sweep_offline()
+    assert silent.id in offline
+
+    alert = await db.scalar(
+        sa.select(AlertModel).where(AlertModel.kind == AlertKind.DEVICE_OFFLINE)
+    )
+    assert alert.installation_id == silent.id
+    assert alert.detail["never_reported"] is True

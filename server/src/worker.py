@@ -26,12 +26,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from src.core import database
+
 # The registry, imported before any model is touched (CONVENTIONS.md §10).
 from src.core import models as _model_registry  # noqa: F401
 from src.core.clock import TASHKENT
 from src.core.config import get_settings
+from src.core.enums import AlertKind, AlertSeverity
 from src.core.jobs import JobCallable, JobRunner
 from src.core.logging import configure_logging, get_logger
+from src.modules.alerts.service import AlertService
 from src.modules.audio.jobs import (
     audio_retention,
     pending_audio_sweeper,
@@ -103,9 +107,36 @@ ALL_JOBS: dict[str, JobCallable] = {
 } | {"reclassify_calls": reclassify_calls}
 
 
+async def alert_on_repeated_failure(name: str, failures: int, exc: Exception) -> None:
+    """Three strikes and an admin is told (SPEC §10.4).
+
+    Lives here and not in ``core/jobs.py`` because ``core`` must not import a
+    module (§2), and because "three failures means raise an alert" is a policy
+    rather than a property of running a function under a lock.
+
+    Its own session: the job's has already failed, and quite possibly its
+    database connection with it.
+    """
+    kind = (
+        AlertKind.BACKUP_FAILED if name == "backup_verify" else AlertKind.RETENTION_JOB_FAILED
+    )
+    async with database.get_sessionmaker()() as session:
+        await AlertService(session).raise_alert(
+            kind=kind,
+            severity=AlertSeverity.CRITICAL,
+            scope=name,
+            detail={
+                "job": name,
+                "consecutive_failures": failures,
+                "error": type(exc).__name__,
+            },
+        )
+        await session.commit()
+
+
 def build_scheduler(runner: JobRunner | None = None) -> AsyncIOScheduler:
     """Wire every job onto the scheduler. Separated so a test can inspect it."""
-    runner = runner or JobRunner()
+    runner = runner or JobRunner(on_repeated_failure=alert_on_repeated_failure)
     scheduler = AsyncIOScheduler(timezone=TASHKENT)
     for name, (job, trigger) in SCHEDULE.items():
         scheduler.add_job(
@@ -158,7 +189,9 @@ async def run_once(name: str) -> int:
     if job is None:
         print(f"unknown job {name!r}. Known: {', '.join(sorted(ALL_JOBS))}")
         return 1
-    result = await JobRunner().run(name, job)
+    result = await JobRunner(on_repeated_failure=alert_on_repeated_failure).run(
+        name, job
+    )
     if result.error:
         print(f"{name} failed: {result.error}")
         return 1

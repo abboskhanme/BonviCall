@@ -22,6 +22,7 @@ modules must not invent twenty definitions of "a call".
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime, timedelta
@@ -134,7 +135,73 @@ def migrated_database(test_database_url: str) -> str:
         # away when 001 freezes at the first deploy (W03).
         command.downgrade(config, "base")
         command.upgrade(config, "head")
+    _clear_leftovers(test_database_url)
     return test_database_url
+
+
+def _clear_leftovers(url: str) -> None:
+    """Empty every operational table before the suite starts.
+
+    Per-test rollback keeps runs independent *while everything behaves*. A test
+    that commits on its own connection — a job runner's session, a fixture that
+    got its wiring wrong — leaves rows behind, and the next run then fails
+    somewhere unrelated with a count that is one too high. Diagnosing that from
+    the failure is genuinely hard, so the suite starts from empty by
+    construction rather than by trusting that nothing ever escapes.
+
+    ``app_settings`` is snapshotted and restored: it holds the migration's
+    seed, and it has a foreign key into ``users``, so CASCADE reaches it
+    whatever the truncate list says.
+    """
+
+    async def _clear() -> None:
+        engine = create_async_engine(url, poolclass=sa.pool.NullPool)
+        try:
+            async with engine.begin() as connection:
+                seeded = (
+                    await connection.execute(
+                        sa.text(
+                            "SELECT key, value, value_type, description_uz "
+                            "FROM app_settings"
+                        )
+                    )
+                ).all()
+                names = [
+                    name
+                    for (name,) in await connection.execute(
+                        sa.text(
+                            "SELECT tablename FROM pg_tables "
+                            "WHERE schemaname = 'public'"
+                        )
+                    )
+                    if name != "alembic_version"
+                ]
+                if names:
+                    await connection.execute(
+                        sa.text(
+                            "TRUNCATE TABLE "
+                            + ", ".join(f'"{name}"' for name in names)
+                            + " RESTART IDENTITY CASCADE"
+                        )
+                    )
+                for row in seeded:
+                    await connection.execute(
+                        sa.text(
+                            "INSERT INTO app_settings "
+                            "(key, value, value_type, description_uz) "
+                            "VALUES (:key, CAST(:value AS jsonb), :value_type, :note)"
+                        ),
+                        {
+                            "key": row.key,
+                            "value": json.dumps(row.value),
+                            "value_type": row.value_type,
+                            "note": row.description_uz,
+                        },
+                    )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_clear())
 
 
 def _enums_match_code(url: str) -> bool:

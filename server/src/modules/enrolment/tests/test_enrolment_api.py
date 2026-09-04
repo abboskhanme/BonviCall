@@ -359,3 +359,26 @@ async def test_the_enrolment_banner_says_when_nobody_can_enrol(db, admin) -> Non
     up = (await admin.get("/api/v1/enrolment/receiver-status")).json()
     assert up["enrolment_possible"] is True
     assert up["receiver_msisdn"] == "+998712000000"
+
+
+async def test_the_receiver_banner_has_a_real_type(db, admin) -> None:
+    """§15: an untyped body reaches the contract as a free-form map.
+
+    This is the one endpoint whose failure means nobody can enrol, so it
+    should be the best-specified thing on the page rather than the least.
+    """
+    down = (await admin.get("/api/v1/enrolment/receiver-status")).json()
+    assert down == {
+        "enrolment_possible": False,
+        "receiver_name": None,
+        "receiver_msisdn": None,
+        "status": "down",
+        "active_receivers": 0,
+    }
+
+    await _receiver(db)
+    up = (await admin.get("/api/v1/enrolment/receiver-status")).json()
+    assert up["enrolment_possible"] is True
+    assert up["status"] == "up"
+    assert up["active_receivers"] == 1
+    assert up["receiver_msisdn"] == "+998712000000"

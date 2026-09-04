@@ -46,6 +46,12 @@ MAX_JOB_RUNTIME = timedelta(minutes=30)
 #: transaction inside it, exactly like a service method serving a request.
 JobCallable = Callable[[AsyncSession], Awaitable[int]]
 
+#: Called when a job has failed ``FAILURES_BEFORE_ALERT`` times in a row.
+#: Injected rather than imported: ``core`` must not import a module (§2), and
+#: "three failures means raise an alert" is a policy the composition root owns,
+#: not a property of running a function under a lock.
+FailureHandler = Callable[[str, int, Exception], Awaitable[None]]
+
 
 def lock_key(name: str) -> int:
     """A stable 63-bit advisory-lock key for a job name.
@@ -72,6 +78,7 @@ class JobResult:
 class JobRunner:
     """Runs registered jobs under an advisory lock, and counts failures."""
 
+    on_repeated_failure: FailureHandler | None = None
     consecutive_failures: dict[str, int] = field(default_factory=dict)
 
     async def run(self, name: str, job: JobCallable) -> JobResult:
@@ -106,8 +113,11 @@ class JobRunner:
                 failures = self.consecutive_failures.get(name, 0) + 1
                 self.consecutive_failures[name] = failures
                 log.exception("job_failed", job=name, consecutive_failures=failures)
-                if failures >= FAILURES_BEFORE_ALERT:
-                    await self._raise_failure_alert(name, failures, exc)
+                if failures >= FAILURES_BEFORE_ALERT and self.on_repeated_failure:
+                    try:
+                        await self.on_repeated_failure(name, failures, exc)
+                    except Exception:  # the database is the likely cause anyway
+                        log.exception("job_failure_handler_failed", job=name)
                 return JobResult(
                     name=name,
                     ran=True,
@@ -122,41 +132,10 @@ class JobRunner:
                     text("SELECT pg_advisory_unlock(:key)"), {"key": lock_key(name)}
                 )
 
-    async def _raise_failure_alert(self, name: str, failures: int, exc: Exception) -> None:
-        """Three strikes. Raised on its own session, because the job's failed.
-
-        Imported here rather than at module level: ``core`` must not import a
-        module (§2), and the composition root cannot inject into a dataclass
-        the scheduler builds. This one call is the exception, and it is a write
-        to the alerts table by the only process that can know a job failed.
-        """
-        from src.core.enums import AlertKind, AlertSeverity
-        from src.modules.alerts.service import AlertService
-
-        kind = (
-            AlertKind.BACKUP_FAILED
-            if name == "backup_verify"
-            else AlertKind.RETENTION_JOB_FAILED
-        )
-        try:
-            async with database.get_sessionmaker()() as session:
-                await AlertService(session).raise_alert(
-                    kind=kind,
-                    severity=AlertSeverity.CRITICAL,
-                    scope=name,
-                    detail={
-                        "job": name,
-                        "consecutive_failures": failures,
-                        "error": f"{type(exc).__name__}",
-                    },
-                )
-                await session.commit()
-        except Exception:  # the database is the likely cause of the job failing
-            log.exception("job_failure_alert_failed", job=name)
-
 
 __all__ = [
     "FAILURES_BEFORE_ALERT",
+    "FailureHandler",
     "MAX_JOB_RUNTIME",
     "JobCallable",
     "JobResult",

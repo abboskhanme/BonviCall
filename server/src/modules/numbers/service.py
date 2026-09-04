@@ -125,6 +125,26 @@ class NumberService:
         )
         return rows, len(rows)
 
+    async def assignments_for_agent(
+        self, agent_id: uuid.UUID
+    ) -> tuple[list[NumberAssignmentModel], int]:
+        """Every period this agent held a line, newest first.
+
+        One request instead of one per number: fifteen cached round trips are
+        fine and three hundred are not, and the agent detail page is where that
+        difference shows up first.
+        """
+        rows = list(
+            (
+                await self.session.scalars(
+                    select(NumberAssignmentModel)
+                    .where(NumberAssignmentModel.agent_id == agent_id)
+                    .order_by(NumberAssignmentModel.valid_from.desc())
+                )
+            ).all()
+        )
+        return rows, len(rows)
+
     async def holder_at(
         self, number_id: uuid.UUID, moment: datetime
     ) -> NumberAssignmentModel | None:

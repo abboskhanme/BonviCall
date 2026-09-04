@@ -16,9 +16,9 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 import sqlalchemy as sa
 
-from src.core.database import get_engine
 from src.core.enums import (
     AlertKind,
     AudioMissingReason,
@@ -33,25 +33,38 @@ from src.worker import ALL_JOBS, ON_DEMAND, SCHEDULE, build_scheduler
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture(autouse=True)
-def _runner_uses_the_test_engine(engine, monkeypatch):
-    """Point ``JobRunner``'s own session at the suite's engine.
+@pytest_asyncio.fixture(autouse=True)
+async def _runner_uses_the_test_session(db, engine, monkeypatch):
+    """Point ``JobRunner``'s own session at the **test transaction**.
 
-    The runner deliberately opens its own session — a job owns its transaction
-    and must not inherit a request's. In tests that would mean the application
-    engine, which is pooled and therefore bound to whichever event loop first
-    used it; with a loop per test, the second test gets a connection from a
-    closed loop.
+    Two separate problems, one fixture:
+
+    * the application engine is pooled and therefore bound to whichever event
+      loop first used it, so with a loop per test the second test gets a
+      connection from a closed loop;
+    * a session on its own connection **commits for real**, and those rows
+      then leak into every later test. That is not hypothetical — it broke
+      eleven unrelated tests before this bound the maker to ``db``'s
+      connection.
+
+    The lock connection still comes from the engine, which is right: an
+    advisory lock taken inside the test transaction would be released by the
+    rollback rather than by the job finishing.
     """
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from src.core import database
 
+    connection = await db.connection()
     monkeypatch.setattr(database, "get_engine", lambda: engine)
     monkeypatch.setattr(
         database,
         "get_sessionmaker",
-        lambda: async_sessionmaker(bind=engine, expire_on_commit=False),
+        lambda: async_sessionmaker(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        ),
     )
 
 
@@ -101,7 +114,7 @@ async def test_lock_keys_are_stable_and_distinct() -> None:
 # --- The advisory lock ------------------------------------------------------
 
 
-async def test_a_second_worker_skips_rather_than_waits(migrated_database) -> None:
+async def test_a_second_worker_skips_rather_than_waits(db) -> None:
     """T150's done criterion: a job runs exactly once with two workers up.
 
     Skipping and not queueing: a queued duplicate would run the job twice in a
@@ -124,7 +137,7 @@ async def test_a_second_worker_skips_rather_than_waits(migrated_database) -> Non
     assert {first.ran, second.ran} == {True, False}
 
 
-async def test_the_lock_is_released_when_the_job_finishes(migrated_database) -> None:
+async def test_the_lock_is_released_when_the_job_finishes(db, engine) -> None:
     """Otherwise the next tick skips forever and the job silently stops."""
 
     async def trivial(session) -> int:
@@ -132,18 +145,19 @@ async def test_the_lock_is_released_when_the_job_finishes(migrated_database) -> 
 
     runner = JobRunner()
     await runner.run("test_release_job", trivial)
-    engine = get_engine()
     async with engine.connect() as connection:
         free = await connection.scalar(
-            sa.text("SELECT pg_try_advisory_lock(:key)"), {"key": lock_key("test_release_job")}
+            sa.text("SELECT pg_try_advisory_lock(:key)"),
+            {"key": lock_key("test_release_job")},
         )
         await connection.execute(
-            sa.text("SELECT pg_advisory_unlock(:key)"), {"key": lock_key("test_release_job")}
+            sa.text("SELECT pg_advisory_unlock(:key)"),
+            {"key": lock_key("test_release_job")},
         )
     assert free is True
 
 
-async def test_the_lock_is_released_when_the_job_raises(migrated_database) -> None:
+async def test_the_lock_is_released_when_the_job_raises(db, engine) -> None:
     """A failing job that kept its lock would stop itself forever."""
 
     async def failing(session) -> int:
@@ -153,7 +167,6 @@ async def test_the_lock_is_released_when_the_job_raises(migrated_database) -> No
     result = await runner.run("test_failing_job", failing)
     assert result.error is not None and "boom" in result.error
 
-    engine = get_engine()
     async with engine.connect() as connection:
         free = await connection.scalar(
             sa.text("SELECT pg_try_advisory_lock(:key)"),
@@ -166,34 +179,29 @@ async def test_the_lock_is_released_when_the_job_raises(migrated_database) -> No
     assert free is True
 
 
-async def test_three_consecutive_failures_raise_an_alert(migrated_database) -> None:
+async def test_three_consecutive_failures_raise_an_alert(db) -> None:
     """A scheduler that fails silently is worse than none: the absence of
     alerts then means nothing."""
 
     async def failing(session) -> int:
         raise RuntimeError("still broken")
 
-    runner = JobRunner()
+    from src.worker import alert_on_repeated_failure
+
+    runner = JobRunner(on_repeated_failure=alert_on_repeated_failure)
     for _ in range(FAILURES_BEFORE_ALERT):
         await runner.run("test_alerting_job", failing)
     assert runner.consecutive_failures["test_alerting_job"] == FAILURES_BEFORE_ALERT
 
-    engine = get_engine()
-    async with engine.connect() as connection:
-        raised = await connection.scalar(
-            sa.text(
-                "SELECT count(*) FROM alerts WHERE kind = 'retention_job_failed' "
-                "AND dedupe_key = 'retention_job_failed:test_alerting_job'"
-            )
-        )
-        await connection.execute(
-            sa.text("DELETE FROM alerts WHERE dedupe_key = 'retention_job_failed:test_alerting_job'")
-        )
-        await connection.commit()
+    raised = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(AlertModel)
+        .where(AlertModel.kind == AlertKind.RETENTION_JOB_FAILED)
+    )
     assert raised == 1
 
 
-async def test_a_success_resets_the_failure_count(migrated_database) -> None:
+async def test_a_success_resets_the_failure_count(db) -> None:
     """Otherwise one bad night arms the alert for the rest of the year."""
 
     async def failing(session) -> int:

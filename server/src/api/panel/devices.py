@@ -16,7 +16,11 @@ from fastapi import APIRouter, Depends
 
 from src.core.deps import PrincipalDep, SessionDep
 from src.core.permissions import Perm, require_any_permission
-from src.modules.devices.schemas import DeviceHealthListResponse, DeviceHealthResponse
+from src.modules.devices.schemas import (
+    DeviceDetailResponse,
+    DeviceHealthListResponse,
+    DeviceHealthResponse,
+)
 from src.modules.devices.service import DeviceService
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
@@ -38,12 +42,18 @@ async def list_devices(
 
 @router.get(
     "/{installation_id}",
-    response_model=DeviceHealthResponse,
+    response_model=DeviceDetailResponse,
     dependencies=[Depends(_read_any)],
 )
 async def get_device(
     installation_id: uuid.UUID, principal: PrincipalDep, session: SessionDep
-) -> DeviceHealthResponse:
-    """One device. Another agent's phone is 404, like every other scoped read."""
+) -> DeviceDetailResponse:
+    """One device, **with its capability matrix** (UC-17's device page).
+
+    The response model is the detail one, not the list one: declaring the list
+    model here silently stripped ``capabilities`` and ``capturing``, which are
+    the two things the page exists to show. Another agent's phone is 404, like
+    every other scoped read.
+    """
     row = await DeviceService(session).get(principal, installation_id)
-    return DeviceHealthResponse.model_validate(row)
+    return DeviceDetailResponse.model_validate(row)

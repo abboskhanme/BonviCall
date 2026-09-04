@@ -148,6 +148,25 @@ async def issue_enrolment_code(
     return EnrolmentCodeResponse.model_validate(code)
 
 
+@assignments_router.get(
+    "",
+    response_model=AssignmentListResponse,
+    dependencies=[Depends(require_permission(Perm.NUMBERS_READ))],
+)
+async def list_agent_assignments(
+    agent_id: uuid.UUID, session: SessionDep
+) -> AssignmentListResponse:
+    """Every line an agent has held, in one request.
+
+    The agent detail page renders this as a timeline — the one place the
+    time-boxed mapping becomes visible to a person.
+    """
+    items, total = await NumberService(session).assignments_for_agent(agent_id)
+    return AssignmentListResponse(
+        items=[AssignmentResponse.model_validate(row) for row in items], total=total
+    )
+
+
 @assignments_router.patch(
     "/{assignment_id}",
     response_model=AssignmentResponse,

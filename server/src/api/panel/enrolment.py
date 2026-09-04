@@ -6,7 +6,6 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request
 
-from src.core import clock
 from src.core.deps import PrincipalDep, SessionDep
 from src.core.permissions import Perm, require_permission
 from src.modules.enrolment.schemas import (
@@ -14,6 +13,7 @@ from src.modules.enrolment.schemas import (
     EnrolmentAttemptResponse,
     EnrolmentCodeListResponse,
     EnrolmentCodeResponse,
+    ReceiverStatusResponse,
 )
 from src.modules.enrolment.service import EnrolmentService
 
@@ -75,23 +75,13 @@ async def list_attempts(
 
 @router.get(
     "/receiver-status",
+    response_model=ReceiverStatusResponse,
     dependencies=[Depends(require_permission(Perm.ENROLMENT_READ))],
 )
-async def receiver_status(session: SessionDep) -> dict[str, str | bool]:
+async def receiver_status(session: SessionDep) -> ReceiverStatusResponse:
     """The banner at the top of the rollout page.
 
     If every receiver is down nobody can enrol, and the page says so **before**
     anyone tries. Absence of enrolment must be an event, not a quiet stall.
     """
-    service = EnrolmentService(session)
-    receiver = await service.usable_receiver()
-    return {
-        "enrolment_possible": receiver is not None,
-        "receiver_name": receiver.name if receiver else "",
-        "receiver_msisdn": receiver.msisdn if receiver else "",
-        "status": (
-            service.status_for(receiver.last_heartbeat_at, clock.now()).value
-            if receiver
-            else "down"
-        ),
-    }
+    return await EnrolmentService(session).receiver_status()

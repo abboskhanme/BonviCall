@@ -70,6 +70,12 @@ PLAYBACK_AUDIT_DEDUPE_SECONDS = 60
 
 DELETED_REASON_RETENTION = "retention"
 
+#: Where the panel fetches a recording. A path, never a signed or public URL
+#: (N20): the route is token-protected and the browser reaches it through the
+#: Service Worker bridge, which is the only way an <audio> element can carry an
+#: Authorization header and still issue real Range requests (T153, N43).
+PLAYBACK_PATH = "/api/v1/calls/{call_id}/audio"
+
 
 @dataclass(frozen=True)
 class PlaybackSource:
@@ -330,6 +336,11 @@ class AudioService:
         return {
             row.call_id: CallAudioSummary(
                 available=row.deleted_at is None,
+                url=(
+                    PLAYBACK_PATH.format(call_id=row.call_id)
+                    if row.deleted_at is None
+                    else None
+                ),
                 capture_route=row.capture_route,
                 capture_route_detail=row.capture_route_detail,
                 duration_ms=row.duration_ms,

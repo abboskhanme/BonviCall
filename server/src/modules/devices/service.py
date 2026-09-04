@@ -61,6 +61,18 @@ from src.modules.settings.service import SettingsService
 
 log = get_logger(__name__)
 
+#: Fields that only exist once a phone has reported. Nulled together for one
+#: that never has, so the response shape is the same either way and the panel
+#: renders one component.
+_HEALTH_ONLY_FIELDS = (
+    "last_heartbeat_at", "last_call_at", "ws_connected", "battery_level",
+    "battery_charging", "battery_optimisation_exempt", "power_save_mode",
+    "free_storage_bytes", "queue_records", "queue_bytes", "queue_oldest_at",
+    "parked_records", "clock_skew_sec", "device_timezone", "network_type",
+    "cellular_bytes_month", "service_running", "capture_enabled",
+    "recording_route", "recording_route_ok", "updated_at",
+)
+
 SETTING_OFFLINE_MINUTES = "alerts.device_offline_minutes"
 SETTING_SILENCE_HOURS = "alerts.silence_hours"
 SETTING_FLEET_SILENCE_HOURS = "alerts.fleet_silence_hours"
@@ -453,9 +465,10 @@ class DeviceService:
         rows = (
             await self.session.execute(
                 select(DeviceHealthModel, InstallationModel)
-                .join(
-                    InstallationModel,
-                    InstallationModel.id == DeviceHealthModel.installation_id,
+                .select_from(InstallationModel)
+                .outerjoin(
+                    DeviceHealthModel,
+                    DeviceHealthModel.installation_id == InstallationModel.id,
                 )
                 .where(InstallationModel.status == InstallationStatus.ACTIVE)
             )
@@ -466,7 +479,7 @@ class DeviceService:
         silent: list[tuple[uuid.UUID, uuid.UUID]] = []
         quiet_seconds: list[int] = []
         for health, installation in rows:
-            last = health.last_call_at or health.last_heartbeat_at
+            last = (health.last_call_at or health.last_heartbeat_at) if health else None
             elapsed = (
                 working_seconds_between(last.astimezone(TASHKENT), moment, calendar)
                 if last is not None
@@ -506,19 +519,25 @@ class DeviceService:
         """Raise ``device_offline`` for phones past the heartbeat window (UC-17)."""
         minutes = await self.settings.get_int(SETTING_OFFLINE_MINUTES)
         moment = clock.now()
+        # LEFT OUTER JOIN, for the same reason the list uses one: a phone that
+        # was bound and never sent a heartbeat is the strongest case for this
+        # alert, and an inner join means it never raises one at all. The device
+        # nobody hears from is the device nobody is told about.
         rows = (
             await self.session.execute(
                 select(DeviceHealthModel, InstallationModel)
-                .join(
-                    InstallationModel,
-                    InstallationModel.id == DeviceHealthModel.installation_id,
+                .select_from(InstallationModel)
+                .outerjoin(
+                    DeviceHealthModel,
+                    DeviceHealthModel.installation_id == InstallationModel.id,
                 )
                 .where(InstallationModel.status == InstallationStatus.ACTIVE)
             )
         ).all()
         offline: list[uuid.UUID] = []
         for health, installation in rows:
-            if is_online(health.last_heartbeat_at, moment, minutes):
+            last = health.last_heartbeat_at if health is not None else None
+            if is_online(last, moment, minutes):
                 continue
             offline.append(installation.id)
             await self.alerts.raise_alert(
@@ -527,29 +546,52 @@ class DeviceService:
                 scope=installation.id,
                 installation_id=installation.id,
                 agent_id=installation.agent_id,
-                detail={"offline_minutes": minutes},
+                detail={
+                    "offline_minutes": minutes,
+                    # The panel sorts these above the phones that merely
+                    # stopped: never started is a person waiting for help now.
+                    "never_reported": health is None,
+                },
             )
         await self.session.commit()
         return offline
 
     # --- Panel reads ------------------------------------------------------
 
-    async def list(self, principal: Principal) -> list[dict]:
-        """Device health for every installation the principal may see."""
-        statement = self._scoped(
-            select(DeviceHealthModel, InstallationModel, DeviceModel)
-            .join(
-                InstallationModel,
-                InstallationModel.id == DeviceHealthModel.installation_id,
+    def _fleet_query(self) -> Select:
+        """Every installation, **whether or not it has ever reported**.
+
+        A LEFT OUTER JOIN, and that is the point. An inner join drops the
+        installation that was bound and never sent a heartbeat — which is the
+        single device an admin most needs to see, and the strongest form of the
+        absence this page exists to surface (R3). It also fails in the
+        reassuring direction: the fleet looks smaller and healthier than it is.
+        """
+        return (
+            select(InstallationModel, DeviceModel, DeviceHealthModel)
+            .join(DeviceModel, DeviceModel.id == InstallationModel.device_id)
+            .outerjoin(
+                DeviceHealthModel,
+                DeviceHealthModel.installation_id == InstallationModel.id,
             )
-            .join(DeviceModel, DeviceModel.id == InstallationModel.device_id),
-            principal,
-        ).order_by(DeviceHealthModel.last_heartbeat_at.desc().nullslast())
+        )
+
+    async def list(self, principal: Principal) -> list[dict]:
+        """Device health for every installation the principal may see.
+
+        Ordered worst first: never reported, then longest silent, then
+        healthy. The page is read when something is wrong, so the row that
+        needs a person is at the top rather than sorted under fifteen working
+        phones.
+        """
+        statement = self._scoped(self._fleet_query(), principal).order_by(
+            DeviceHealthModel.last_heartbeat_at.asc().nullsfirst()
+        )
         rows = (await self.session.execute(statement)).all()
         cutoff = await self._offline_cutoff()
         return [
             self._row(health, installation, device, cutoff)
-            for health, installation, device in rows
+            for installation, device, health in rows
         ]
 
     async def capability_matrix(
@@ -569,27 +611,21 @@ class DeviceService:
     async def get(self, principal: Principal, installation_id: uuid.UUID) -> dict:
         """One device. Wrong owner is 404, like every other scoped read."""
         statement = self._scoped(
-            select(DeviceHealthModel, InstallationModel, DeviceModel)
-            .join(
-                InstallationModel,
-                InstallationModel.id == DeviceHealthModel.installation_id,
-            )
-            .join(DeviceModel, DeviceModel.id == InstallationModel.device_id)
-            .where(DeviceHealthModel.installation_id == installation_id),
+            self._fleet_query().where(InstallationModel.id == installation_id),
             principal,
         )
         row = (await self.session.execute(statement)).first()
         if row is None:
             raise NotFoundError()
         cutoff = await self._offline_cutoff()
-        health, installation, device = row
+        installation, device, health = row
         detail = self._row(health, installation, device, cutoff)
         capabilities = await self.capability_matrix(installation_id)
         detail["capabilities"] = capabilities
         detail["capturing"] = is_capturing(
             {row.capability.value: row.state.value for row in capabilities},
             verified=installation.verified_at is not None,
-            service_running=bool(health.service_running),
+            service_running=bool(health and health.service_running),
         )
         return detail
 
@@ -603,10 +639,38 @@ class DeviceService:
         return clock.now() - timedelta(minutes=minutes)
 
     @staticmethod
-    def _row(health: DeviceHealthModel, installation: InstallationModel,
-             device: DeviceModel, cutoff) -> dict:
+    def _row(
+        health: DeviceHealthModel | None,
+        installation: InstallationModel,
+        device: DeviceModel,
+        cutoff,
+    ) -> dict:
+        """One row. ``health`` is ``None`` for a phone that never reported.
+
+        ``never_reported`` is kept distinct from ``is_online=false`` because
+        the admin's next action differs: "never started" is a person waiting
+        for help right now; "worked once and stopped" is a phone in a lift or
+        a battery manager to argue with.
+        """
+        if health is None:
+            return {
+                "installation_id": installation.id,
+                "agent_id": installation.agent_id,
+                "number_id": installation.number_id,
+                "installation_status": installation.status,
+                "manufacturer": device.manufacturer,
+                "model": device.model,
+                "android_release": device.android_release,
+                "api_level": device.api_level,
+                "app_version": installation.app_version,
+                "app_variant": installation.app_variant,
+                "never_reported": True,
+                "is_online": False,
+                **dict.fromkeys(_HEALTH_ONLY_FIELDS),
+            }
         return {
             "installation_id": health.installation_id,
+            "never_reported": False,
             "agent_id": installation.agent_id,
             "number_id": installation.number_id,
             "installation_status": installation.status,

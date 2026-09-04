@@ -52,7 +52,7 @@ from src.modules.enrolment.rules import (
     msisdn_matches,
     normalise_code,
 )
-from src.modules.enrolment.schemas import DeviceRedeemIn
+from src.modules.enrolment.schemas import DeviceRedeemIn, ReceiverStatusResponse
 from src.modules.installations.models import InstallationModel
 from src.modules.installations.service import DeviceTokenPair, InstallationService
 from src.modules.numbers.models import RegisteredNumberModel
@@ -596,6 +596,31 @@ class EnrolmentService:
                 CallbackReceiverModel.last_heartbeat_at > cutoff,
             )
             .order_by(CallbackReceiverModel.last_heartbeat_at.desc())
+        )
+
+    async def receiver_status(self) -> ReceiverStatusResponse:
+        """Whether anybody can enrol right now, and through which receiver."""
+        moment = clock.now()
+        receivers = list(
+            (
+                await self.session.scalars(
+                    select(CallbackReceiverModel).where(
+                        CallbackReceiverModel.is_active.is_(True)
+                    )
+                )
+            ).all()
+        )
+        usable = await self.usable_receiver()
+        return ReceiverStatusResponse(
+            enrolment_possible=usable is not None,
+            receiver_name=usable.name if usable else None,
+            receiver_msisdn=usable.msisdn if usable else None,
+            status=(
+                self.status_for(usable.last_heartbeat_at, moment)
+                if usable
+                else ReceiverStatus.DOWN
+            ),
+            active_receivers=len(receivers),
         )
 
     async def receiver_by_token(self, raw_token: str) -> CallbackReceiverModel | None:
