@@ -294,7 +294,7 @@ async def test_committing_twice_returns_the_same_answer(
     opened = await _upload(client, call)
     first = await client.post(f"/api/device/v1/audio/{opened['upload_id']}/commit")
     second = await client.post(f"/api/device/v1/audio/{opened['upload_id']}/commit")
-    assert first.json()["audio_id"] == second.json()["audio_id"]
+    assert first.json() == second.json()
     assert await db.scalar(sa.select(sa.func.count()).select_from(CallAudioModel)) == 1
 
 
@@ -315,9 +315,17 @@ async def test_a_duration_that_disagrees_with_the_call_log_is_flagged(
     await client.put(
         f"/api/device/v1/audio/{upload_id}/chunk?offset=0", content=PAYLOAD
     )
-    await client.post(f"/api/device/v1/audio/{upload_id}/commit")
+    committed = await client.post(f"/api/device/v1/audio/{upload_id}/commit")
     await db.refresh(call)
     assert call.audio_duration_mismatch is True
+    # And the handset is told. A device whose recorder truncates every call
+    # learns it here or not at all — the flag was once hardcoded to false,
+    # which made the whole field decorative.
+    assert committed.json()["duration_mismatch"] is True
+    # Idempotent in the flag too, not just the id: the device may only ever
+    # see the second response.
+    replay = await client.post(f"/api/device/v1/audio/{upload_id}/commit")
+    assert replay.json()["duration_mismatch"] is True
 
 
 async def test_upload_needs_a_verified_installation(

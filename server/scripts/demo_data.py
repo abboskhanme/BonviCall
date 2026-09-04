@@ -3,7 +3,14 @@
 Drives the **real API** rather than writing rows directly, so everything it
 creates has passed the same validation, RBAC and business rules a real device
 and a real admin would hit. That makes it a smoke test as well as a fixture: if
-this script runs clean, the enrolment chain and the ingest path work.
+this script runs clean, the enrolment chain, the ingest path and the three-step
+resumable audio upload all work.
+
+Audio is synthetic silence generated at the call's true length (see
+``synthetic_audio``) and pushed through the real upload endpoints, so the panel's
+player, the attribution gate, Range playback and the retention job all have
+something behind them. The two handsets that cannot record upload nothing and
+keep their real reasons — that difference is the product.
 
 Never run against production — it creates accounts with a published password.
 
@@ -12,14 +19,15 @@ Never run against production — it creates accounts with a published password.
 
 from __future__ import annotations
 
-import os
 import hashlib
+import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
+import synthetic_audio
 
 BASE = os.environ.get("DEMO_BASE_URL", "http://localhost:8000")
 ADMIN_EMAIL = os.environ.get("DEMO_ADMIN_EMAIL", "admin@bonvi.uz")
@@ -50,6 +58,23 @@ CAPTURE = {
     "Redmi 10C": ("none", "oem_recorder_off"),
     "V2111": ("none", "no_permission"),
 }
+
+#: Audio matches the call's real length so the player's scrubber agrees with the
+#: duration column. At ~205 bytes per second of silence a five-minute call costs
+#: about 60 KB and the whole fleet stays well under a megabyte, so calls are
+#: capped here rather than the audio being capped and every call then tripping
+#: ``audio_duration_mismatch``.
+MAX_CALL_SEC = 300
+
+#: One call is deliberately older than ``retention.audio_months`` (12) so that
+#: running the retention job leaves the panel a genuinely expired recording to
+#: render, rather than a state nobody can reach without editing the database.
+EXPIRED_CALL_AGE_DAYS = 400
+
+#: And one file is deliberately shorter than the call it belongs to, so UC-14's
+#: mismatch warning has a real example. Exactly one — if every call tripped it
+#: the panel would look broken instead of informative.
+MISMATCHED_CLIP_MS = 4_000
 
 CONTACTS = [
     ("Oybek aka", "+998901234567"),
@@ -110,6 +135,126 @@ class Api:
     def post(self, path, **kw):
         return self.call("POST", path, **kw)
 
+    def put_bytes(self, path, *, content, params=None, token=None, headers=None):
+        """A raw body, not JSON — an audio chunk is bytes on the wire (§4.5)."""
+        headers = dict(headers or {})
+        bearer = token if token is not None else self.token
+        if bearer:
+            headers["Authorization"] = f"Bearer {bearer}"
+        headers["Content-Type"] = "application/octet-stream"
+        response = self.client.put(path, content=content, params=params, headers=headers)
+        if response.status_code >= 400:
+            raise SystemExit(
+                f"\nPUT {path} -> {response.status_code}\n{response.text[:600]}\n"
+            )
+        return response.json()
+
+
+def make_call(
+    *,
+    started: datetime,
+    direction: str,
+    disposition: str,
+    duration: int,
+    variant: str,
+    route: str,
+    missing: str | None,
+) -> dict:
+    """One call record as the device puts it on the wire (SPEC §4.4)."""
+    answered = disposition == "answered"
+    answered_at = started + timedelta(seconds=random.randint(3, 20))
+    ended_at = (answered_at if answered else started) + timedelta(seconds=duration)
+    contact_name, remote = random.choice(CONTACTS)
+
+    call = {
+        "client_call_id": str(uuid.uuid4()),
+        "started_at": iso(started),
+        "ended_at": iso(ended_at),
+        "direction": direction,
+        "disposition": disposition,
+        "duration_sec": duration,
+        "remote_number": remote,
+        "contact_name": contact_name,
+        "device_epoch_ms": int(started.timestamp() * 1000),
+        "device_timezone": "Asia/Tashkent",
+        "app_variant": variant,
+        "app_version": "1.0.0",
+        "sim_slot": 0,
+        "sim_subscription_id": 1,
+    }
+    if answered:
+        call["answered_at"] = iso(answered_at)
+        call["audio_expected"] = missing is None
+        call["capture_route"] = route
+        # Metadata always lands before audio (R7), so at ingest time even a
+        # recording that is about to be uploaded is honestly "queued".
+        call["audio_missing_reason"] = missing or "pending_upload"
+    else:
+        # UC-14: an unanswered call has no recording and that is not a failure.
+        # Saying "not expected" keeps it out of the gap report's numerator.
+        call["audio_expected"] = False
+        call["capture_route"] = "none"
+        call["audio_missing_reason"] = "not_expected"
+    return call
+
+
+def upload_audio(api: Api, device, call: dict, clip_ms: int) -> int:
+    """Push one recording through the real three-step upload. Returns bytes.
+
+    In **two** chunks on purpose: a single-shot upload never exercises the
+    offset check, and the offset check is the whole reason this protocol exists
+    instead of a re-POST.
+    """
+    token, headers, route = device
+    blob = synthetic_audio.ogg_opus_silence(clip_ms)
+
+    # Inside the attribution window [started_at - 5 s, ended_at + 120 s] (N28).
+    # The handset's recorder finishes writing a moment after the call ends;
+    # a file outside that window is refused and never stored, which is a
+    # privacy boundary and not a validation nicety.
+    recorded_at = datetime.fromisoformat(call["ended_at"]) + timedelta(seconds=2)
+
+    session = api.post(
+        f"/api/device/v1/calls/{call['client_call_id']}/audio/session",
+        json={
+            "bytes_total": len(blob),
+            "sha256": hashlib.sha256(blob).hexdigest(),
+            "codec": "opus",
+            "container": "ogg",
+            "sample_rate_hz": 48000,
+            "channels": 1,
+            "duration_ms": clip_ms,
+            "capture_route": route,
+            # The folder name only. A path from the phone would leak the
+            # employee's directory layout (§8).
+            "capture_route_detail": "Call" if route == "oem_file_harvest" else None,
+            "recorded_at": iso(recorded_at),
+        },
+        token=token,
+        headers=headers,
+    )
+
+    upload_id = session["upload_id"]
+    # Resume from what the server says it has, not from zero — that is the
+    # behaviour a real client needs and the one worth demonstrating.
+    offset = session["received_bytes"]
+    step = min(session["chunk_size"], max(1, -(-len(blob) // 2)))
+    while offset < len(blob):
+        chunk = blob[offset : offset + step]
+        accepted = api.put_bytes(
+            f"/api/device/v1/audio/{upload_id}/chunk",
+            content=chunk,
+            params={"offset": offset},
+            token=token,
+            headers={**headers, "X-Chunk-Sha256": hashlib.sha256(chunk).hexdigest()},
+        )
+        offset = accepted["received_bytes"]
+
+    api.post(
+        f"/api/device/v1/audio/{upload_id}/commit", token=token, headers=headers
+    )
+    return len(blob)
+
 
 def main() -> int:
     with httpx.Client(base_url=BASE, timeout=30.0) as client:
@@ -129,16 +274,17 @@ def main() -> int:
             print("  bazani tozalash uchun: make clean-db (yoki qo'lda)")
             return 0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         created = []
 
         for full_name, code, e164, manufacturer, model, release, api_level in FLEET:
+            hired_at = now - timedelta(days=random.randint(500, 900))
             agent = api.post(
                 "/api/v1/agents",
                 json={
                     "full_name": full_name,
                     "employee_code": code,
-                    "hired_at": (now - timedelta(days=random.randint(90, 900))).date().isoformat(),
+                    "hired_at": hired_at.date().isoformat(),
                 },
             )
             number = api.post(
@@ -147,7 +293,11 @@ def main() -> int:
             )
             api.post(
                 f"/api/v1/numbers/{number['id']}/assignments",
-                json={"agent_id": agent["id"]},
+                # They got the line when they were hired. Back-dating matters:
+                # attribution runs against the assignment covering the call's
+                # started_at (D-08), so an assignment starting today would leave
+                # the retention-expired call below attributed out of range.
+                json={"agent_id": agent["id"], "valid_from": iso(hired_at)},
             )
             enrolment = api.post(f"/api/v1/numbers/{number['id']}/enrolment-code")
             created.append((agent, number, enrolment, manufacturer, model, release, api_level))
@@ -208,16 +358,21 @@ def main() -> int:
 
         print("\n  qo'ng'iroqlar yuborilmoqda…")
         total = 0
-        for agent, number, device_token, device_headers, model, variant in installations:
+        pending_audio = []
+        specials_placed = False
+
+        for agent, _number, device_token, device_headers, model, variant in installations:
             route, missing = CAPTURE[model]
+            can_record = missing is None
+            device = (device_token, device_headers, route)
             batch = []
-            for index in range(random.randint(6, 12)):
+
+            for _ in range(random.randint(6, 12)):
                 started = now - timedelta(
                     days=random.randint(0, 6),
                     hours=random.randint(0, 9),
                     minutes=random.randint(0, 59),
                 )
-                contact_name, remote = random.choice(CONTACTS)
                 direction = random.choice(["incoming", "outgoing"])
                 answered = random.random() > 0.22
                 # ck_calls_direction_disposition: an incoming call can be
@@ -229,44 +384,50 @@ def main() -> int:
                     disposition = random.choice(["missed", "rejected"])
                 else:
                     disposition = "no_answer"
-                duration = random.randint(25, 900) if answered else 0
-                answered_at = started + timedelta(seconds=random.randint(3, 20))
-                ended_at = (answered_at if answered else started) + timedelta(seconds=duration)
+                duration = random.randint(20, MAX_CALL_SEC) if answered else 0
 
-                call = {
-                    "client_call_id": str(uuid.uuid4()),
-                    "started_at": iso(started),
-                    "ended_at": iso(ended_at),
-                    "direction": direction,
-                    "disposition": disposition,
-                    "duration_sec": duration,
-                    "remote_number": remote,
-                    "contact_name": contact_name,
-                    "device_epoch_ms": int(started.timestamp() * 1000),
-                    "device_timezone": "Asia/Tashkent",
-                    "app_variant": variant,
-                    "app_version": "1.0.0",
-                    "sim_slot": 0,
-                    "sim_subscription_id": 1,
-                }
-                if answered:
-                    call["answered_at"] = iso(answered_at)
-                    call["audio_expected"] = missing is None
-                    call["capture_route"] = route
-                    if missing:
-                        call["audio_missing_reason"] = missing
-                    else:
-                        # No audio has been uploaded yet by this script, so the
-                        # honest state is "queued", not "recorded".
-                        call["audio_missing_reason"] = "pending_upload"
-                else:
-                    # UC-14: an unanswered call has no recording and that is not
-                    # a failure. Saying "not expected" keeps it out of the gap
-                    # report's numerator.
-                    call["audio_expected"] = False
-                    call["capture_route"] = "none"
-                    call["audio_missing_reason"] = "not_expected"
+                call = make_call(
+                    started=started,
+                    direction=direction,
+                    disposition=disposition,
+                    duration=duration,
+                    variant=variant,
+                    route=route,
+                    missing=missing,
+                )
                 batch.append(call)
+                if answered and can_record:
+                    pending_audio.append((device, call, duration * 1000))
+
+            if can_record and not specials_placed:
+                # Two states the panel has to render and that random data never
+                # produces. They go on the first capable handset so one agent's
+                # page shows both.
+                specials_placed = True
+
+                expired = make_call(
+                    started=now - timedelta(days=EXPIRED_CALL_AGE_DAYS, hours=3),
+                    direction="outgoing",
+                    disposition="answered",
+                    duration=95,
+                    variant=variant,
+                    route=route,
+                    missing=None,
+                )
+                batch.append(expired)
+                pending_audio.append((device, expired, 95_000))
+
+                truncated = make_call(
+                    started=now - timedelta(days=2, hours=5),
+                    direction="incoming",
+                    disposition="answered",
+                    duration=180,
+                    variant=variant,
+                    route=route,
+                    missing=None,
+                )
+                batch.append(truncated)
+                pending_audio.append((device, truncated, MISMATCHED_CLIP_MS))
 
             api.post(
                 "/api/device/v1/calls",
@@ -277,10 +438,23 @@ def main() -> int:
             total += len(batch)
             print(f"    {agent['full_name']:20} {len(batch):2} ta qo'ng'iroq  ({route})")
 
+        print("\n  audio yuklanmoqda…")
+        audio_bytes = 0
+        for device, call, clip_ms in pending_audio:
+            audio_bytes += upload_audio(api, device, call, clip_ms)
+        print(
+            f"    {len(pending_audio)} ta yozuv, {audio_bytes / 1024:.0f} KB "
+            f"— uchta bosqichli yuklash orqali"
+        )
+        print(
+            f"    1 tasi saqlash muddatidan o'tgan "
+            f"({EXPIRED_CALL_AGE_DAYS} kun), 1 tasi qisqa (davomiylik mos emas)"
+        )
+
         print("\n  qurilma holati yuborilmoqda…")
         for position, (
-            agent,
-            number,
+            _agent,
+            _number,
             device_token,
             device_headers,
             model,
@@ -295,7 +469,7 @@ def main() -> int:
             api.post(
                 "/api/device/v1/heartbeat",
                 json={
-                    "device_epoch_ms": int(datetime.now(timezone.utc).timestamp() * 1000),
+                    "device_epoch_ms": int(datetime.now(UTC).timestamp() * 1000),
                     "device_timezone": "Asia/Tashkent",
                     "battery_level": random.randint(35, 95),
                     "battery_charging": random.random() > 0.6,
@@ -341,7 +515,10 @@ def main() -> int:
         print("\n  panel: http://localhost:5190")
         print(f"  {'admin@bonvi.uz':24} {DEMO_PASSWORD}   (hammasi)")
         print(f"  {'manager@bonvi.uz':24} {DEMO_PASSWORD}   (hammasi, sozlamasiz)")
-        print(f"  {'sales@bonvi.uz':24} {DEMO_PASSWORD}   (faqat o'zinikini — {first_agent['full_name']})")
+        print(
+            f"  {'sales@bonvi.uz':24} {DEMO_PASSWORD}   "
+            f"(faqat o'zinikini — {first_agent['full_name']})"
+        )
     return 0
 
 

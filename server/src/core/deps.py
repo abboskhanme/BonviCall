@@ -15,6 +15,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import HTTPConnection
 
 from src.core.database import session_scope
 from src.core.errors import UnauthorizedError
@@ -62,7 +63,13 @@ class Principal:
 #: It receives the request's own session, so authentication reads the same
 #: transaction as the rest of the request — and so the test suite's session
 #: override applies to it too.
-PrincipalResolver = Callable[[Request, AsyncSession], Awaitable[Principal]]
+#:
+#: ``HTTPConnection`` rather than ``Request`` because the device realtime socket
+#: authenticates on its handshake (SPEC §4.6) and must go through *this* code,
+#: not a second copy of it. ``Request`` and ``WebSocket`` are both
+#: ``HTTPConnection``; the resolver only ever reads headers, and a second
+#: authentication path is how one of them ends up missing a check.
+PrincipalResolver = Callable[[HTTPConnection, AsyncSession], Awaitable[Principal]]
 
 _principal_resolver: PrincipalResolver | None = None
 
@@ -94,12 +101,20 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-async def get_current_principal(request: Request, session: SessionDep) -> Principal:
-    """The authenticated caller, or 401."""
+async def get_current_principal(
+    connection: HTTPConnection, session: SessionDep
+) -> Principal:
+    """The authenticated caller, or 401. Works for HTTP **and** the socket.
+
+    FastAPI injects the live ``Request`` or ``WebSocket`` here; asking for
+    ``HTTPConnection`` is what lets one dependency serve both, and therefore
+    what lets ``tests/test_app.py`` hold the socket to the same protection rule
+    as every other route.
+    """
     resolver = _principal_resolver
     if resolver is None:
         raise UnauthorizedError()
-    return await resolver(request, session)
+    return await resolver(connection, session)
 
 
 def get_request_id(request: Request) -> str:

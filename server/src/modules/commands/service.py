@@ -10,9 +10,10 @@ measured rather than assumed. ``RISKS.md`` R3 flags that bar as possibly
 unachievable on doze-restricted OEMs, and this column is what makes the
 conversation evidential instead of anecdotal.
 
-The transport is the socket plus an FCM wake-up (SPEC §4.6); the lifecycle
-below does not depend on which one delivered the command, which is why it can
-be built and tested before the socket exists.
+The transport is the socket plus an FCM wake-up (SPEC §4.6). The lifecycle
+does not depend on which one delivered the command — that is why it was built
+and tested before the socket existed, and why :meth:`CommandService.deliver`
+can be a thin choice between two transports rather than a second lifecycle.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core import clock
+from src.core import clock, push, realtime
 from src.core.enums import (
     ActorType,
     AuditAction,
@@ -37,7 +38,11 @@ from src.core.phone import to_e164
 from src.modules.audit.service import AuditService
 from src.modules.calls.models import CallModel
 from src.modules.commands.models import CommandModel
-from src.modules.commands.schemas import CreateCommandRequest, DeviceAckIn
+from src.modules.commands.schemas import (
+    CommandFrameOut,
+    CreateCommandRequest,
+    DeviceAckIn,
+)
 from src.modules.installations.models import InstallationModel
 
 log = get_logger(__name__)
@@ -113,6 +118,79 @@ class CommandService:
         await self.session.commit()
         log.info("command_issued", command_id=str(command.id), kind=payload.kind.value)
         return command
+
+    async def issue_and_deliver(
+        self,
+        installation_id: uuid.UUID,
+        payload: CreateCommandRequest,
+        actor_id: uuid.UUID,
+        ip: str | None,
+    ) -> CommandModel:
+        """One panel click, end to end. The router calls this and nothing else.
+
+        Issuing and delivering are separate methods because a resend is a real
+        operation and because the lifecycle was built before the transport
+        existed. They are joined *here* rather than in the handler so the
+        orchestration and the commit stay in the service (§2) — the same shape
+        as ``DeviceService.ingest_heartbeat``.
+        """
+        command = await self.issue(installation_id, payload, actor_id, ip)
+        await self.deliver(command)
+        return command
+
+    async def deliver(self, command: CommandModel) -> bool:
+        """Get ``command`` to the phone now, or arrange for it to come and look.
+
+        Returns whether it went down a **live socket**. That is the only case
+        with a chance at UC-16's five-second bar, so it is the thing worth
+        reporting; everything else is a wake-up and a wait.
+
+        Order matters. The socket is tried first because it is the fast path and
+        because it is the one we control. Only when there is no socket does the
+        FCM wake-up happen, and that message carries ``{"cmd":"poll"}`` and
+        never the number being dialled (SPEC §4.6, and see ``core/push.py`` for
+        why the interface cannot express anything else).
+
+        A wake-up is not a delivery. ``sent_at`` is set either way — the fifteen
+        second ack clock starts when we stopped being able to do anything more —
+        but a phone that never answers ends up ``failed`` /``device_offline``
+        through :meth:`expire_stale`, which is the truthful outcome whether the
+        socket was down or FCM never reached it.
+        """
+        frame = CommandFrameOut(
+            command_id=command.id,
+            kind=command.kind,
+            number=(command.payload or {}).get("number"),
+            issued_at=command.created_at,
+            expires_at=command.expires_at,
+        )
+        on_socket = await realtime.get_hub().send(
+            command.installation_id, frame.model_dump(mode="json")
+        )
+        if not on_socket:
+            # No registration token is stored anywhere yet, so this reports
+            # "cannot wake" today rather than pretending. See
+            # docs/PENDING_WIRING.md — the column and the wire field are the
+            # missing halves, not this call site.
+            try:
+                await push.get_sender().wake(command.installation_id, push_token=None)
+            except Exception:  # noqa: BLE001 — a future FCM sender calls a network
+                # The command is already recorded, and a phone we failed to wake
+                # is one that does not answer, which ``expire_stale`` already
+                # calls ``device_offline``. An outage at Google must not turn a
+                # click-to-call into a 500 on the panel.
+                log.warning("push_wake_failed", command_id=str(command.id))
+
+        command.status = CommandStatus.SENT
+        command.sent_at = command.sent_at or clock.now()
+        await self.session.commit()
+        log.info(
+            "command_delivered",
+            command_id=str(command.id),
+            kind=command.kind.value,
+            transport="socket" if on_socket else "push",
+        )
+        return on_socket
 
     async def pending_for(self, installation: InstallationModel) -> list[CommandModel]:
         """Commands the phone should act on now, marked as sent.

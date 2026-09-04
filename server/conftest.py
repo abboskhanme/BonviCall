@@ -38,7 +38,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.core import clock
+from src.core import clock, realtime
 from src.core.config import get_settings
 from src.core.deps import Principal, get_current_principal, get_session
 from src.core.enums import (
@@ -791,3 +791,22 @@ def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[datetime
 
     monkeypatch.setattr(clock, "now", lambda: state["now"])
     yield _set
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_sockets() -> Iterator[None]:
+    """The realtime hub must be empty when a test ends.
+
+    It is a process-wide singleton (``core/realtime.py``), so a socket left
+    registered by one test would make the next one believe a phone is
+    reachable and take the fast path for a command that goes nowhere. This
+    project has already lost an afternoon to one leaked row from a job runner
+    doing exactly this; asserting the leak is louder than clearing it, so the
+    fixture reports which installation was left behind and *then* cleans up.
+    """
+    yield
+    hub = realtime.get_hub()
+    leaked = hub.connected()
+    for installation_id in leaked:
+        hub.unregister(installation_id, hub._sinks[installation_id])  # noqa: SLF001
+    assert not leaked, f"a test left sockets registered in the hub: {sorted(leaked)}"

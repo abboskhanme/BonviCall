@@ -222,6 +222,11 @@ UNBINDABLE = {
         "database.py",
         "database.get_sessionmaker()",
     ),
+    # Added before they bit rather than after: a test that swaps the hub or the
+    # push sender is testing "socket down, so wake the phone", which is the
+    # branch that decides whether UC-16 can work at all.
+    "from src.core.realtime import get_hub": ("realtime.py", "realtime.get_hub()"),
+    "from src.core.push import get_sender": ("push.py", "push.get_sender()"),
 }
 
 

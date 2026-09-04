@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import Depends, Request
+from starlette.requests import HTTPConnection
 
 from src.core.deps import Principal, PrincipalDep, SessionDep
 from src.core.enums import InstallationStatus
@@ -28,14 +29,24 @@ from src.modules.installations.models import InstallationModel
 REQUIRED_DEVICE_HEADERS = ("X-App-Version", "X-Installation-Id")
 
 
-def require_device_headers(request: Request) -> None:
-    """400 ``header_missing`` when the app forgot one, naming which."""
-    missing = [name for name in REQUIRED_DEVICE_HEADERS if not request.headers.get(name)]
+def require_device_headers(connection: HTTPConnection) -> None:
+    """400 ``header_missing`` when the app forgot one, naming which.
+
+    ``HTTPConnection`` rather than ``Request`` so the realtime socket's
+    handshake is held to the same rule as every REST call — an app that opens a
+    socket without ``X-Installation-Id`` is refused there too, and there is one
+    implementation of that rule rather than two (SPEC §4.6).
+    """
+    missing = [
+        name for name in REQUIRED_DEVICE_HEADERS if not connection.headers.get(name)
+    ]
     if missing:
         raise BadRequestError(ErrorCode.HEADER_MISSING, detail={"headers": missing})
 
 
-async def require_device(request: Request, principal: PrincipalDep) -> Principal:
+async def require_device(
+    connection: HTTPConnection, principal: PrincipalDep
+) -> Principal:
     """The caller is an installation, and it sent the headers it must send.
 
     Order matters and is the reason the header check lives here rather than as
@@ -45,7 +56,7 @@ async def require_device(request: Request, principal: PrincipalDep) -> Principal
     """
     if principal.kind != "device":
         raise UnauthorizedError()
-    require_device_headers(request)
+    require_device_headers(connection)
     return principal
 
 
@@ -62,24 +73,37 @@ async def require_installation(
     return installation
 
 
-async def require_active_installation(
-    request: Request,
-    session: SessionDep,
-    installation: Annotated[InstallationModel, Depends(require_installation)],
-) -> InstallationModel:
-    """The installation must be verified.
+def _assert_verified(installation: InstallationModel) -> None:
+    """The privacy boundary's server-side gate, in one place.
 
-    This is where the privacy boundary starts on the server: an unverified
-    phone cannot upload a single call, because it cannot get past this
-    dependency (SPEC §4.2). ``replaced`` is deliberately allowed through —
-    a superseded installation keeps draining its queue, and only its *refresh*
-    is refused (SPEC §9.3). Refusing an old binding must never destroy data.
+    ``replaced`` is deliberately allowed through — a superseded installation
+    keeps draining its queue, and only its *refresh* is refused (SPEC §9.3).
+    Refusing an old binding must never destroy data.
+
+    It lives in its own function because both the REST gate and the socket gate
+    ask it, and a rule about who may send us recordings that exists twice is a
+    rule that will one day only be fixed once.
     """
     if installation.status not in (
         InstallationStatus.ACTIVE,
         InstallationStatus.REPLACED,
     ):
         raise ForbiddenError(ErrorCode.VERIFICATION_REQUIRED)
+
+
+async def require_active_installation(
+    request: Request,
+    session: SessionDep,
+    installation: Annotated[InstallationModel, Depends(require_installation)],
+) -> InstallationModel:
+    """The installation must be verified, and the request must be counted.
+
+    This is where the privacy boundary starts on the server: an unverified
+    phone cannot upload a single call, because it cannot get past this
+    dependency (SPEC §4.2). The verification rule itself is
+    :func:`_assert_verified`, shared with the socket gate.
+    """
+    _assert_verified(installation)
 
     # N14/N15's accounting happens here because this is the one place every
     # ingest request passes through and the request size is already known.
@@ -93,12 +117,27 @@ async def require_active_installation(
     return installation
 
 
+async def require_ws_installation(
+    installation: Annotated[InstallationModel, Depends(require_installation)],
+) -> InstallationModel:
+    """The realtime socket's gate (SPEC §4.6).
+
+    Same verification rule as :func:`require_active_installation` and
+    deliberately **not** its data accounting: that is per-request and reads
+    ``Content-Length``, and a socket has neither. N15's cellular budget is about
+    metadata and audio uploads, which do not travel on this channel.
+    """
+    _assert_verified(installation)
+    return installation
+
+
 DeviceHeadersDep = Depends(require_device_headers)
 DevicePrincipalDep = Annotated[Principal, Depends(require_device)]
 InstallationDep = Annotated[InstallationModel, Depends(require_installation)]
 ActiveInstallationDep = Annotated[
     InstallationModel, Depends(require_active_installation)
 ]
+WsInstallationDep = Annotated[InstallationModel, Depends(require_ws_installation)]
 
 __all__ = [
     "REQUIRED_DEVICE_HEADERS",
@@ -106,8 +145,10 @@ __all__ = [
     "DeviceHeadersDep",
     "DevicePrincipalDep",
     "InstallationDep",
+    "WsInstallationDep",
     "require_active_installation",
     "require_device",
     "require_device_headers",
     "require_installation",
+    "require_ws_installation",
 ]

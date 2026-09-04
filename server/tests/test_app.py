@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, APIWebSocketRoute
 
 from src.api import DEVICE_API_PREFIX, PANEL_API_PREFIX, SERVICE_API_PREFIX
 from src.contract_export import CONTRACT_DIR, build_documents
@@ -16,11 +16,40 @@ from src.main import create_app
 DOCS_ROUTES = {"/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"}
 
 
+#: A WebSocket route has no HTTP method, but the protection rule applies to it
+#: exactly the same way — arguably more, since the device socket is the one
+#: channel that reaches into an employee's personally owned phone. Giving it a
+#: pseudo-method keeps it inside the same harness instead of beside it.
+WEBSOCKET_METHOD = "WEBSOCKET"
+
+
 def _api_routes(app) -> list[APIRoute]:
     return [
         route
         for route in app.routes
         if isinstance(route, APIRoute) and route.path not in DOCS_ROUTES
+    ]
+
+
+def _methods_of(route) -> set[str]:
+    if isinstance(route, APIWebSocketRoute):
+        return {WEBSOCKET_METHOD}
+    return route.methods - {"HEAD", "OPTIONS"}
+
+
+def _protected_routes(app) -> list:
+    """Every route the protection rule applies to, HTTP **and** WebSocket.
+
+    ``APIWebSocketRoute`` is not an ``APIRoute``, so a socket added to the app
+    was invisible to the check below until this existed. An endpoint that can
+    dial a customer from someone's own handset is not the one to leave outside
+    the harness.
+    """
+    return [
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute | APIWebSocketRoute)
+        and route.path not in DOCS_ROUTES
     ]
 
 
@@ -95,8 +124,8 @@ def test_every_registered_route_is_protected_or_declared_public() -> None:
     app = create_app()
     unprotected: list[str] = []
     unchecked: list[str] = []
-    for route in _api_routes(app):
-        for method in sorted(route.methods - {"HEAD", "OPTIONS"}):
+    for route in _protected_routes(app):
+        for method in sorted(_methods_of(route)):
             key = (method, route.path)
             if key in PUBLIC_ROUTES or key in ALTERNATIVE_CREDENTIAL_ROUTES:
                 continue

@@ -1,0 +1,282 @@
+{
+  "$defs": {
+    "AckFrameIn": {
+      "description": "app → server: the outcome of a command, and implicitly its latency.",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "command_id": {
+          "format": "uuid",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "failure_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommandFailureReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "result_client_call_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result Client Call Id"
+        },
+        "status": {
+          "enum": [
+            "acknowledged",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "type": {
+          "const": "ack",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "command_id",
+        "status"
+      ],
+      "title": "AckFrameIn",
+      "type": "object"
+    },
+    "CommandFailureReason": {
+      "description": "Why a command did not happen. UC-16 requires the panel to say which.",
+      "enum": [
+        "device_offline",
+        "no_permission",
+        "os_refused",
+        "ack_timeout",
+        "discarded_stale",
+        "unsupported",
+        "busy"
+      ],
+      "title": "CommandFailureReason",
+      "type": "string"
+    },
+    "CommandFrameOut": {
+      "description": "server → app. **Identical in shape to** :class:`DeviceCommandOut`.\n\nDeliberately so: the app parses one command type whether it arrived on the\nsocket or was collected over REST after an FCM wake-up. Two shapes for one\nconcept is how the two paths drift and only one of them gets the fix.\n\nThe dial target is a named field, not a ``payload`` map (§8 rule 5).",
+      "properties": {
+        "command_id": {
+          "format": "uuid",
+          "title": "Command Id",
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "The app discards this on arrival if it has passed (UC-16).",
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CommandKind"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
+        },
+        "type": {
+          "const": "command",
+          "default": "command",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "kind",
+        "issued_at",
+        "expires_at"
+      ],
+      "title": "CommandFrameOut",
+      "type": "object"
+    },
+    "CommandKind": {
+      "description": "Server-to-device commands. No ``send_sms`` — SMS is out of scope.",
+      "enum": [
+        "dial",
+        "config",
+        "logout",
+        "ping",
+        "recheck"
+      ],
+      "title": "CommandKind",
+      "type": "string"
+    },
+    "LogoutFrameOut": {
+      "description": "server → app: stop using this socket, and why.\n\n``replaced`` is the common one and is not an error — the app reconnected\nbefore the old socket's close was noticed.",
+      "properties": {
+        "reason": {
+          "enum": [
+            "revoked",
+            "replaced",
+            "version_unsupported"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "type": {
+          "const": "logout",
+          "default": "logout",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "LogoutFrameOut",
+      "type": "object"
+    },
+    "PingFrameOut": {
+      "description": "server → app, every 30 s. No pong within 15 s closes the socket.",
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "ping",
+          "default": "ping",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "title": "PingFrameOut",
+      "type": "object"
+    },
+    "PongFrameIn": {
+      "description": "app → server, answering a ping.",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "type": {
+          "const": "pong",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "PongFrameIn",
+      "type": "object"
+    },
+    "PresenceFrameIn": {
+      "description": "app → server: still here, and this much is queued.\n\nPresence means **reachable**, never healthy. ``is_online`` in the panel is\ndriven by ``last_heartbeat_at`` (SPEC §4.6): a socket can be alive while\ncapture is dead, and conflating the two is how a broken phone looks fine.",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "queue_records": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Queue Records"
+        },
+        "state": {
+          "enum": [
+            "online",
+            "away"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "type": {
+          "const": "presence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "state"
+      ],
+      "title": "PresenceFrameIn",
+      "type": "object"
+    }
+  },
+  "app_to_server": [
+    "AckFrameIn",
+    "PresenceFrameIn",
+    "PongFrameIn"
+  ],
+  "description": "Frames on the device realtime socket, wss://<host>/api/device/v1/ws (SPEC 4.6). OpenAPI cannot describe a WebSocket, so these are generated separately from the same Pydantic models. Auth is on the handshake: Authorization, X-Installation-Id and X-App-Version headers, never a query string.",
+  "server_to_app": [
+    "CommandFrameOut",
+    "PingFrameOut",
+    "LogoutFrameOut"
+  ]
+}

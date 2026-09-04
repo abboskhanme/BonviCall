@@ -90,13 +90,15 @@ async def commit(
     upload_id: uuid.UUID, installation: ActiveInstallationDep, session: SessionDep
 ) -> CommitOut:
     """Step 3. Idempotent — and only after this does the device delete its copy."""
-    audio, _ = await AudioService(session).commit(installation, upload_id)
+    audio, duration_mismatch = await AudioService(session).commit(
+        installation, upload_id
+    )
     return CommitOut(
         audio_id=audio.id,
         sha256=audio.sha256,
         bytes=audio.bytes,
         stored=True,
-        duration_mismatch=False,
+        duration_mismatch=duration_mismatch,
     )
 
 

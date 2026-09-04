@@ -50,7 +50,7 @@ async def issue_command(
     )
     if not principal.has(needed):
         raise ForbiddenError()
-    command = await CommandService(session).issue(
+    command = await CommandService(session).issue_and_deliver(
         installation_id,
         payload,
         principal.id,

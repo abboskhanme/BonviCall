@@ -17,7 +17,14 @@ Four artefacts:
 ``contract/openapi-panel-v1.json``           panel TypeScript types
 ``contract/openapi-service-v1.json``         BonviZvonki's ingest adapter
 ``contract/error-codes.json``                the ``code`` catalogue of §9
+``contract/device-ws-frames.json``           the realtime socket's frames
 ===========================================  ==================================
+
+The fifth file exists because **OpenAPI cannot describe a WebSocket**, and the
+device realtime channel (SPEC §4.6) carries a command that dials a customer.
+Left out, its frames would be the one part of the wire hand-written on both
+sides — precisely the case CONVENTIONS.md §1 forbids, and on the one channel
+where a mismatch means a phone silently never dials.
 
 The error-code file carries codes and statuses only, never messages: clients
 branch on ``code`` and never on ``message`` (SPEC §4.0), and the Uzbek text
@@ -38,10 +45,19 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
+from pydantic.json_schema import models_json_schema
 
 from src.api import DEVICE_API_PREFIX, PANEL_API_PREFIX, SERVICE_API_PREFIX
 from src.core.errors import ErrorCode
 from src.main import API_VERSION, create_app
+from src.modules.commands.schemas import (
+    AckFrameIn,
+    CommandFrameOut,
+    LogoutFrameOut,
+    PingFrameOut,
+    PongFrameIn,
+    PresenceFrameIn,
+)
 
 #: ``server/../contract``. The Makefile mounts the repository, so this resolves
 #: to the same directory inside the container and on a developer machine.
@@ -56,6 +72,11 @@ SURFACES: tuple[tuple[str, str, str], ...] = (
 
 #: Routes with no surface of their own, exported with the panel document.
 UNPREFIXED_PATHS: frozenset[str] = frozenset({"/healthz", "/readyz"})
+
+#: The realtime frames, in the direction they travel (SPEC §4.6). Order is
+#: fixed so the generated file is stable across runs.
+WS_FRAMES_OUT = (CommandFrameOut, PingFrameOut, LogoutFrameOut)
+WS_FRAMES_IN = (AckFrameIn, PresenceFrameIn, PongFrameIn)
 
 
 def _routes_for(app: FastAPI, prefix: str) -> list[APIRoute]:
@@ -93,6 +114,7 @@ def build_documents(app: FastAPI | None = None) -> dict[str, dict[str, Any]]:
         )
         for stem, title, prefix in SURFACES
     }
+    documents["device-ws-frames"] = _ws_frames_document()
     documents["error-codes"] = {
         "description": (
             "Stable machine contract. Clients branch on 'code', never on the "
@@ -101,6 +123,32 @@ def build_documents(app: FastAPI | None = None) -> dict[str, dict[str, Any]]:
         "codes": sorted(ErrorCode.all_codes()),
     }
     return documents
+
+
+def _ws_frames_document() -> dict[str, Any]:
+    """JSON Schema for every frame on ``/api/device/v1/ws``.
+
+    ``models_json_schema`` rather than one ``model_json_schema`` per class, so
+    shared definitions are emitted once and the ``$ref`` targets agree — a
+    generator fed six independent documents produces six copies of the same
+    enum, which then drift.
+    """
+    _, schemas = models_json_schema(
+        [(model, "serialization") for model in WS_FRAMES_OUT + WS_FRAMES_IN],
+        ref_template="#/$defs/{model}",
+    )
+    return {
+        "description": (
+            "Frames on the device realtime socket, wss://<host>/api/device/v1/ws "
+            "(SPEC 4.6). OpenAPI cannot describe a WebSocket, so these are "
+            "generated separately from the same Pydantic models. Auth is on the "
+            "handshake: Authorization, X-Installation-Id and X-App-Version "
+            "headers, never a query string."
+        ),
+        "server_to_app": [model.__name__ for model in WS_FRAMES_OUT],
+        "app_to_server": [model.__name__ for model in WS_FRAMES_IN],
+        "$defs": schemas.get("$defs", {}),
+    }
 
 
 def export(directory: Path = CONTRACT_DIR) -> list[str]:

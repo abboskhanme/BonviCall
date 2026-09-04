@@ -255,6 +255,30 @@ class DeviceService:
         await self.session.flush()
         return health, skew
 
+    async def set_ws_connected(
+        self, installation_id: uuid.UUID, connected: bool, queue_records: int | None = None
+    ) -> None:
+        """Mirror the realtime socket's state onto the device page (SPEC §4.6).
+
+        ``ws_connected`` answers "reachable", ``last_heartbeat_at`` answers
+        "healthy", and the panel shows them as two fields because a socket can
+        be alive while capture is dead. Do not merge them into one green dot.
+
+        **Only updates an existing row.** A phone that has opened a socket but
+        never sent a heartbeat has no health to record, and inventing a row of
+        nulls here would put it into the health table before it has ever
+        reported anything — the exact state ``detect_silence`` reads as "never
+        reported". The hub is the live answer to who is connected; this column
+        is the panel's copy of it.
+        """
+        health = await self.session.get(DeviceHealthModel, installation_id)
+        if health is None:
+            return
+        health.ws_connected = connected
+        if queue_records is not None:
+            health.queue_records = queue_records
+        await self.session.commit()
+
     async def ingest_heartbeat(self, installation, payload):
         """One heartbeat request, end to end: state, alerts, update block.
 

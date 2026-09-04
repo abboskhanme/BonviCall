@@ -21,9 +21,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from fastapi import Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import HTTPConnection
 
 from src.core import clock
 from src.core.config import get_settings
@@ -217,14 +217,16 @@ class AuthService:
         )
 
 
-async def resolve_principal(request: Request, session: AsyncSession) -> Principal:
-    """Turn a request into a :class:`Principal`, or raise 401.
+async def resolve_principal(
+    connection: HTTPConnection, session: AsyncSession
+) -> Principal:
+    """Turn a request or a socket handshake into a :class:`Principal`, or 401.
 
     Registered on the application in ``main.py``. ``core`` never imports this
     module — the composition root does the wiring, which is what keeps the
     dependency arrows pointing one way (CONVENTIONS.md §11).
     """
-    token = bearer_token(request.headers.get("Authorization"))
+    token = bearer_token(connection.headers.get("Authorization"))
 
     service_principal = await _service_principal(session, token)
     if service_principal is not None:
@@ -239,8 +241,8 @@ async def resolve_principal(request: Request, session: AsyncSession) -> Principa
         # token_version rule, so it builds its own principal (CONVENTIONS §2).
         return await InstallationService(session).principal_for_claims(
             claims,
-            installation_header=request.headers.get(HEADER_INSTALLATION),
-            fingerprint_header=request.headers.get(HEADER_FINGERPRINT),
+            installation_header=connection.headers.get(HEADER_INSTALLATION),
+            fingerprint_header=connection.headers.get(HEADER_FINGERPRINT),
         )
     raise UnauthorizedError()
 

@@ -224,9 +224,14 @@ class AudioService:
     ) -> tuple[CallAudioModel, bool]:
         """Verify, store, and flip the call to ``has_audio``.
 
-        Idempotent: committing twice returns the same row, because the device
-        may not have seen the first response and must not be made to re-upload
-        3 MB to find out.
+        Returns the audio row and whether the file's length disagrees with the
+        call log by more than two seconds (UC-14). That second value goes back
+        to the handset: a device whose recorder truncates every call needs to
+        hear so, and it is the only signal that says so.
+
+        Idempotent: committing twice returns the same row *and the same flag*,
+        because the device may not have seen the first response and must not be
+        made to re-upload 3 MB to find out.
         """
         upload = await self.session.get(AudioUploadSessionModel, upload_id)
         if upload is None or upload.installation_id != installation.id:
@@ -235,7 +240,8 @@ class AudioService:
             audio = await self.session.scalar(
                 select(CallAudioModel).where(CallAudioModel.call_id == upload.call_id)
             )
-            return audio, False
+            committed_call = await self.session.get(CallModel, upload.call_id)
+            return audio, committed_call.audio_duration_mismatch
         if upload.status is not UploadStatus.OPEN:
             raise GoneError(ErrorCode.UPLOAD_EXPIRED)
 
@@ -286,7 +292,7 @@ class AudioService:
         await self.session.commit()
         await self.session.refresh(audio)
         log.info("audio_committed", call_id=str(call.id), bytes=stored.bytes)
-        return audio, True
+        return audio, call.audio_duration_mismatch
 
     async def probe(
         self, installation: InstallationModel, upload_id: uuid.UUID

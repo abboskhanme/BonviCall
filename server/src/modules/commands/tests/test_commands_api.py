@@ -21,14 +21,24 @@ from src.modules.commands.service import CommandService
 pytestmark = pytest.mark.asyncio
 
 
-async def test_a_manager_can_dial(manager, installation_factory) -> None:
+async def test_a_manager_can_dial(db, manager, installation_factory) -> None:
+    """202 and already ``sent``: the panel issues *and* delivers in one request.
+
+    This phone holds no socket, so "sent" means the wake-up was attempted and
+    the ball is now with the handset — which is what starts the fifteen second
+    ack clock (SPEC §4.6 step 3). It read ``pending`` before the realtime
+    channel existed, when nothing followed the insert.
+    """
     installation = await installation_factory()
     response = await manager.post(
         f"/api/v1/devices/{installation.id}/commands",
         json={"kind": "dial", "number": "+998 93 555-44-33"},
     )
     assert response.status_code == 202
-    assert response.json()["status"] == "pending"
+    assert response.json()["status"] == "sent"
+
+    command = await db.get(CommandModel, uuid.UUID(response.json()["id"]))
+    assert command.sent_at is not None, "the ack timeout never starts without it"
 
 
 async def test_the_dialled_number_is_normalised(db, manager, installation_factory) -> None:
