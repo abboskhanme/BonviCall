@@ -200,10 +200,10 @@ async def test_a_fresh_delta_is_not_a_gap_yet(db, manager, installation_factory)
     assert body["open_deltas"] == []
 
 
-async def test_the_report_needs_reports_read(sales, viewer, client) -> None:
+async def test_the_report_needs_reports_read(sales, service_token, client) -> None:
     assert (await client.get("/api/v1/reports/gap")).status_code == 401
     assert (await sales.get("/api/v1/reports/gap")).status_code == 403
-    assert (await viewer.get("/api/v1/reports/gap")).status_code == 403
+    assert (await service_token.get("/api/v1/reports/gap")).status_code == 403
 
 
 async def test_an_empty_report_does_not_divide_by_zero(manager) -> None:

@@ -65,6 +65,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Agents
+         * @description A one-off roster import, dry-run by default (T59).
+         *
+         *     ~33 people, pasted out of a spreadsheet. The diff is shown before anything
+         *     is written, because a roster import that half-succeeded is harder to
+         *     recover from than one that did not run.
+         */
+        post: operations["import_agents_api_v1_agents_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/alerts": {
         parameters: {
             query?: never;
@@ -297,8 +321,9 @@ export interface paths {
          *     Only the retention job removes audio, and it never removes a call.
          *
          *     **No permission dependency on purpose.** T45 asserts 405 for all five
-         *     roles, so the refusal has to outrank authorisation: a ``viewer`` getting
-         *     403 here would mean the answer depends on who is asking, and it does not.
+         *     roles, so the refusal has to outrank authorisation: a role that cannot read
+         *     calls getting 403 here would mean the answer depends on who is asking, and
+         *     it does not.
          *     A caller with no token still gets 401 — that is the principal dependency.
          */
         delete: operations["delete_call_api_v1_calls__call_id__delete"];
@@ -735,6 +760,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/data-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Usage Report
+         * @description Per-device cellular traffic against the cap (N14, R14).
+         *
+         *     The employee pays for this, so it is a first-class report rather than a
+         *     debug counter — an unexplained data charge on a personal phone is exactly
+         *     what gets an app uninstalled.
+         */
+        get: operations["data_usage_report_api_v1_reports_data_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/gap": {
         parameters: {
             query?: never;
@@ -751,6 +800,26 @@ export interface paths {
          *     than a gap.
          */
         get: operations["gap_report_api_v1_reports_gap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage Report
+         * @description Current GB and 30-day growth, without a ``du`` over 200 GB (N18).
+         */
+        get: operations["storage_report_api_v1_reports_storage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1581,6 +1650,41 @@ export interface components {
             permissions: string[];
             role: components["schemas"]["UserRole"];
         };
+        /** DataUsageResponse */
+        DataUsageResponse: {
+            /** Cap Bytes Month */
+            cap_bytes_month: number;
+            /** Items */
+            items: components["schemas"]["DataUsageRowOut"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * DataUsageRowOut
+         * @description One installation's traffic against the cap the employee pays for.
+         */
+        DataUsageRowOut: {
+            /** Agent Name */
+            agent_name: string;
+            /** Cap Bytes Month */
+            cap_bytes_month: number;
+            /** Cellular Bytes Month */
+            cellular_bytes_month: number;
+            /**
+             * Installation Id
+             * Format: uuid
+             */
+            installation_id: string;
+            /**
+             * Over Cap
+             * @description Past N14's cap: the app stops uploading audio over cellular.
+             */
+            over_cap: boolean;
+            /** Requests Month */
+            requests_month: number;
+            /** Wifi Bytes Month */
+            wifi_bytes_month: number;
+        };
         /** DeviceHealthListResponse */
         DeviceHealthListResponse: {
             /** Items */
@@ -1908,6 +2012,64 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * ImportAgentsRequest
+         * @description ``POST /api/v1/agents/import`` — CSV text, not a file upload.
+         *
+         *     A one-off for ~33 people (T59), not a live integration. Text rather than a
+         *     multipart file because the realistic input is a paste out of a spreadsheet,
+         *     and asking somebody to save a file first is a step that fails.
+         */
+        ImportAgentsRequest: {
+            /**
+             * Csv
+             * @description Header row plus data: full_name[,employee_code[,hired_at]].
+             */
+            csv: string;
+            /**
+             * Dry Run
+             * @description Default true, deliberately: the diff is shown before anything is written, because a roster import that half-succeeded is worse than one that did not run.
+             * @default true
+             */
+            dry_run: boolean;
+        };
+        /** ImportAgentsResponse */
+        ImportAgentsResponse: {
+            /** Created */
+            created: number;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Errors */
+            errors: number;
+            /** Rows */
+            rows: components["schemas"]["ImportRowResult"][];
+            /** Skipped */
+            skipped: number;
+            /** Updated */
+            updated: number;
+        };
+        /**
+         * ImportRowResult
+         * @description What would happen, or did happen, to one roster line.
+         */
+        ImportRowResult: {
+            /**
+             * Action
+             * @description create | update | skip | error
+             */
+            action: string;
+            /** Employee Code */
+            employee_code: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Line */
+            line: number;
+            /**
+             * Reason
+             * @description Why it was skipped or refused.
+             */
+            reason?: string | null;
+        };
         /** InstallationListResponse */
         InstallationListResponse: {
             /** Items */
@@ -2211,6 +2373,44 @@ export interface components {
             value_type: string;
         };
         /**
+         * StoragePointOut
+         * @description One day of the growth curve.
+         */
+        StoragePointOut: {
+            /** Audio Bytes Total */
+            audio_bytes_total: number;
+            /** Audio Files */
+            audio_files: number;
+            /** Bytes Added */
+            bytes_added: number;
+            /** Bytes Deleted */
+            bytes_deleted: number;
+            /**
+             * Period Date
+             * Format: date
+             */
+            period_date: string;
+        };
+        /**
+         * StorageReportResponse
+         * @description N18: current usage, 30-day growth, and the projection it implies.
+         */
+        StorageReportResponse: {
+            /** Audio Bytes Total */
+            audio_bytes_total: number;
+            /** Audio Files */
+            audio_files: number;
+            /** Bytes Added 30D */
+            bytes_added_30d: number;
+            /** History */
+            history: components["schemas"]["StoragePointOut"][];
+            /**
+             * Projected Bytes 12M
+             * @description Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.
+             */
+            projected_bytes_12m: number;
+        };
+        /**
          * UpdateAgentRequest
          * @description ``PATCH /api/v1/agents/{id}``. Absent fields are unchanged.
          */
@@ -2329,10 +2529,13 @@ export interface components {
          *     ``service`` is deliberately absent: machine access is a ``service_tokens``
          *     row, because a machine has no password, no session and no navigation. The
          *     authorisation registry in ``core/permissions.py`` covers both and a test
-         *     asserts these four are a subset of it.
+         *     asserts these three are a subset of it.
+         *
+         *     ``viewer`` was removed on 2026-09-05 with the TV board — see
+         *     ``core.permissions.Role``.
          * @enum {string}
          */
-        UserRole: "admin" | "manager" | "sales" | "viewer";
+        UserRole: "admin" | "manager" | "sales";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2506,6 +2709,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_agents_api_v1_agents_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportAgentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportAgentsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3748,6 +3984,26 @@ export interface operations {
             };
         };
     };
+    data_usage_report_api_v1_reports_data_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataUsageResponse"];
+                };
+            };
+        };
+    };
     gap_report_api_v1_reports_gap_get: {
         parameters: {
             query?: {
@@ -3776,6 +4032,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    storage_report_api_v1_reports_storage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageReportResponse"];
                 };
             };
         };

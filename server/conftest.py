@@ -385,15 +385,6 @@ async def sales(db: AsyncSession, user_factory) -> AsyncIterator[AsyncClient]:
 
 
 @pytest_asyncio.fixture
-async def viewer(db: AsyncSession, user_factory) -> AsyncIterator[AsyncClient]:
-    """A client authenticated as ``viewer`` — the sales-room TV."""
-    user = await user_factory(UserRole.VIEWER)
-    async with await _authenticated_client(db, _principal_for(user)) as http_client:
-        http_client.principal = _principal_for(user)  # type: ignore[attr-defined]
-        yield http_client
-
-
-@pytest_asyncio.fixture
 async def service_token(db: AsyncSession) -> AsyncIterator[AsyncClient]:
     """A client authenticated as the machine principal (UC-29), plus its row."""
     token = ServiceTokenModel(

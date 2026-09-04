@@ -223,8 +223,9 @@ async def delete_call(call_id: uuid.UUID, principal: PrincipalDep) -> None:
     Only the retention job removes audio, and it never removes a call.
 
     **No permission dependency on purpose.** T45 asserts 405 for all five
-    roles, so the refusal has to outrank authorisation: a ``viewer`` getting
-    403 here would mean the answer depends on who is asking, and it does not.
+    roles, so the refusal has to outrank authorisation: a role that cannot read
+    calls getting 403 here would mean the answer depends on who is asking, and
+    it does not.
     A caller with no token still gets 401 — that is the principal dependency.
     """
     raise MethodNotAllowedError(ErrorCode.DELETE_NOT_ALLOWED)

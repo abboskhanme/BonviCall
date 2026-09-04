@@ -3852,12 +3852,11 @@
         "type": "object"
       },
       "UserRole": {
-        "description": "A panel login's role (SPEC §3.2).\n\n``service`` is deliberately absent: machine access is a ``service_tokens``\nrow, because a machine has no password, no session and no navigation. The\nauthorisation registry in ``core/permissions.py`` covers both and a test\nasserts these four are a subset of it.",
+        "description": "A panel login's role (SPEC §3.2).\n\n``service`` is deliberately absent: machine access is a ``service_tokens``\nrow, because a machine has no password, no session and no navigation. The\nauthorisation registry in ``core/permissions.py`` covers both and a test\nasserts these three are a subset of it.\n\n``viewer`` was removed on 2026-09-05 with the TV board — see\n``core.permissions.Role``.",
         "enum": [
           "admin",
           "manager",
-          "sales",
-          "viewer"
+          "sales"
         ],
         "title": "UserRole",
         "type": "string"
@@ -5326,7 +5325,7 @@
     },
     "/api/v1/calls/{call_id}": {
       "delete": {
-        "description": "**405 for every role, including admin** (UC-26, T45).\n\nThe route exists precisely so that the refusal is explicit and testable.\nWithout it a DELETE would 405 from the router with FastAPI's own body, and\n\"nobody can delete a call\" would be an absence rather than a decision.\nOnly the retention job removes audio, and it never removes a call.\n\n**No permission dependency on purpose.** T45 asserts 405 for all five\nroles, so the refusal has to outrank authorisation: a ``viewer`` getting\n403 here would mean the answer depends on who is asking, and it does not.\nA caller with no token still gets 401 — that is the principal dependency.",
+        "description": "**405 for every role, including admin** (UC-26, T45).\n\nThe route exists precisely so that the refusal is explicit and testable.\nWithout it a DELETE would 405 from the router with FastAPI's own body, and\n\"nobody can delete a call\" would be an absence rather than a decision.\nOnly the retention job removes audio, and it never removes a call.\n\n**No permission dependency on purpose.** T45 asserts 405 for all five\nroles, so the refusal has to outrank authorisation: a role that cannot read\ncalls getting 403 here would mean the answer depends on who is asking, and\nit does not.\nA caller with no token still gets 401 — that is the principal dependency.",
         "operationId": "delete_call_api_v1_calls__call_id__delete",
         "parameters": [
           {

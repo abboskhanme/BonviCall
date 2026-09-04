@@ -121,9 +121,11 @@ async def test_every_uc17_field_is_present(db, manager, installation_factory) ->
         assert field in item, field
 
 
-async def test_a_viewer_cannot_read_device_health(db, viewer, installation_factory) -> None:
+async def test_a_role_without_devices_read_sees_nothing(
+    db, service_token, installation_factory
+) -> None:
     await _health(db, await installation_factory())
-    assert (await viewer.get("/api/v1/devices")).status_code == 403
+    assert (await service_token.get("/api/v1/devices")).status_code == 403
 
 
 async def test_without_a_token_it_is_401(client) -> None:

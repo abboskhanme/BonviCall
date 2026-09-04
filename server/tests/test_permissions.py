@@ -37,16 +37,15 @@ EXPECTED_MATRIX: dict[str, set[str]] = {
         "calls:read", "calls:note", "audio:play", "audio:download", "commands:dial",
         "alerts:read", "alerts:ack", "reports:read", "reports:export", "audit:read",
         "settings:read", "settings:write", "appversions:read", "appversions:write",
-        "monitor:read", "export:read", "export:audio",
+        "export:read", "export:audio",
     },
     "manager": {
         "agents:read", "numbers:read", "enrolment:read", "installations:read",
         "devices:read", "calls:read", "calls:note", "audio:play", "audio:download",
         "commands:dial", "alerts:read", "reports:read", "reports:export",
-        "settings:read", "appversions:read", "monitor:read",
+        "settings:read", "appversions:read",
     },
     "sales": {"devices:read:own", "calls:read:own", "audio:play:own"},
-    "viewer": {"monitor:read"},
     "service": {"export:read", "export:audio", "callback:report"},
 }
 
@@ -94,13 +93,20 @@ def test_service_cannot_read_users_or_the_audit_log() -> None:
     assert not any(perm.endswith(":write") for perm in service)
 
 
-def test_viewer_holds_nothing_but_the_board() -> None:
-    """The TV hangs where visitors walk past."""
-    assert ROLE_PERMISSIONS[Role.VIEWER] == frozenset({Perm.MONITOR_READ})
+def test_the_viewer_role_is_gone() -> None:
+    """Removed with the TV board it was invented for (2026-09-05).
+
+    A role that can log in and then 403s on everything reads as a permissions
+    bug to whoever holds the account, and somebody eventually "fixes" it by
+    granting more than they meant to. There are three logins and one machine.
+    """
+    assert {role.value for role in Role} == {"admin", "manager", "sales", "service"}
+    assert {role.value for role in UserRole} == {"admin", "manager", "sales"}
+    assert not any(perm.startswith("monitor:") for perm in ALL_PERMISSIONS)
 
 
 def test_user_roles_are_a_subset_of_the_authorised_roles() -> None:
-    """``service`` is a token, not a login (SPEC §3.2), and the four DB roles fit."""
+    """``service`` is a token, not a login (SPEC §3.2); the logins are a subset."""
     assert {role.value for role in UserRole} < {role.value for role in Role}
     assert Role.SERVICE.value not in {role.value for role in UserRole}
 

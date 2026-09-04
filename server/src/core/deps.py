@@ -33,7 +33,7 @@ class Principal:
 
     :param kind: ``user`` (panel login), ``service`` (machine token, UC-29) or
         ``device`` (an installation-bound app token, N24).
-    :param role: ``admin`` / ``manager`` / ``sales`` / ``viewer`` / ``service``.
+    :param role: ``admin`` / ``manager`` / ``sales`` / ``service``.
         Do not branch on this outside ``core/permissions.py`` — ask for a
         permission instead (§2, §11).
     :param agent_id: set for a ``sales`` user only. It is what own-scope

@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from src.core.enums import AudioMissingReason
+from src.core.enums import AppVariant, AudioMissingReason
 
 
 class GapByReasonOut(BaseModel):
@@ -40,6 +40,10 @@ class GapByAgentOut(BaseModel):
 class GapByModelOut(BaseModel):
     manufacturer: str
     model: str
+    api_level: int = Field(description="Part of the M0 baseline's identity.")
+    app_variant: AppVariant = Field(
+        description="Capture rate is per variant, not only per model (D-06)."
+    )
     answered_calls: int
     calls_with_audio: int
     capture_rate: Decimal | None

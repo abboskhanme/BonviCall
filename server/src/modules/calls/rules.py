@@ -83,6 +83,26 @@ def classify_call_type(remote_number: str | None, directory: LineDirectory) -> s
     return "external"
 
 
+#: UC-11's five classes are direction x disposition. The database enforces this
+#: with ``ck_calls_direction_disposition``; the same rule lives here so a device
+#: gets a 422 it can act on instead of a 500 it will retry forever.
+VALID_DISPOSITIONS: dict[str, frozenset[str]] = {
+    "incoming": frozenset({"answered", "missed", "rejected"}),
+    "outgoing": frozenset({"answered", "no_answer"}),
+}
+
+
+def is_valid_combination(direction: str, disposition: str) -> bool:
+    """Whether ``direction`` and ``disposition`` can describe the same call.
+
+    An outgoing call cannot be "missed" and an incoming one cannot be
+    "no_answer": those are the caller's word and the receiver's word for the
+    same event, and mixing them means the record came from somewhere that does
+    not understand the call it is describing.
+    """
+    return disposition in VALID_DISPOSITIONS.get(direction, frozenset())
+
+
 def resolve_audio_reason(
     disposition: str,
     audio_expected: bool,

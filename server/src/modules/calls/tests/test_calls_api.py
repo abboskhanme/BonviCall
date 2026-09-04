@@ -474,10 +474,12 @@ async def test_another_agents_call_is_404_not_403(sales, call_factory) -> None:
     assert response.json()["error"]["code"] == "call_not_found"
 
 
-async def test_viewer_cannot_read_calls_at_all(viewer, call_factory) -> None:
+async def test_a_service_token_cannot_read_the_panel_call_list(
+    service_token, call_factory
+) -> None:
+    """UC-29: the machine reads the export, never the panel's own list."""
     await call_factory()
-    response = await viewer.get("/api/v1/calls")
-    assert response.status_code == 403
+    assert (await service_token.get("/api/v1/calls")).status_code == 403
 
 
 async def test_listing_without_a_token_is_401(client, call_factory) -> None:
@@ -535,7 +537,7 @@ async def test_a_tampered_cursor_is_400_not_500(manager) -> None:
 
 
 async def test_delete_is_405_for_every_role(
-    admin, manager, sales, viewer, call_factory
+    admin, manager, sales, service_token, call_factory
 ) -> None:
     """UC-26/T45: nobody deletes a call or its audio, including an admin.
 
@@ -548,7 +550,10 @@ async def test_delete_is_405_for_every_role(
     """
     call = await call_factory()
     for role, http_client in (
-        ("admin", admin), ("manager", manager), ("sales", sales), ("viewer", viewer)
+        ("admin", admin),
+        ("manager", manager),
+        ("sales", sales),
+        ("service", service_token),
     ):
         for path in (f"/api/v1/calls/{call.id}", f"/api/v1/calls/{call.id}/audio"):
             response = await http_client.delete(path)
@@ -773,3 +778,87 @@ async def test_sorting_ascending_by_started_at(manager, call_factory) -> None:
 
 async def test_an_unknown_sort_is_refused(manager) -> None:
     assert (await manager.get("/api/v1/calls?sort=note")).status_code == 422
+
+
+# --- Impossible records must not 500 (found by scripts/demo_data.py) --------
+
+
+async def test_an_impossible_combination_is_422_not_500(
+    installation_factory, device_client_factory
+) -> None:
+    """An outgoing call cannot be "missed" (UC-11).
+
+    Before this, the row reached ``ck_calls_direction_disposition`` and the
+    request 500'd — which a device reads as "server broken, retry" and it
+    retries the same impossible record forever. The 422 names the item and the
+    field, so the app can park it (N9).
+    """
+    installation = await installation_factory()
+    client = await device_client_factory(installation)
+    response = await client.post(
+        "/api/device/v1/calls",
+        json={
+            "calls": [
+                call_payload(
+                    direction="outgoing",
+                    disposition="missed",
+                    answered_at=None,
+                    duration_sec=0,
+                )
+            ]
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    fields = response.json()["error"]["detail"]["fields"]
+    assert any("calls.0" in field["field"] for field in fields), (
+        "the item's index must be named, or the app cannot tell which record to park"
+    )
+
+
+async def test_a_constraint_violation_fails_one_item_not_the_batch(
+    db, installation_factory, device_client_factory
+) -> None:
+    """SPEC §4.4 rule 6, for the failures the schema did not foresee.
+
+    A savepoint per item, so a row the database refuses takes only its own item
+    down. Without it one bad record poisons the transaction and the other
+    forty-nine are lost — and the device retries all fifty forever.
+    """
+    installation = await installation_factory()
+    client = await device_client_factory(installation)
+
+    good = call_payload()
+    # Answered with duration 0 trips ck_calls_answered_has_duration, which the
+    # wire schema does not check — exactly the class of failure this is for.
+    bad = call_payload(duration_sec=0)
+
+    response = await client.post(
+        "/api/device/v1/calls", json={"calls": [bad, good]}
+    )
+    assert response.status_code == 200
+    results = {item["client_call_id"]: item for item in response.json()["results"]}
+    assert results[bad["client_call_id"]]["status"] == "failed"
+    assert results[bad["client_call_id"]]["error"]["code"] == "validation_error"
+    assert "ck_calls_answered_has_duration" in results[bad["client_call_id"]]["error"]["message"]
+    assert results[good["client_call_id"]]["status"] == "created"
+
+    stored = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(CallModel)
+        .where(CallModel.client_call_id == uuid.UUID(good["client_call_id"]))
+    )
+    assert stored == 1, "the good item committed"
+
+
+async def test_the_failure_message_never_carries_the_customers_number(
+    installation_factory, device_client_factory
+) -> None:
+    """PostgreSQL's raw error includes the whole failing row, which for a call
+    means the number the employee dialled."""
+    installation = await installation_factory()
+    client = await device_client_factory(installation)
+    response = await client.post(
+        "/api/device/v1/calls", json={"calls": [call_payload(duration_sec=0)]}
+    )
+    assert "+998935554433" not in response.text

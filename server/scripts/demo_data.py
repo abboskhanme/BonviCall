@@ -322,7 +322,6 @@ def main() -> int:
         for email, role, agent_id in [
             ("manager@bonvi.uz", "manager", None),
             ("sales@bonvi.uz", "sales", first_agent["id"]),
-            ("monitor@bonvi.uz", "viewer", None),
         ]:
             body = {
                 "email": email,
@@ -343,7 +342,6 @@ def main() -> int:
         print(f"  {'admin@bonvi.uz':24} {DEMO_PASSWORD}   (hammasi)")
         print(f"  {'manager@bonvi.uz':24} {DEMO_PASSWORD}   (hammasi, sozlamasiz)")
         print(f"  {'sales@bonvi.uz':24} {DEMO_PASSWORD}   (faqat o'zinikini — {first_agent['full_name']})")
-        print(f"  {'monitor@bonvi.uz':24} {DEMO_PASSWORD}   (faqat monitor ekrani)")
     return 0
 
 

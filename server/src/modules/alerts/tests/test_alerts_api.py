@@ -143,7 +143,7 @@ async def test_the_inbox_filters_by_severity_and_open_state(
     assert (await admin.get("/api/v1/alerts")).json()["open_count"] == 1
 
 
-async def test_reading_alerts_needs_a_permission(sales, viewer, client) -> None:
+async def test_reading_alerts_needs_a_permission(sales, service_token, client) -> None:
     assert (await client.get("/api/v1/alerts")).status_code == 401
     assert (await sales.get("/api/v1/alerts")).status_code == 403
-    assert (await viewer.get("/api/v1/alerts")).status_code == 403
+    assert (await service_token.get("/api/v1/alerts")).status_code == 403

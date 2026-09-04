@@ -44,7 +44,7 @@ class UserModel(Base, UUIDMixin, TimestampMixin):
     role: Mapped[UserRole] = mapped_column(
         pg_enum(UserRole, "user_role"),
         nullable=False,
-        doc="admin | manager | sales | viewer. 'service' is a service_tokens row.",
+        doc="admin | manager | sales. 'service' is a service_tokens row, not a login.",
     )
     is_active: Mapped[bool] = mapped_column(
         sa.Boolean, nullable=False, server_default=sa.true(), doc="Can log in."
@@ -55,7 +55,7 @@ class UserModel(Base, UUIDMixin, TimestampMixin):
         nullable=True,
         doc=(
             "Which salesperson this login *is*. Required when role='sales' "
-            "(CHECK below); NULL for admin, manager and viewer."
+            "(CHECK below); NULL for admin and manager."
         ),
     )
     must_change_password: Mapped[bool] = mapped_column(

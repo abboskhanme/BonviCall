@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 
 from sqlalchemy import Select, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import clock
@@ -115,17 +116,40 @@ class CallService:
         directory = await self._line_directory()
         results: list[DeviceCallResultOut] = []
         for item in items:
+            # A savepoint per item, so a row the database refuses takes only
+            # its own item down. Without it a single constraint violation
+            # poisons the transaction and the whole batch is lost — and a batch
+            # that fails wholesale is a batch the device retries forever
+            # (SPEC §4.4 rule 6).
+            savepoint = await self.session.begin_nested()
             try:
                 results.append(await self._ingest_one(installation, item, directory))
+                await savepoint.commit()
             except ConflictError as exc:
-                # Per-item failure. The rest of the batch still commits: a
-                # batch that fails wholesale is a batch the device retries
-                # forever (SPEC §4.4 rule 6).
+                await savepoint.rollback()
+                if exc.code == ErrorCode.CALL_IDENTITY_CONFLICT:
+                    # Raised *after* the rollback, on purpose. SPEC §3.10
+                    # rule 5 wants both halves true: nothing about the call is
+                    # stored, and the alert is. Inside the savepoint the alert
+                    # would be rolled back with it, and two devices claiming
+                    # one call would pass in silence.
+                    await self._raise_replay_alert(installation, item)
+                results.append(_failed(item, exc.code, exc.message or exc.code))
+            except IntegrityError as exc:
+                # A CHECK or a unique index the schema did not foresee. The
+                # device gets a code rather than a 500, so it can park the
+                # record instead of retrying it forever (N9).
+                await savepoint.rollback()
+                log.warning(
+                    "call_rejected_by_constraint",
+                    installation_id=str(installation.id),
+                    constraint=_constraint_name(exc),
+                )
                 results.append(
-                    DeviceCallResultOut(
-                        client_call_id=item.client_call_id,
-                        status="failed",
-                        error={"code": exc.code, "message": exc.message or exc.code},
+                    _failed(
+                        item,
+                        ErrorCode.VALIDATION_ERROR,
+                        f"rejected by {_constraint_name(exc)}",
                     )
                 )
         await self.session.commit()
@@ -206,15 +230,9 @@ class CallService:
         """A repeat of a known ``client_call_id`` (SPEC §3.10 rules 4 and 5)."""
         if call.number_id != installation.number_id:
             # Two devices claiming one call is either a bug or a stolen
-            # credential. Both need a human, and nothing is written either way.
-            await self.alerts.raise_alert(
-                kind=AlertKind.CREDENTIAL_REPLAY,
-                severity=AlertSeverity.CRITICAL,
-                scope=installation.id,
-                installation_id=installation.id,
-                agent_id=installation.agent_id,
-                detail={"client_call_id": str(item.client_call_id)},
-            )
+            # credential. Both need a human, and nothing about the call is
+            # written either way. The alert is raised by the caller, after the
+            # savepoint is rolled back.
             log.warning(
                 "call_identity_conflict",
                 installation_id=str(installation.id),
@@ -268,6 +286,18 @@ class CallService:
     ) -> NumberAssignmentModel | None:
         """The attribution rule (D-08) lives in ``numbers``; this asks it."""
         return await self.numbers.holder_at(number_id, moment)
+
+    async def _raise_replay_alert(
+        self, installation: InstallationModel, item: DeviceCallIn
+    ) -> None:
+        await self.alerts.raise_alert(
+            kind=AlertKind.CREDENTIAL_REPLAY,
+            severity=AlertSeverity.CRITICAL,
+            scope=installation.id,
+            installation_id=installation.id,
+            agent_id=installation.agent_id,
+            detail={"client_call_id": str(item.client_call_id)},
+        )
 
     async def _raise_out_of_range(
         self, installation: InstallationModel, started_at: datetime
@@ -554,6 +584,37 @@ class CallService:
         # everything: the database CHECK makes that state unreachable, and this
         # is the belt to its braces.
         return statement.where(CallModel.agent_id == principal.agent_id)
+
+
+def _failed(item: DeviceCallIn, code: str, message: str) -> DeviceCallResultOut:
+    """One item's failure, in the shape the batch response promises."""
+    return DeviceCallResultOut(
+        client_call_id=item.client_call_id,
+        status="failed",
+        error={"code": code, "message": message},
+    )
+
+
+def _constraint_name(error: IntegrityError) -> str:
+    """The constraint PostgreSQL named, for the log and the message.
+
+    The name only, never the raw error string: PostgreSQL's DETAIL line carries
+    the **whole failing row**, which for a call includes the number the
+    employee dialled. That must not travel back to the device or into a log.
+
+    asyncpg puts the name two levels down, under SQLAlchemy's DBAPI wrapper.
+    """
+    candidate = error
+    for _ in range(3):
+        name = getattr(candidate, "constraint_name", None)
+        if name:
+            return str(name)
+        candidate = getattr(candidate, "orig", None) or getattr(
+            candidate, "__cause__", None
+        )
+        if candidate is None:
+            break
+    return "a database constraint"
 
 
 def _normalise_remote(raw: str | None) -> str | None:

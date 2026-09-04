@@ -14,7 +14,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.enums import (
     AppVariant,
@@ -25,6 +25,7 @@ from src.core.enums import (
     CallType,
     CaptureRoute,
 )
+from src.modules.calls.rules import is_valid_combination
 
 #: SPEC §4.0: a call batch is 50 items or 256 KiB, whichever comes first.
 MAX_CALL_BATCH = 50
@@ -90,6 +91,23 @@ class DeviceCallIn(BaseModel):
     )
     app_version: str | None = Field(default=None, max_length=20)
     app_variant: AppVariant | None = None
+
+
+    @model_validator(mode="after")
+    def _direction_matches_disposition(self) -> DeviceCallIn:
+        """Refuse a combination the database would refuse anyway (UC-11).
+
+        Without this the row reaches ``ck_calls_direction_disposition`` and the
+        request 500s — which a device treats as "server broken, retry" and it
+        retries the same impossible record forever. A 422 names the field and
+        the item, so the app can park the record instead (N9).
+        """
+        if not is_valid_combination(self.direction.value, self.disposition.value):
+            raise ValueError(
+                f"disposition {self.disposition.value!r} is impossible for a "
+                f"{self.direction.value} call"
+            )
+        return self
 
 
 class DeviceCallBatchIn(BaseModel):

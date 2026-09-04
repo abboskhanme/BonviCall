@@ -129,9 +129,9 @@ async def test_an_admin_reset_forces_a_password_change(admin, user_factory) -> N
     assert body["must_change_password"] is True
 
 
-async def test_users_is_admin_only(manager, sales, viewer) -> None:
+async def test_users_is_admin_only(manager, sales, service_token) -> None:
     """``users:read`` is admin-only, so the whole screen is."""
-    for http_client in (manager, sales, viewer):
+    for http_client in (manager, sales, service_token):
         assert (await http_client.get("/api/v1/users")).status_code == 403
 
 

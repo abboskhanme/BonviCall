@@ -113,9 +113,9 @@ async def test_a_manager_reads_but_does_not_write(manager) -> None:
     assert response.status_code == 403
 
 
-async def test_sales_and_viewer_see_no_settings(sales, viewer, client) -> None:
+async def test_only_settings_read_sees_settings(sales, service_token, client) -> None:
     assert (await sales.get("/api/v1/settings")).status_code == 403
-    assert (await viewer.get("/api/v1/settings")).status_code == 403
+    assert (await service_token.get("/api/v1/settings")).status_code == 403
     assert (await client.get("/api/v1/settings")).status_code == 401
 
 

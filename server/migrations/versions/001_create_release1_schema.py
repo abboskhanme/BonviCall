@@ -75,7 +75,7 @@ EXTENSIONS: tuple[str, ...] = ("btree_gist", "citext")
 #: after the application's enums have moved on; ``core/enums.py`` and this table
 #: are compared by a test.
 PG_ENUMS: dict[str, tuple[str, ...]] = {
-    "user_role": ("admin", "manager", "sales", "viewer",),
+    "user_role": ("admin", "manager", "sales",),
     "call_direction": ("incoming", "outgoing",),
     "call_disposition": ("answered", "missed", "rejected", "no_answer",),
     "call_type": ("internal", "external", "unknown",),

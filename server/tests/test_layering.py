@@ -209,23 +209,37 @@ def test_no_router_contains_sql_or_a_commit() -> None:
     )
 
 
-def test_nothing_binds_the_clock_function_directly() -> None:
-    """``from src.core import clock`` — never ``from src.core.clock import now``.
+#: Process-wide singletons that a test must be able to redirect. Import the
+#: **module** and call through it; binding the name makes the object
+#: unpatchable, and a test that cannot redirect it silently exercises the real
+#: one. Both entries here are bugs that shipped: ``clock.now`` made three
+#: silence tests pass against the wall clock, and ``get_engine`` made three
+#: lock tests pass alone and fail in a suite.
+UNBINDABLE = {
+    "from src.core.clock import now": ("clock.py", "clock.now()"),
+    "from src.core.database import get_engine": ("database.py", "database.get_engine()"),
+    "from src.core.database import get_sessionmaker": (
+        "database.py",
+        "database.get_sessionmaker()",
+    ),
+}
 
-    Not style. ``frozen_clock`` patches ``core.clock.now``, and a module that
-    has already bound the name keeps the real one: three silence-detection
-    tests passed against the wall clock before this was fixed, which means they
-    were testing nothing.
-    """
+
+def test_nothing_binds_a_patchable_singleton_directly() -> None:
+    """Import the module, not the function, for anything a test redirects."""
     src = Path(__file__).resolve().parents[1] / "src"
-    offenders = [
-        str(path.relative_to(src))
-        for path in sorted(src.rglob("*.py"))
-        if path.name != "clock.py"
-        and "from src.core.clock import now" in path.read_text(encoding="utf-8")
-    ]
+    offenders: list[str] = []
+    for path in sorted(src.rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        for statement, (owner, replacement) in UNBINDABLE.items():
+            if path.name == owner:
+                continue
+            if statement in source:
+                offenders.append(
+                    f"{path.relative_to(src)}: {statement!r} — use {replacement}"
+                )
     assert offenders == [], (
-        f"these bind clock.now and are unpatchable by frozen_clock: {offenders}"
+        "these bind a singleton a test needs to redirect:\n  " + "\n  ".join(offenders)
     )
 
 

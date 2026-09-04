@@ -44,6 +44,11 @@ SECRET_KEY_EXCEPTIONS: frozenset[str] = frozenset(
         "has_token",
         "password_changed_at",
         "must_change_password",
+        # A boolean saying *whether* a password was generated. Redacting it
+        # produced `password_generated=…`, which hides a useful fact and
+        # teaches people that the log line is noise.
+        "password_generated",
+        "password_required",
     }
 )
 

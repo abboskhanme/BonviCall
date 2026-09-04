@@ -31,18 +31,23 @@ from src.core.errors import ForbiddenError
 
 
 class Role(StrEnum):
-    """Every principal the server authorises.
+    """Every principal the server authorises: three logins and one machine.
 
     ``service`` is here but is **not** a ``user_role`` in the database
     (``core.enums.UserRole``): a machine has no password, no session and no
     navigation, so it is a ``service_tokens`` row (SPEC §3.2). A test asserts
-    the four user roles are a subset of these five.
+    the login roles are a subset of these four.
+
+    **``viewer`` was removed on 2026-09-05** with the sales-room TV board the
+    client dropped. It was the only surface that role could reach, and a role
+    that can log in and then 403s on everything reads as a permissions bug to
+    whoever holds the account — which somebody eventually "fixes" by granting
+    more than they meant to.
     """
 
     ADMIN = "admin"
     MANAGER = "manager"
     SALES = "sales"
-    VIEWER = "viewer"
     SERVICE = "service"
 
 
@@ -93,7 +98,8 @@ class Perm:
     APPVERSIONS_READ = "appversions:read"
     APPVERSIONS_WRITE = "appversions:write"
 
-    MONITOR_READ = "monitor:read"
+    # ``monitor:read`` was removed with the TV board (2026-09-05). It gated one
+    # page and one role, and both are gone.
 
     EXPORT_READ = "export:read"
     EXPORT_AUDIO = "export:audio"
@@ -146,7 +152,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.SETTINGS_WRITE,
             Perm.APPVERSIONS_READ,
             Perm.APPVERSIONS_WRITE,
-            Perm.MONITOR_READ,
             Perm.EXPORT_READ,
             Perm.EXPORT_AUDIO,
             # Not granted: *:*:own — an admin sees everything, so an own-scope
@@ -172,7 +177,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.REPORTS_EXPORT,
             Perm.SETTINGS_READ,
             Perm.APPVERSIONS_READ,
-            Perm.MONITOR_READ,
             # Not granted: agents:write / numbers:write / enrolment:write —
             # the rollout is the admin's job; a manager reviews calls.
             # Not granted: installations:revoke — revoking wipes an employee's
@@ -194,14 +198,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             # Not granted: audio:download — playing is transparency, taking a
             # copy of a customer conversation off the system is not.
             # Not granted: reports:* — every report is fleet-wide by shape.
-        }
-    ),
-    Role.VIEWER: frozenset(
-        {
-            Perm.MONITOR_READ,
-            # The sales-room TV and nothing else. The board's own DTO masks the
-            # remote number server-side (SPEC §4.1 rule 3); masking in CSS is
-            # not masking, and this role is what a visitor walking past reads.
         }
     ),
     Role.SERVICE: frozenset(

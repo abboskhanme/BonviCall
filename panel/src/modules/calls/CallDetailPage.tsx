@@ -15,7 +15,7 @@
  * feature is worse than a labelled gap. `GET /calls/{id}/audio` is not in
  * `contract/openapi-panel-v1.json` yet either.
  */
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Lock, Pencil } from 'lucide-react'
 
@@ -25,7 +25,6 @@ import { messageForError } from '@/shared/api/errors'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
 import {
-  EM_DASH,
   formatDateTime,
   formatDateTimeOrDash,
   formatDuration,
@@ -33,6 +32,7 @@ import {
   formatPhone,
 } from '@/shared/lib/format'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
+import { Field, FieldGrid, Section } from '@/shared/ui/detail'
 import { Modal, ModalField, ModalFields } from '@/shared/ui/Modal'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 
@@ -48,38 +48,6 @@ import {
   DISPOSITION_TONE,
   SOURCE_LABEL,
 } from './labels'
-
-/** One `label / value` pair. Values that are absent render an em dash, never
- *  an empty cell — "not recorded" and "nothing here" read the same otherwise. */
-function Field({
-  label,
-  value,
-  title,
-  mono = false,
-}: {
-  label: string
-  value: string | null
-  title?: string
-  mono?: boolean
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-2xs font-medium uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={mono ? 'truncate font-mono text-sm text-text' : 'text-sm text-text'} title={title}>
-        {value ?? EM_DASH}
-      </dd>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card className="p-4">
-      <h2 className="mb-3 text-sm font-semibold text-text">{title}</h2>
-      <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</dl>
-    </Card>
-  )
-}
 
 function boolText(value: boolean): string {
   return value ? t('common.yes') : t('common.no')
@@ -145,7 +113,7 @@ function AudioSection({ call }: { call: Call }) {
           <p className="text-xs text-warn">{t('callDetail.durationMismatch')}</p>
         ) : null}
 
-        <dl className="grid gap-4 pt-1 sm:grid-cols-2 xl:grid-cols-3">
+        <FieldGrid className="pt-1">
           {/* The capture route stays visible even when the audio is gone: the
               per-model capture rate is the M0 baseline and UC-23 compares
               against it, so "which mechanism ran on this handset" must remain
@@ -166,7 +134,7 @@ function AudioSection({ call }: { call: Call }) {
                 : formatDuration(Math.round(audio.duration_ms / 1000))
             }
           />
-        </dl>
+        </FieldGrid>
       </div>
     </Card>
   )

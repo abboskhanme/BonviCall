@@ -1,9 +1,9 @@
 """Panel account administration (T148, T149's server side; SPEC §4.7).
 
 Effectively admin-only, because ``users:read`` and ``users:write`` are
-admin-only. This is the screen that creates the ``manager``, ``sales`` and
-``viewer`` logins every other page is gated on — before it existed, the panel
-had role-gated pages and no way to create the roles.
+admin-only. This is the screen that creates the ``manager`` and ``sales``
+logins every other page is gated on — before it existed, the panel had
+role-gated pages and no way to create the roles.
 """
 
 from __future__ import annotations

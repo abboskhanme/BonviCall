@@ -33,6 +33,20 @@ services:
       uvicorn src.main:app --host 0.0.0.0 --port 8000
       --reload --reload-dir /app/src
 
+  # The scheduler (T150, SPEC §10.4). Its own container, not a thread inside
+  # the API: a job that deletes audio must not be able to take a request
+  # worker down with it, and restarting the API must not skip a nightly run.
+  # Two of these may run at once — every job takes a PostgreSQL advisory lock.
+  worker:
+    build: ./server
+    env_file: [.env]
+    volumes:
+      - ./server:/app
+      - audio:/data/audio
+    depends_on:
+      postgres: {condition: service_healthy}
+    command: python -m src.worker
+
   panel:
     build: ./panel
     env_file: [.env]

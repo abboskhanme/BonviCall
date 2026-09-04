@@ -151,6 +151,18 @@ class GapService:
             open_deltas=deltas,
         )
 
+    async def capture_rates_by_model(
+        self, window_start: date, window_end: date
+    ) -> list[GapByModelOut]:
+        """The rolling per-model window the nightly job persists (N4).
+
+        Read-only and projection-only, like everything in this module. The
+        rows are **written** by ``catalog``, which owns ``model_capture_stats``
+        — this module owns no table and never writes one (§2.1 rule 2).
+        """
+        conditions = self._conditions(window_start, window_end)
+        return await self._by_model(and_(*conditions))
+
     async def _by_model(self, where) -> list[GapByModelOut]:
         """Per handset model, against the M0 baseline (N4).
 
@@ -169,6 +181,8 @@ class GapService:
                 select(
                     DeviceModel.manufacturer,
                     DeviceModel.model,
+                    DeviceModel.api_level,
+                    CallModel.app_variant,
                     func.count().label("answered"),
                     func.count(case((CallModel.has_audio.is_(True), 1))).label(
                         "with_audio"
@@ -180,7 +194,12 @@ class GapService:
                 )
                 .join(DeviceModel, DeviceModel.id == InstallationModel.device_id)
                 .where(where)
-                .group_by(DeviceModel.manufacturer, DeviceModel.model)
+                .group_by(
+                    DeviceModel.manufacturer,
+                    DeviceModel.model,
+                    DeviceModel.api_level,
+                    CallModel.app_variant,
+                )
                 .order_by(DeviceModel.manufacturer, DeviceModel.model)
             )
         ).all()
@@ -211,6 +230,8 @@ class GapService:
                 GapByModelOut(
                     manufacturer=row.manufacturer,
                     model=row.model,
+                    api_level=row.api_level,
+                    app_variant=row.app_variant,
                     answered_calls=row.answered,
                     calls_with_audio=row.with_audio,
                     capture_rate=rate,

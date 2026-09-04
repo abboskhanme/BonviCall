@@ -40,7 +40,17 @@ def test_secret_bearing_keys_are_recognised(key: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "key", ["code", "error_code", "token_version", "must_change_password", "call_id"]
+    "key",
+    [
+        "code",
+        "error_code",
+        "token_version",
+        "must_change_password",
+        # A boolean about a password is not a password. Redacting it hides a
+        # fact and teaches people the log line is noise.
+        "password_generated",
+        "call_id",
+    ],
 )
 def test_contract_keys_are_not_redacted(key: str) -> None:
     """``code`` is the error contract; redacting it would blind every failure log."""

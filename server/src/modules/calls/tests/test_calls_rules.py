@@ -116,3 +116,46 @@ def test_clock_skew_is_signed() -> None:
 def test_digits_of_strips_everything_else() -> None:
     assert digits_of("+998 (90) 111-22-33") == "998901112233"
     assert digits_of(None) == ""
+
+
+# --- The direction x disposition rule (UC-11) -------------------------------
+
+
+@pytest.mark.parametrize(
+    ("direction", "disposition"),
+    [
+        ("incoming", "answered"),
+        ("incoming", "missed"),
+        ("incoming", "rejected"),
+        ("outgoing", "answered"),
+        ("outgoing", "no_answer"),
+    ],
+)
+def test_the_five_real_classes_are_valid(direction: str, disposition: str) -> None:
+    """UC-11's five classes are direction x disposition, and only these five."""
+    from src.modules.calls.rules import is_valid_combination
+
+    assert is_valid_combination(direction, disposition) is True
+
+
+@pytest.mark.parametrize(
+    ("direction", "disposition"),
+    [
+        ("outgoing", "missed"),
+        ("outgoing", "rejected"),
+        ("incoming", "no_answer"),
+    ],
+)
+def test_the_impossible_combinations_are_refused(direction: str, disposition: str) -> None:
+    """"Missed" is the receiver's word and "no answer" is the caller's; a
+    record that mixes them came from somewhere that does not understand the
+    call it is describing."""
+    from src.modules.calls.rules import is_valid_combination
+
+    assert is_valid_combination(direction, disposition) is False
+
+
+def test_an_unknown_direction_is_refused() -> None:
+    from src.modules.calls.rules import is_valid_combination
+
+    assert is_valid_combination("sideways", "answered") is False

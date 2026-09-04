@@ -39,13 +39,15 @@ class UserRole(StrEnum):
     ``service`` is deliberately absent: machine access is a ``service_tokens``
     row, because a machine has no password, no session and no navigation. The
     authorisation registry in ``core/permissions.py`` covers both and a test
-    asserts these four are a subset of it.
+    asserts these three are a subset of it.
+
+    ``viewer`` was removed on 2026-09-05 with the TV board — see
+    ``core.permissions.Role``.
     """
 
     ADMIN = "admin"
     MANAGER = "manager"
     SALES = "sales"
-    VIEWER = "viewer"
 
 
 class CallDirection(StrEnum):

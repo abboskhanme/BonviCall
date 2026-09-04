@@ -44,13 +44,12 @@ async def test_db_rolls_back_between_tests_again(db, agent_factory) -> None:
 
 
 async def test_role_clients_carry_the_right_permissions(
-    admin, manager, sales, viewer, service_token
+    admin, manager, sales, service_token
 ) -> None:
     assert admin.principal.has(Perm.AUDIT_READ)
     assert not manager.principal.has(Perm.AUDIT_READ)
     assert sales.principal.has(Perm.CALLS_READ_OWN)
     assert not sales.principal.has(Perm.CALLS_READ)
-    assert viewer.principal.permissions == frozenset({Perm.MONITOR_READ})
     assert service_token.principal.has(Perm.EXPORT_READ)
 
 

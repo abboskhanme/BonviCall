@@ -26,6 +26,12 @@ logs-backend:
 logs-panel:
 	docker compose logs -f panel
 
+logs-worker:
+	docker compose logs -f worker
+
+job:               ## make job n=silence_detection — run one job once, now
+	docker compose run --rm backend python -m src.worker --once $(n)
+
 psql:
 	docker compose exec postgres psql -U $${POSTGRES_USER:-bonvicall} -d $${POSTGRES_DB:-bonvicall}
 
@@ -110,6 +116,9 @@ shell-backend:
 # Drives the real API, so a clean run is also a smoke test of the enrolment
 # chain and the ingest path. Local stack only — it creates accounts with a
 # password that is written down in the repo.
+
+seed:              ## Create the first admin (idempotent; prints the password once)
+	docker compose run --rm backend python -m src.seed
 
 demo:              ## Seed a demo fleet: 5 agents, 5 devices, ~45 calls
 	docker compose exec -T backend python scripts/demo_data.py

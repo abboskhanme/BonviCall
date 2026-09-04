@@ -471,9 +471,13 @@ async def test_a_salesperson_can_play_their_own_audio(
     assert response.status_code == 200
 
 
-async def test_a_viewer_never_reaches_audio(viewer, audio_factory) -> None:
+async def test_a_role_without_audio_play_never_reaches_a_recording(
+    service_token, audio_factory
+) -> None:
+    """The machine token reads audio through the export route, not this one."""
     audio = await audio_factory(payload=PAYLOAD)
-    assert (await viewer.get(f"/api/v1/calls/{audio.call_id}/audio")).status_code == 403
+    response = await service_token.get(f"/api/v1/calls/{audio.call_id}/audio")
+    assert response.status_code == 403
 
 
 # --- Playback auditing (UC-24) ---------------------------------------------

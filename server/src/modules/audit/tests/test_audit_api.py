@@ -7,10 +7,10 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-async def test_audit_is_admin_only(admin, manager, sales, viewer, client) -> None:
+async def test_audit_is_admin_only(admin, manager, sales, service_token, client) -> None:
     """A manager is one of the people this log records. That is the reason."""
     assert (await admin.get("/api/v1/audit")).status_code == 200
-    for other in (manager, sales, viewer):
+    for other in (manager, sales, service_token):
         assert (await other.get("/api/v1/audit")).status_code == 403
     assert (await client.get("/api/v1/audit")).status_code == 401
 
