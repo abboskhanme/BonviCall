@@ -13,6 +13,11 @@
     "UnusedImport"
 )
 
+// PATCHED by android/scripts/widen_int64.py: the contract declares this
+// field as a formatless integer, which generates as a 32-bit kotlin.Int
+// and cannot hold its real range. Delete the patch once the server emits
+// format: int64 — Int64WireContractTest says when.
+
 package uz.bonvi.call.data.remote.dto
 
 import uz.bonvi.call.data.remote.dto.AppInfoIn
@@ -47,7 +52,7 @@ data class DeviceRedeemIn (
     val device: DeviceInfoIn,
 
     @Json(name = "device_epoch_ms")
-    val deviceEpochMs: kotlin.Int,
+    val deviceEpochMs: kotlin.Long,
 
     @Json(name = "device_fingerprint")
     val deviceFingerprint: kotlin.String,

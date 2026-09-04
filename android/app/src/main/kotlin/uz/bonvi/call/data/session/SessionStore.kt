@@ -111,6 +111,7 @@ class SessionStore @Inject constructor(
         val baseUrl: String = DEFAULT_BASE_URL,
         val simSubscriptionId: Int? = null,
         val registeredNumberDisplay: String? = null,
+        val registeredNumberE164: String? = null,
     )
 
     init {
@@ -126,6 +127,7 @@ class SessionStore @Inject constructor(
                         baseUrl = prefs[KEY_BASE_URL] ?: DEFAULT_BASE_URL,
                         simSubscriptionId = prefs[KEY_SUBSCRIPTION_ID],
                         registeredNumberDisplay = prefs[KEY_NUMBER_DISPLAY],
+                        registeredNumberE164 = prefs[KEY_NUMBER_E164],
                     )
                 }
                 .collect()

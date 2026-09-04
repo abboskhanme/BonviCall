@@ -1,6 +1,8 @@
 package uz.bonvi.call.capture
 
 import uz.bonvi.call.data.session.SessionStore
+import uz.bonvi.call.domain.SimDirectory
+import uz.bonvi.call.domain.SimOptionInfo
 import uz.bonvi.call.enrolment.SubscriptionPresenceProbe
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,4 +23,30 @@ class EnrolledSubscriptionPresenceProbe @Inject constructor(
 
     override fun enrolledSubscriptionPresent(): Boolean =
         boundary.enrolledSubscriptionPresent(session.snapshot.simSubscriptionId)
+}
+
+/**
+ * E4's SIM list, exposed as pure data.
+ *
+ * The adapter that lets `ui/` ask the question without importing `capture/`
+ * (SPEC §7.1) and without becoming a second reader of `SubscriptionManager`
+ * (CONVENTIONS.md §8.1). One reader is one place that can decide a private call
+ * is a work call.
+ */
+@Singleton
+class TelephonySimDirectory @Inject constructor(
+    private val boundary: SubscriptionPrivacyBoundary,
+) : SimDirectory {
+
+    override fun available(): List<SimOptionInfo> =
+        runCatching { boundary.availableSubscriptions() }
+            .getOrDefault(emptyList())
+            .map {
+                SimOptionInfo(
+                    subscriptionId = it.subscriptionId,
+                    slotIndex = it.slotIndex,
+                    carrierName = it.carrierName,
+                    msisdn = it.msisdn,
+                )
+            }
 }

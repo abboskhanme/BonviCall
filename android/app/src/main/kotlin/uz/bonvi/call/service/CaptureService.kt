@@ -51,6 +51,7 @@ class CaptureService : Service() {
         super.onCreate()
         createChannel()
         startInForeground()
+        isRunning = true
         Timber.i("CaptureService started, variant=%s sdk=%d", BUILD_VARIANT, Capabilities.sdkInt)
         resumeInFlightCalls()
     }
@@ -78,6 +79,7 @@ class CaptureService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         scope.cancel()
         super.onDestroy()
     }
@@ -128,6 +130,18 @@ class CaptureService : Service() {
     }
 
     companion object {
+        /**
+         * Whether the service is running RIGHT NOW.
+         *
+         * The `foreground_service` capability asks "is it running", not "was it
+         * started", and `ActivityManager.getRunningServices` answers neither
+         * usefully from API 26 (it only reports the caller's own services). A
+         * flag the service maintains is the honest answer.
+         */
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
         private const val CHANNEL_ID = "bonvicall.capture"
         private const val NOTIFICATION_ID = 1001
 

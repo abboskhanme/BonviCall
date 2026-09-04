@@ -29,5 +29,104 @@
     <string name="calls_title">Qo\'ng\'iroqlar</string>
     <string name="diagnostics_title">Tashxis</string>
 
+
+    <!-- ══ N41 ══════════════════════════════════════════════════════════════
+         The number the app records. Shown on EVERY enrolment screen and on the
+         home screen, from the moment the code is redeemed — before the install
+         finishes, not after. It is not a settings detail; it is the sentence
+         that makes the privacy boundary visible to the person carrying the
+         phone, and the install landing page has already said it once. -->
+    <string name="n41_recording_number">Yozib olinadi: %1$s</string>
+    <string name="n41_only_this_number">Faqat shu raqamdagi ish qo\'ng\'iroqlari yoziladi. Ikkinchi SIM karta hech qachon tegilmaydi.</string>
+    <string name="n41_never_uploaded">Kontaktlar, SMS, suratlar va joylashuv hech qachon yuborilmaydi.</string>
+
+    <!-- E1 — the code -->
+    <string name="enrol_code_hint">Kod</string>
+    <string name="enrol_code_explain">Administrator yuborgan havoladagi kodni kiriting.</string>
+    <string name="enrol_code_submit">Davom etish</string>
+    <string name="enrol_hello">Salom, %1$s!</string>
+
+    <!-- E1 failures. Each has its own sentence AND its own next action; a
+         generic error here is where an unaided install stops. -->
+    <string name="enrol_error_code_not_found">Bunday kod topilmadi. Kodni tekshirib, qaytadan kiriting.</string>
+    <string name="enrol_error_code_used">Bu kod allaqachon ishlatilgan.</string>
+    <string name="enrol_error_code_expired">Kod muddati tugagan.</string>
+    <string name="enrol_error_code_revoked">Bu kod bekor qilingan.</string>
+    <string name="enrol_error_already_active">Bu raqam boshqa telefonga ulangan.</string>
+    <string name="enrol_error_offline">Internetga ulanib bo\'lmadi. Aloqani tekshiring.</string>
+    <string name="enrol_error_generic">Xatolik yuz berdi. Qaytadan urinib ko\'ring.</string>
+    <string name="enrol_action_new_code">Administratordan yangi kod so\'rash</string>
+    <string name="enrol_action_move_here">Bu telefonga ko\'chirish</string>
+    <string name="enrol_action_contact_admin">Administratorga murojaat qilish</string>
+    <string name="common_retry">Qaytadan urinish</string>
+    <string name="common_skip">O\'tkazib yuborish</string>
+    <string name="common_continue">Davom etish</string>
+    <string name="common_open_settings">Sozlamalarni ochish</string>
+    <string name="common_help">Yordam kerak</string>
+    <string name="common_optional">ixtiyoriy</string>
+
+    <!-- ══ E2 ═══════════════════════════════════════════════════════════════
+         One screen per permission. Each sentence says PURPOSE AND CONSEQUENCE,
+         never the permission's name: the reader is not technical, it is their
+         own phone, and Android designed some of these dialogs to look
+         alarming. -->
+    <string name="perm_phone_state_title">Qo\'ng\'iroqlarni aniqlash</string>
+    <string name="perm_phone_state_why">Ilova qo\'ng\'iroq boshlanganini bilishi kerak. Bo\'lmasa hech narsa qayd etilmaydi.</string>
+
+    <string name="perm_call_log_title">Qo\'ng\'iroqlar tarixi</string>
+    <string name="perm_call_log_why">Qo\'ng\'iroq tugagach, uning davomiyligi va yo\'nalishi shu yerdan aniqlanadi.</string>
+
+    <string name="perm_notifications_title">Bildirishnomalar</string>
+    <string name="perm_notifications_why">Ilova ishlab turganini ko\'rsatuvchi doimiy bildirishnoma uchun. Bildirishnoma o\'chirilsa, telefon ilovani to\'xtatib qo\'yadi.</string>
+
+    <string name="perm_microphone_title">Mikrofon</string>
+    <string name="perm_microphone_why">Mikrofon bo\'lmasa suhbat yozilmaydi, lekin qo\'ng\'iroq baribir qayd etiladi.</string>
+
+    <string name="perm_call_phone_title">Qo\'ng\'iroq qilish</string>
+    <string name="perm_call_phone_why">Panelidan raqamni bosib qo\'ng\'iroq qilish uchun kerak.</string>
+
+    <string name="perm_contacts_title">Kontaktlar</string>
+    <string name="perm_contacts_why">Faqat ro\'yxatda ismni ko\'rsatish uchun. Kontaktlaringiz hech qayerga yuborilmaydi va bu qadamni o\'tkazib yuborsangiz ham bo\'ladi.</string>
+
+    <string name="perm_battery_title">Batareya cheklovini olib tashlash</string>
+    <string name="perm_battery_why">Telefon batareyani tejash uchun ilovani to\'xtatadi va qo\'ng\'iroqlar yozilmay qoladi.</string>
+
+    <string name="perm_storage_title">Yozuvlar papkasi</string>
+    <string name="perm_storage_why">Telefonning o\'z diktofoni yozgan faylni topish uchun. Boshqa hech qanday fayl o\'qilmaydi.</string>
+
+    <string name="perm_autostart_title">Avtomatik ishga tushish</string>
+    <string name="perm_autostart_why">Telefon o\'chib yonganda ilova o\'zi ishga tushishi kerak.</string>
+
+    <!-- E2 result chips. `granted_not_working` is a distinct state: retrying
+         the system dialog will never fix it, so the app must not offer that. -->
+    <string name="perm_state_working">Ishlayapti</string>
+    <string name="perm_state_not_working">Ruxsat berilgan, lekin ishlamayapti</string>
+    <string name="perm_state_not_working_help">Telefon sozlamalaridan ushbu ilova uchun ruxsatni qo\'lda yoqing — bu oynani qayta ochish yordam bermaydi.</string>
+    <string name="perm_state_denied">Ruxsat berilmagan</string>
+    <string name="perm_state_denied_permanently">Sozlamalardan yoqing</string>
+    <string name="perm_state_unknown">Tekshirib bo\'lmadi</string>
+    <string name="perm_check_running">Tekshirilmoqda…</string>
+    <string name="perm_allow">Ruxsat berish</string>
+
+    <!-- E4 -->
+    <string name="enrol_sim_explain">Ish raqamingiz turgan SIM kartani tanlang. Ikkinchi SIM kartaga hech qachon tegilmaydi.</string>
+    <string name="enrol_sim_slot">%1$d-uyacha</string>
+
+    <!-- E5 -->
+    <string name="enrol_verify_explain">Raqamingiz sizga tegishli ekanini tasdiqlash uchun quyidagi raqamga qo\'ng\'iroq qiling. Qo\'ng\'iroq qabul qilinmaydi va pul yechilmaydi.</string>
+    <string name="enrol_verify_call">Qo\'ng\'iroq qilish</string>
+    <string name="enrol_verify_waiting">Qo\'ng\'iroq kutilmoqda… %1$s</string>
+    <string name="enrol_error_no_caller_id">Operatoringiz raqamingizni ko\'rsatmayapti, shuning uchun bu usul ishlamaydi. Administrator tasdiqlashi kerak.</string>
+    <string name="enrol_error_wrong_sim">Qo\'ng\'iroq boshqa raqamdan keldi. Ish raqamingiz turgan SIM kartani tanlab, qaytadan urinib ko\'ring.</string>
+    <string name="enrol_error_timeout">Vaqt tugadi. Qaytadan urinib ko\'ring.</string>
+    <string name="enrol_error_receiver_down">Tasdiqlash xizmati hozir ishlamayapti. Administratorga murojaat qiling.</string>
+
+    <!-- E6. Reached only when everything works AND the number is proven. -->
+    <string name="enrol_done_ready">Hammasi tayyor. Ish qo\'ng\'iroqlaringiz qayd etilmoqda.</string>
+    <string name="enrol_done_blocked">Hali tayyor emas: %1$s</string>
+    <string name="enrol_done_attested">Raqamni administrator tasdiqlagan.</string>
+    <string name="enrol_done_diagnostics">Tashxis sahifasi</string>
+    <string name="enrol_not_finished">Ro\'yxatdan o\'tish tugamagan — qo\'ng\'iroqlar hali yuborilmaydi.</string>
+
     <string name="common_not_ready">Bu ekran hali tayyor emas.</string>
 </resources>

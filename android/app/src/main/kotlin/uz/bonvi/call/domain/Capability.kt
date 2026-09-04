@@ -47,6 +47,29 @@ enum class Capability(val wire: String) {
     SUBSCRIPTION_RESOLUTION("subscription_resolution"),
 }
 
+/**
+ * The runtime permission behind a capability, or null when it is a settings
+ * screen rather than a dialog.
+ *
+ * Null is not "no permission needed" — battery exemption and all-files access
+ * are granted on a settings page, and asking for them with
+ * `RequestPermission()` silently does nothing, which looks to the agent like a
+ * button that is broken.
+ */
+fun Capability.runtimePermission(): String? = when (this) {
+    Capability.PHONE_STATE -> android.Manifest.permission.READ_PHONE_STATE
+    Capability.CALL_LOG -> android.Manifest.permission.READ_CALL_LOG
+    Capability.MICROPHONE -> android.Manifest.permission.RECORD_AUDIO
+    Capability.CALL_PHONE -> android.Manifest.permission.CALL_PHONE
+    Capability.NOTIFICATIONS -> "android.permission.POST_NOTIFICATIONS"
+    // Never requested: the contact book is not read (N28). Present only so the
+    // panel can report it as not_applicable.
+    Capability.CONTACTS -> null
+    Capability.BATTERY_EXEMPTION, Capability.STORAGE_ACCESS, Capability.OEM_AUTOSTART,
+    Capability.FOREGROUND_SERVICE, Capability.OEM_RECORDER, Capability.SUBSCRIPTION_RESOLUTION,
+    -> null
+}
+
 enum class CapabilityState(val wire: String) {
     GRANTED_WORKING("granted_working"),
 

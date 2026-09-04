@@ -13,6 +13,11 @@
     "UnusedImport"
 )
 
+// PATCHED by android/scripts/widen_int64.py: the contract declares this
+// field as a formatless integer, which generates as a 32-bit kotlin.Int
+// and cannot hold its real range. Delete the patch once the server emits
+// format: int64 — Int64WireContractTest says when.
+
 package uz.bonvi.call.data.remote.dto
 
 import uz.bonvi.call.data.remote.dto.AudioMissingReason
@@ -58,7 +63,7 @@ data class DeviceEventDetailIn (
     val clientCallId: java.util.UUID? = null,
 
     @Json(name = "deleted_bytes")
-    val deletedBytes: kotlin.Int? = null,
+    val deletedBytes: kotlin.Long? = null,
 
     @Json(name = "deleted_records")
     val deletedRecords: kotlin.Int? = null,
@@ -67,13 +72,13 @@ data class DeviceEventDetailIn (
     val discardedCount: kotlin.Int? = null,
 
     @Json(name = "free_storage_bytes")
-    val freeStorageBytes: kotlin.Int? = null,
+    val freeStorageBytes: kotlin.Long? = null,
 
     @Json(name = "from_version")
     val fromVersion: kotlin.String? = null,
 
     @Json(name = "queue_bytes")
-    val queueBytes: kotlin.Int? = null,
+    val queueBytes: kotlin.Long? = null,
 
     @Json(name = "queue_records")
     val queueRecords: kotlin.Int? = null,

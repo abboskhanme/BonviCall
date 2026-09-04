@@ -13,6 +13,11 @@
     "UnusedImport"
 )
 
+// PATCHED by android/scripts/widen_int64.py: the contract declares this
+// field as a formatless integer, which generates as a 32-bit kotlin.Int
+// and cannot hold its real range. Delete the patch once the server emits
+// format: int64 — Int64WireContractTest says when.
+
 package uz.bonvi.call.data.remote.dto
 
 import uz.bonvi.call.data.remote.dto.AppVariant
@@ -55,7 +60,7 @@ data class DeviceHeartbeatIn (
 
     /* Raw device clock; the skew evidence (N36). */
     @Json(name = "device_epoch_ms")
-    val deviceEpochMs: kotlin.Int,
+    val deviceEpochMs: kotlin.Long,
 
     @Json(name = "device_timezone")
     val deviceTimezone: kotlin.String,
@@ -82,13 +87,13 @@ data class DeviceHeartbeatIn (
     val captureEnabled: kotlin.Boolean? = null,
 
     @Json(name = "cellular_bytes_month")
-    val cellularBytesMonth: kotlin.Int? = null,
+    val cellularBytesMonth: kotlin.Long? = null,
 
     @Json(name = "device_rtt_ms")
     val deviceRttMs: kotlin.Int? = null,
 
     @Json(name = "free_storage_bytes")
-    val freeStorageBytes: kotlin.Int? = null,
+    val freeStorageBytes: kotlin.Long? = null,
 
     @Json(name = "network_type")
     val networkType: NetworkType? = null,
@@ -103,7 +108,7 @@ data class DeviceHeartbeatIn (
     val powerSaveMode: kotlin.Boolean? = null,
 
     @Json(name = "queue_bytes")
-    val queueBytes: kotlin.Int? = null,
+    val queueBytes: kotlin.Long? = null,
 
     @Json(name = "queue_oldest_at")
     val queueOldestAt: java.time.OffsetDateTime? = null,

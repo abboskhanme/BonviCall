@@ -142,34 +142,6 @@ class SubscriptionPrivacyBoundary @Inject constructor(
         }.getOrDefault(false)
     }
 
-    /**
- * What the boundary judges against. An interface so the pure rule and its
- * Android adapter both stay free of DataStore.
- */
-fun interface EnrolmentFacts {
-    fun current(): EnrolledSubscription
-}
-
-/** One SIM as E4 offers it. The MSISDN is a hint for the human, never evidence:
- *  `getLine1Number()` is empty on many Uzbek SIMs, and treating "I don't know"
- *  as "yes" is exactly what SPEC §9.1 forbids. */
-data class SimOption(
-    val subscriptionId: Int,
-    val slotIndex: Int,
-    val carrierName: String,
-    val msisdn: String?,
-)
-
-/** One SIM as E4 offers it. The MSISDN is a hint for the human, never
-     *  evidence: `getLine1Number()` is empty on many Uzbek SIMs and treating
-     *  "I don't know" as "yes" is exactly what SPEC §9.1 forbids. */
-    data class SimOption(
-        val subscriptionId: Int,
-        val slotIndex: Int,
-        val carrierName: String,
-        val msisdn: String?,
-    )
-
     companion object {
         /** `TelephonyManager.EXTRA_SUBSCRIPTION_INDEX` is `@SystemApi` on some
          *  levels, so the documented string is used rather than the constant. */
@@ -185,3 +157,28 @@ data class SimOption(
         private val TELEPHONY_SERVICE_MARKER = TelephonyManager::class.java
     }
 }
+
+/**
+ * What the boundary judges against.
+ *
+ * An interface so the pure rule and its Android adapter both stay free of
+ * DataStore: Guard 1 asks this on every call, and a boundary that had to
+ * suspend on a disk read to answer would be a boundary somebody caches.
+ */
+fun interface EnrolmentFacts {
+    fun current(): EnrolledSubscription
+}
+
+/**
+ * One SIM as E4 offers it.
+ *
+ * The MSISDN is a hint for the human, never evidence: `getLine1Number()` is
+ * empty on many Uzbek SIMs, and treating "I don't know" as "yes" is exactly
+ * what SPEC §9.1 forbids.
+ */
+data class SimOption(
+    val subscriptionId: Int,
+    val slotIndex: Int,
+    val carrierName: String,
+    val msisdn: String?,
+)

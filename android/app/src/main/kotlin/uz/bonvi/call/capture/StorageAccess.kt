@@ -1,8 +1,10 @@
 package uz.bonvi.call.capture
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import uz.bonvi.call.core.Capabilities
@@ -33,6 +35,10 @@ class OemFolderStorageAccessProbe @Inject constructor(
     override fun hasAccess(): Boolean =
         if (Capabilities.requiresAllFilesAccess()) hasAllFilesAccess() else canReadLegacyFolder()
 
+    // `Capabilities.requiresAllFilesAccess()` is annotated @ChecksSdkIntAtLeast,
+    // so lint understands these branches are API-guarded without a raw SDK_INT
+    // appearing outside core/Capabilities.kt.
+
     override fun describe(): String =
         if (Capabilities.requiresAllFilesAccess()) {
             if (hasAllFilesAccess()) "all-files access granted" else "all-files access not granted"
@@ -44,6 +50,16 @@ class OemFolderStorageAccessProbe @Inject constructor(
             }
         }
 
+    /**
+     * `@RequiresApi`, not `@SuppressLint`.
+     *
+     * Lint understands `Capabilities.requiresAllFilesAccess()` as a version
+     * guard at the CALL SITE (it is `@ChecksSdkIntAtLeast`), but it analyses
+     * this function's body independently. The annotation says what the guard
+     * already guarantees, and it keeps the raw `SDK_INT` inside
+     * core/Capabilities.kt where the architecture rule requires it.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun hasAllFilesAccess(): Boolean =
         @Suppress("TooGenericExceptionCaught")
         try {

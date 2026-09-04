@@ -41,4 +41,17 @@
       build says it is not, and the build wins.
     -->
     <issue id="ObsoleteSdkInt" severity="informational" />
+    <!--
+      REQUEST_IGNORE_BATTERY_OPTIMIZATIONS is flagged as a Play Store Content
+      Policy violation. **This app is never distributed through Google Play**
+      (N33): it is a self-hosted APK on ~15 company-registered handsets, which
+      is also why the install flow has to walk past Play Protect at all.
+
+      And UC-05 requires the exemption outright: without it the OEM battery
+      manager stops the capture service overnight and the phone silently
+      records nothing — the exact failure the whole gap report exists to catch.
+      E2 asks for it with a sentence explaining that consequence, which is more
+      than the policy this check enforces would require.
+    -->
+    <issue id="BatteryLife" severity="informational" />
 </lint>

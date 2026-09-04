@@ -46,7 +46,7 @@ test-panel:
 	docker compose run --rm panel npm run test
 
 lint:
-	docker compose run --rm backend ruff check src tests conftest.py migrations
+	docker compose run --rm backend ruff check src tests conftest.py migrations scripts
 	docker compose run --rm panel npm run lint
 
 # --- Migrations ------------------------------------------------------------
@@ -108,6 +108,10 @@ android-dto:
 	  -g kotlin -o /out \
 	  --global-property models,modelDocs=false,modelTests=false \
 	  --additional-properties=packageName=uz.bonvi.call.data.remote.dto,modelPackage=uz.bonvi.call.data.remote.dto,serializationLibrary=moshi,enumPropertyNaming=UPPERCASE,sourceFolder=.
+	@# Stopgap: the contract declares 64-bit fields as formatless integers,
+	@# which generate as 32-bit kotlin.Int. See the script's docstring; it
+	@# deletes itself once the server emits format: int64.
+	python3 android/scripts/widen_int64.py
 
 shell-backend:
 	docker compose exec backend bash
@@ -120,10 +124,19 @@ shell-backend:
 seed:              ## Create the first admin (idempotent; prints the password once)
 	docker compose run --rm backend python -m src.seed
 
-demo:              ## Seed a demo fleet: 5 agents, 5 devices, ~45 calls
+demo:              ## Seed a demo fleet: 5 agents, 5 devices, ~45 calls, real audio
 	docker compose exec -T backend python scripts/demo_data.py
+# The demo uploads one recording that is already older than
+# retention.audio_months. Running the real job — not an UPDATE — is what turns
+# it into the panel's "expired" state, and proves the job works while it is at it.
+	$(MAKE) job n=audio_retention
 
 demo-reset:        ## Wipe operational data and re-seed the demo
 	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} \
 		-d $${POSTGRES_DB:-bonvicall} -q < server/scripts/reset_demo.sql
+# The SQL drops call_audio rows but cannot reach the blobs. Clearing them here
+# keeps the two in step; leaving them would accumulate files that no row points
+# at, which is exactly the state the retention job can never clean up.
+	docker compose exec -T backend sh -c \
+		'rm -rf $${AUDIO_STORAGE_PATH:-/data/audio}/* || true'
 	$(MAKE) demo
