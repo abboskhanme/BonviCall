@@ -1,0 +1,14 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+node_modules/
+dist/
+.DS_Store
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/google-services.json
+server/.pytest_cache/
+server/.ruff_cache/
+audio_store/

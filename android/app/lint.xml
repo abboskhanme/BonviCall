@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+      The whole product is Uzbek and self-hosted (N33, N39). There is no second
+      locale in release 1, so a missing translation cannot exist, and a Play
+      Store policy check has nothing to check.
+    -->
+    <issue id="MissingTranslation" severity="ignore" />
+    <issue id="GoogleAppIndexingWarning" severity="ignore" />
+
+    <!--
+      MANAGE_EXTERNAL_STORAGE, QUERY_ALL_PACKAGES-style warnings and the
+      "scoped storage" advice all fire on the modern34 flavour by design: the
+      OEM recordings folder is the product (S1). The permission carries its own
+      comment naming the UC in the manifest, which is the check that matters
+      here (CONVENTIONS-CLIENT.md §9), and T104 minimises the set once.
+    -->
+    <issue id="ScopedStorage" severity="informational" />
+    <!--
+      Version-currency nags. The dependency versions are a DECISION, recorded in
+      gradle/libs.versions.toml: they are the combination ../CallSentry is proven
+      on, and AGP/Kotlin/Compose-compiler move as a set. A lint run that is sixty
+      lines of "a newer version exists" is a lint run nobody reads, and the one
+      real finding hides in it. Upgrades are a task, not a warning.
+    -->
+    <issue id="GradleDependency" severity="informational" />
+    <issue id="AndroidGradlePluginVersion" severity="informational" />
+
+    <!--
+      TODO(T145): migrate Room, Moshi and Hilt from kapt to KSP. It is a real
+      improvement — build time, and Moshi drops kapt support in 2.0 — but it is
+      a change to the annotation-processing setup of the whole app, which is
+      wiring work, not scaffold work. Kept visible rather than silenced.
+    -->
+    <issue id="KaptUsageInsteadOfKsp" severity="informational" />
+
+    <!--
+      AAPT requires the `-v26` qualifier on the adaptive-icon folder even though
+      minSdk is 26 — without it resource linking fails outright with "resource
+      mipmap/ic_launcher not found". Lint says the qualifier is redundant; the
+      build says it is not, and the build wins.
+    -->
+    <issue id="ObsoleteSdkInt" severity="informational" />
+</lint>

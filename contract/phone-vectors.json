@@ -1,0 +1,20 @@
+{
+  "_comment": "CONVENTIONS.md §7. Read by BOTH server/tests/test_phone.py and android/app/src/test. This file is the mechanism that keeps the Python and Kotlin implementations from drifting: adding a format means adding a vector here, once. PHONE_KEY_DIGITS = 9.",
+  "phone_key_digits": 9,
+  "vectors": [
+    {"raw": "+998 90 111-22-33",  "key": "901112233", "e164": "+998901112233", "note": "BonviZvonki contact export, spaced with dashes"},
+    {"raw": "998901112233",       "key": "901112233", "e164": "+998901112233", "note": "no plus"},
+    {"raw": "901112233",          "key": "901112233", "e164": "+998901112233", "note": "national, 9 digits"},
+    {"raw": "+998901112233",      "key": "901112233", "e164": "+998901112233", "note": "canonical"},
+    {"raw": "(90) 111 22 33",     "key": "901112233", "e164": "+998901112233", "note": "parenthesised operator code"},
+    {"raw": "8 90 111 22 33",     "key": "901112233", "e164": "+998901112233", "note": "Russian-style trunk prefix 8"},
+    {"raw": "+998 (90) 111 22 33","key": "901112233", "e164": "+998901112233", "note": "mixed"},
+    {"raw": "1234567",            "key": null, "e164": null, "note": "7 digits. NEVER a key — BonviZvonki matched this against the tail of every number and marked strangers as colleagues"},
+    {"raw": "700",                "key": null, "e164": null, "note": "PBX extension, is_extension = true"},
+    {"raw": "*700",               "key": null, "e164": null, "note": "extension with prefix"},
+    {"raw": "",                   "key": null, "e164": null, "note": "empty"},
+    {"raw": null,                 "key": null, "e164": null, "note": "null in, null out"}
+  ],
+  "extensions": ["700", "*700", "101", "1234"],
+  "not_extensions": ["901112233", "+998901112233", "123456"]
+}

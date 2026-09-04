@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  legacy28 — targetSdk 28, legacy storage.
+
+  Everything shared is in src/main/AndroidManifest.xml; only the difference is
+  here (SPEC §7.2: the two manifests and one di/CaptureModule.kt are the ONLY
+  flavour-specific sources).
+
+  On targetSdk 28 the OEM harvest reaches /sdcard/Recordings/... through
+  Environment.getExternalStorageDirectory() and plain File objects. That is
+  legacy storage, and it is exactly what scoped storage closes — which is why
+  this flavour exists and why M0 has to measure rather than assume.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- UC-14: read the handset's own call recordings. READ only — the files
+         are never moved, modified or deleted (CONVENTIONS.md §8.3), so
+         WRITE_EXTERNAL_STORAGE is deliberately NOT declared even though
+         SPEC §7.2 names it. maxSdkVersion 28: above that the permission grants
+         nothing and would only add a screen. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+</manifest>

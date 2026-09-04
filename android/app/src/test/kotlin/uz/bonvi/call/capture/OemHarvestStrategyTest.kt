@@ -1,0 +1,101 @@
+package uz.bonvi.call.capture
+
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
+import uz.bonvi.call.domain.AudioMissingReason
+import uz.bonvi.call.domain.CaptureRoute
+import uz.bonvi.call.domain.Decision
+import java.io.File
+
+/**
+ * The preferred route's seam.
+ *
+ * The real locators are T71b and are blocked on S1 + M0. What is testable — and
+ * load-bearing — today is that **the strategy cannot be pointed at a call it
+ * has no proof for**, and that a window matching nothing is the boundary
+ * refusing rather than a bug (CONVENTIONS.md §8, SPEC §7.4).
+ */
+class OemHarvestStrategyTest {
+
+    private val proof = Decision.Capture(
+        subscriptionId = 2,
+        registeredNumber = "+998901112233",
+        answeredAtEpochMillis = 10_000L,
+        endedAtEpochMillis = 70_000L,
+    )
+
+    private val harvested = File("oem.m4a")
+
+    private fun strategy(
+        located: File?,
+        recorderReachable: Boolean = true,
+    ) = OemHarvestStrategy(
+        capture = proof,
+        locator = { _ -> located },
+        recorderReachable = { recorderReachable },
+    )
+
+    @Test
+    fun `a located file is returned on the OEM route`() {
+        val strategy = strategy(located = harvested)
+
+        strategy.start(File("ignored"))
+
+        assertThat(strategy.stop()).isEqualTo(harvested)
+        assertThat(strategy.route).isEqualTo(CaptureRoute.OEM_FILE_HARVEST)
+        assertThat(strategy.lastFailure()).isNull()
+    }
+
+    @Test
+    fun `a window that matches nothing is attribution_failed, not a crash`() {
+        // The boundary REFUSING. An unmatched recording in that folder is the
+        // employee's private call: it is discarded on the device rather than
+        // uploaded and sorted out server-side.
+        val strategy = strategy(located = null)
+
+        strategy.start(File("ignored"))
+
+        assertThat(strategy.stop()).isNull()
+        assertThat(strategy.lastFailure()).isEqualTo(AudioMissingReason.ATTRIBUTION_FAILED)
+    }
+
+    @Test
+    fun `an unreachable OEM recorder is reported as oem_recorder_off`() {
+        // Distinct from attribution_failed on purpose: "the recorder is
+        // switched off" and "the boundary refused the file" are two different
+        // conversations with an employee.
+        val strategy = strategy(located = harvested, recorderReachable = false)
+
+        assertThat(strategy.isSupported()).isFalse()
+        assertThat(strategy.lastFailure()).isEqualTo(AudioMissingReason.OEM_RECORDER_OFF)
+    }
+
+    @Test
+    fun `the locator is given the capture proof and nothing weaker`() {
+        // The privacy boundary in its enforced form: locate() takes a
+        // Decision.Capture, so a caller that has not passed
+        // PrivacyBoundary.evaluate() cannot express the call to it at all.
+        var received: Decision.Capture? = null
+        val strategy = OemHarvestStrategy(
+            capture = proof,
+            locator = { capture -> received = capture; null },
+            recorderReachable = { true },
+        )
+
+        strategy.start(File("ignored"))
+        strategy.stop()
+
+        assertThat(received).isEqualTo(proof)
+        assertThat(received?.subscriptionId).isEqualTo(2)
+    }
+
+    @Test
+    fun `the harvest window constants are the measured ones`() {
+        // CallSentry's values (S1-RECORDING.md). Widening either widens the
+        // privacy boundary, so it must be a one-line diff a reviewer sees.
+        assertThat(OemRecordingLocator.PRE_BUFFER_MS).isEqualTo(5_000L)
+        assertThat(OemRecordingLocator.POST_BUFFER_MS).isEqualTo(120_000L)
+        assertThat(OemRecordingLocator.MIN_FILE_BYTES).isEqualTo(2_048L)
+        assertThat(OemRecordingLocator.RETRY_COUNT).isEqualTo(4)
+    }
+}

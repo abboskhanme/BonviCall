@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+# Tests run against bonvicall_test, never the dev database (CONVENTIONS.md §13).
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+# Cross-cutting tests live in tests/; a module's own tests live beside it in
+# src/modules/<name>/tests/ (CONVENTIONS.md §3), so both trees are collected.
+testpaths = ["tests", "src"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# The release-1 migration is largely machine-produced DDL. Rewrapping a
+# create_table call by hand is how a column silently loses a constraint, so the
+# line-length rule does not apply to it — every other rule still does.
+"migrations/versions/*.py" = ["E501"]

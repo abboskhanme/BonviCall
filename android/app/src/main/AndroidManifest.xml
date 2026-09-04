@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The shared manifest. Flavour-specific storage permissions and the Android 14
+  foreground-service type override live in src/legacy28/ and src/modern34/.
+
+  EVERY <uses-permission> CARRIES A COMMENT NAMING THE UC THAT NEEDS IT
+  (CONVENTIONS-CLIENT.md §9). An uncommented permission is a review failure,
+  because each one is another alarming screen during N40's 15 unaided minutes,
+  and T107 photographs those screens against whatever set T104 leaves behind.
+
+  Deliberately ABSENT, and they must stay absent:
+    READ_CONTACTS       the contact book is never uploaded (N28, §8.1 line 2).
+                        `contacts` exists as a CAPABILITY in SPEC §3.1 so the
+                        panel can report it as not_applicable — it is not a
+                        permission this app asks for.
+    READ_SMS / RECEIVE_SMS, ACCESS_FINE_LOCATION, CAMERA, READ_MEDIA_IMAGES
+                        nothing in UC-01…UC-29 reads any of them, and each is a
+                        screen that makes an employee hand back their own phone.
+    WRITE_EXTERNAL_STORAGE
+                        SPEC §7.2 names it for legacy28; it is NOT declared.
+                        OEM recordings are opened READ-ONLY and never moved,
+                        modified or deleted (CONVENTIONS.md §8.3), so a write
+                        permission would authorise the one thing the privacy
+                        boundary forbids. Raised in the T22 report.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- UC-10, UC-11: send call metadata and audio to the server. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- UC-11, N14/N15: the upload queue decides Wi-Fi vs cellular against the
+         monthly data cap, so it must be able to see which one it is on. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- UC-09, UC-15: detect a call and resolve its subscription (Guard 1).
+         Without it there is no product. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- UC-04: read the SIM's own MSISDN for verification route 1. Split out of
+         READ_PHONE_STATE at API 30. -->
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+
+    <!-- UC-13: reconcile direction, disposition and duration from the call log,
+         and the recovery sweep that finds calls the service missed. -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+
+    <!-- UC-14: the MediaRecorder fallback route, for handsets whose own
+         recorder produces nothing. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- UC-16: click-to-call from the panel.
+         ⚠️ T104 KEEP-LIST. This was nearly minimised away once; without it the
+         dial command fails SILENTLY, which is the worst kind of failure for a
+         feature nobody tests daily. Do not remove. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+
+    <!-- UC-05: the capture service must survive the user leaving the app. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- UC-14 / UC-09 / UC-11: Android 14 requires the type to be declared as
+         its own permission as well as on the <service> element. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- UC-05: come back after a reboot, which is the most common way a phone
+         stops reporting. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- UC-05, UC-11: hold the CPU while a call is being reconciled and while a
+         chunk is uploading, so doze does not truncate either. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- UC-03: ask for the battery-optimisation exemption. The capability check
+         then verifies it actually took effect (granted_not_working is real). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- UC-05: the foreground-service notification is mandatory, and from
+         API 33 showing it needs permission. UC-18's local warnings use it too. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- N32: the fleet is phones. Declared so the manifest says so rather than
+         letting the permission set imply it. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="true" />
+    <uses-feature android:name="android.hardware.microphone" android:required="true" />
+
+    <application
+        android:name=".BonviCallApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.BonviCall"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.BonviCall">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- UC-02, §8.1: the install landing page hands the agent a
+                 single-use code; the deep link prefills E1 so nobody types it. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bonvicall" android:host="enrol" />
+            </intent-filter>
+        </activity>
+
+        <!-- UC-05, UC-14, UC-11.
+             The type list is `microphone|dataSync` for BOTH flavours and is
+             declared once, here, so they cannot drift. `phoneCall` is
+             deliberately absent — the app does not qualify for it and starting
+             an FGS of a type you do not qualify for throws. The reasoning is
+             written out in src/modern34/AndroidManifest.xml. -->
+        <service
+            android:name=".service.CaptureService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|dataSync" />
+
+        <!-- UC-05: BOOT_COMPLETED, MY_PACKAGE_REPLACED and LOCKED_BOOT_COMPLETED
+             all restart the service. If the OS refuses, the app reports
+             service_not_running on its next contact rather than going quiet. -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- WorkManager is initialised by Hilt, not by the default initialiser
+             (androidx.hilt.work). Removing this provider is required, or the
+             default one runs first and the workers have no injected
+             dependencies. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+    </application>
+</manifest>

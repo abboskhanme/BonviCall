@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  N22, CONVENTIONS-CLIENT.md §9: HTTPS only. Cleartext is disabled everywhere
+  and there is no debug override, because a debug override is how a cleartext
+  hole reaches production. Certificate errors are fatal and are never bypassed —
+  there is no <trust-anchors> entry for user-installed CAs, so an employee's
+  phone with a corporate or malware root cannot be used to read the audio of
+  every call the fleet makes.
+
+  Consequence, stated so nobody has to rediscover it: a developer pointing a
+  phone at a local server (T29, M1) needs real TLS — a tunnel or a locally
+  trusted certificate installed at the SYSTEM level. That cost is deliberate.
+  T85 owns transport hardening and may not weaken this file.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

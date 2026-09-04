@@ -1,0 +1,7098 @@
+{
+  "components": {
+    "schemas": {
+      "ActorType": {
+        "description": "Who did the audited thing (SPEC §3.8).",
+        "enum": [
+          "user",
+          "service",
+          "device",
+          "system"
+        ],
+        "title": "ActorType",
+        "type": "string"
+      },
+      "AgentListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AgentListResponse",
+        "type": "object"
+      },
+      "AgentResponse": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "employee_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Code"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "hired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hired At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "employee_code",
+          "is_active",
+          "archived_at",
+          "hired_at",
+          "color",
+          "note",
+          "created_at"
+        ],
+        "title": "AgentResponse",
+        "type": "object"
+      },
+      "AlertKind": {
+        "description": "Every cause that can raise an alert (SPEC §10.3).\n\nSPEC §3.1 says \"24 values\"; §10.3's table groups the three\n``permission_lost_*`` causes on one line and pairs\n``retention_job_failed``/``backup_failed`` on another. Expanded, the closed\nset is the 27 below — the count in §3.1 is a count of table rows.",
+        "enum": [
+          "capture_disabled",
+          "permission_lost_microphone",
+          "permission_lost_phone_state",
+          "permission_lost_call_log",
+          "battery_optimisation_reenabled",
+          "app_force_stopped",
+          "install_disappeared",
+          "recording_route_lost",
+          "service_not_running",
+          "device_offline",
+          "device_silent",
+          "fleet_silent",
+          "capture_rate_regression",
+          "queue_full",
+          "storage_low",
+          "poisoned_record",
+          "auth_expired",
+          "credential_replay",
+          "installation_rebound",
+          "callback_receiver_down",
+          "enrolment_stalled",
+          "attribution_out_of_range",
+          "attribution_discarded_spike",
+          "retention_job_failed",
+          "backup_failed",
+          "storage_capacity_low",
+          "min_version_refusals"
+        ],
+        "title": "AlertKind",
+        "type": "string"
+      },
+      "AlertListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "open_count": {
+            "description": "Neither acknowledged nor resolved.",
+            "title": "Open Count",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "open_count"
+        ],
+        "title": "AlertListResponse",
+        "type": "object"
+      },
+      "AlertResponse": {
+        "description": "One open or acknowledged alert, as the inbox renders it.",
+        "properties": {
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "body_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Uz"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "installation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AlertKind"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "number_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Id"
+          },
+          "occurrence_count": {
+            "description": "Repeats bump this rather than inserting a row: a phone reporting every two minutes must not produce 720 rows a day.",
+            "title": "Occurrence Count",
+            "type": "integer"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AlertSeverity"
+          },
+          "title_uz": {
+            "title": "Title Uz",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "title_uz",
+          "body_uz",
+          "agent_id",
+          "installation_id",
+          "number_id",
+          "device_model",
+          "detail",
+          "first_seen_at",
+          "last_seen_at",
+          "occurrence_count",
+          "acknowledged_at",
+          "acknowledged_by",
+          "resolved_at"
+        ],
+        "title": "AlertResponse",
+        "type": "object"
+      },
+      "AlertSeverity": {
+        "enum": [
+          "info",
+          "warning",
+          "critical"
+        ],
+        "title": "AlertSeverity",
+        "type": "string"
+      },
+      "AppVariant": {
+        "description": "The ``targetSdk`` product flavour (D-06).\n\nReported on every heartbeat, stored on every call, so capture rate is\nmeasurable per variant and not only per handset model.",
+        "enum": [
+          "legacy28",
+          "modern34"
+        ],
+        "title": "AppVariant",
+        "type": "string"
+      },
+      "AssignmentListResponse": {
+        "description": "Full history for a number — this is the timeline the agent page renders.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AssignmentListResponse",
+        "type": "object"
+      },
+      "AssignmentResponse": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "id",
+          "number_id",
+          "agent_id",
+          "valid_from",
+          "valid_to",
+          "note",
+          "created_at"
+        ],
+        "title": "AssignmentResponse",
+        "type": "object"
+      },
+      "AttestRequest": {
+        "description": "``POST /api/v1/installations/{id}/attest`` (T142).\n\nAttestation is deliberately weaker evidence than a proven binding, and the\nreason is mandatory: an unexplained attestation is indistinguishable from a\nmistake six months later.",
+        "properties": {
+          "reason": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "AttestRequest",
+        "type": "object"
+      },
+      "AudioMissingReason": {
+        "description": "Why a call has no audio. Closed, ``NOT NULL`` whenever audio is absent (N5).\n\nUC-14 names six; SPEC §3.9 justifies the other four one by one. The gap\nreport's denominator excludes ``pending_upload`` and ``not_expected``,\nwhich is what keeps \"% of answered calls with audio\" honest.",
+        "enum": [
+          "pending_upload",
+          "not_expected",
+          "recording_route_unavailable",
+          "oem_recorder_off",
+          "no_permission",
+          "capture_returned_silence",
+          "app_not_running",
+          "upload_expired",
+          "queue_space_exhausted",
+          "attribution_failed"
+        ],
+        "title": "AudioMissingReason",
+        "type": "string"
+      },
+      "AuditAction": {
+        "description": "Every auditable action (UC-24, N27).\n\nSPEC §3.16 was written against this set after the fact and added two values\nto it. Both earn their place by being separately *filterable*:\n\n* ``retention_changed`` is technically a ``setting_updated``, but it is the\n  one setting whose change destroys data — \"who shortened retention, and\n  when\" must be one filter, not a JSONB dig through every settings change.\n* ``command_issued`` is a person reaching into an employee's **personally\n  owned** phone. It is the only action in the product that acts on somebody\n  else's hardware, and this log is the only place that is visible.\n\nAdding a value is a migration, which is the point: the list is closed so\nthat \"everything that happened\" is answerable from one column.",
+        "enum": [
+          "login_succeeded",
+          "login_failed",
+          "logout",
+          "password_changed",
+          "password_reset",
+          "user_created",
+          "user_updated",
+          "user_deactivated",
+          "agent_created",
+          "agent_updated",
+          "agent_archived",
+          "agents_imported",
+          "number_created",
+          "number_updated",
+          "assignment_created",
+          "assignment_closed",
+          "calls_reattributed",
+          "enrolment_code_issued",
+          "enrolment_code_revoked",
+          "installation_attested",
+          "installation_revoked",
+          "installation_rebound",
+          "command_issued",
+          "call_note_updated",
+          "calls_exported",
+          "audio_play",
+          "audio_download",
+          "audio_deleted",
+          "alert_acknowledged",
+          "setting_updated",
+          "retention_changed",
+          "line_directory_updated",
+          "supported_model_updated",
+          "app_version_published",
+          "service_token_created",
+          "service_token_revoked",
+          "export_read"
+        ],
+        "title": "AuditAction",
+        "type": "string"
+      },
+      "AuditListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AuditListResponse",
+        "type": "object"
+      },
+      "AuditResponse": {
+        "description": "One thing that happened. Immutable, by database trigger.",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/AuditAction"
+          },
+          "actor_service_token_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Service Token Id"
+          },
+          "actor_type": {
+            "$ref": "#/components/schemas/ActorType"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply.",
+            "title": "Detail"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "object_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Id"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "actor_type",
+          "actor_user_id",
+          "actor_service_token_id",
+          "action",
+          "object_type",
+          "object_id",
+          "ip",
+          "user_agent"
+        ],
+        "title": "AuditResponse",
+        "type": "object"
+      },
+      "CallAudioSummary": {
+        "description": "What the call list and the detail page need to know about the audio.\n\n``capture_route`` is here and not folded into \"audio: yes/no\" because\n``S1-RECORDING.md`` is explicit that ``app_voice_recognition`` and\n``app_mic`` must stay distinguishable: the per-model capture rate is the M0\nbaseline, and UC-23's regression alert compares against it. Collapsing the\nroutes would make \"which mechanism actually works on this handset\" an\nunanswerable question.",
+        "properties": {
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Closed enum, never free text (N5)."
+          },
+          "available": {
+            "description": "Playable now — stored and not yet expired.",
+            "title": "Available",
+            "type": "boolean"
+          },
+          "capture_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which strategy produced it (S1, M0, UC-23)."
+          },
+          "capture_route_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder name only, never a path from the phone.",
+            "title": "Capture Route Detail"
+          },
+          "duration_mismatch": {
+            "default": false,
+            "description": "The file's length disagrees with the call log (UC-14).",
+            "title": "Duration Mismatch",
+            "type": "boolean"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "expired_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Removed by retention; playback answers 410 (UC-26).",
+            "title": "Expired At"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "CallAudioSummary",
+        "type": "object"
+      },
+      "CallDirection": {
+        "description": "Ours, not BonviZvonki's ``inbound``/``outbound``.\n\nThe export (SPEC §4.9) maps ours onto theirs in exactly one place, so the\ntwo vocabularies never leak into each other.",
+        "enum": [
+          "incoming",
+          "outgoing"
+        ],
+        "title": "CallDirection",
+        "type": "string"
+      },
+      "CallDisposition": {
+        "description": "UC-11's five classes are direction x disposition.\n\n``missed`` and ``rejected`` are incoming-only, ``no_answer`` is\noutgoing-only — enforced by a CHECK, so the invalid combinations are\nunrepresentable rather than merely unused.",
+        "enum": [
+          "answered",
+          "missed",
+          "rejected",
+          "no_answer"
+        ],
+        "title": "CallDisposition",
+        "type": "string"
+      },
+      "CallListResponse": {
+        "description": "A cursor page of calls (SPEC §4.0).\n\n``total`` is computed only when the caller asks: a COUNT(*) over a filtered\n500k table is affordable once per filter change and not once per page.",
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CallResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "CallListResponse",
+        "type": "object"
+      },
+      "CallResponse": {
+        "description": "A call as the panel reads it.\n\nCarries the display fields, not only ids. Making the browser look up an\nagent's name per row is the N+1 problem relocated to the client, and the\n``device_model`` filter would otherwise exist server-side for a column the\npanel cannot show.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "agent_name": {
+            "description": "Resolved server-side; the panel renders it.",
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "app_variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "app_version": {
+            "title": "App Version",
+            "type": "string"
+          },
+          "audio": {
+            "$ref": "#/components/schemas/CallAudioSummary"
+          },
+          "audio_duration_mismatch": {
+            "title": "Audio Duration Mismatch",
+            "type": "boolean"
+          },
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "call_type": {
+            "$ref": "#/components/schemas/CallType"
+          },
+          "clock_skew_sec": {
+            "title": "Clock Skew Sec",
+            "type": "integer"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "'Xiaomi Redmi Note 12'. The device_model filter needs it.",
+            "title": "Device Model"
+          },
+          "device_timezone": {
+            "title": "Device Timezone",
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "title": "Duration Sec",
+            "type": "integer"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "has_audio": {
+            "title": "Has Audio",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "number_e164": {
+            "description": "The registered line the call happened on.",
+            "title": "Number E164",
+            "type": "string"
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "received_at": {
+            "description": "Authoritative for ordering (N36).",
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "reconciled_with_call_log": {
+            "title": "Reconciled With Call Log",
+            "type": "boolean"
+          },
+          "remote_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Number"
+          },
+          "remote_number_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Number Key"
+          },
+          "ring_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ring Sec"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CallSource"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "agent_id",
+          "number_id",
+          "installation_id",
+          "direction",
+          "disposition",
+          "call_type",
+          "remote_number",
+          "remote_number_key",
+          "contact_name",
+          "started_at",
+          "answered_at",
+          "ended_at",
+          "duration_sec",
+          "ring_sec",
+          "received_at",
+          "clock_skew_sec",
+          "device_timezone",
+          "source",
+          "reconciled_with_call_log",
+          "has_audio",
+          "audio_missing_reason",
+          "audio_duration_mismatch",
+          "note",
+          "app_version",
+          "app_variant",
+          "agent_name",
+          "number_e164",
+          "audio"
+        ],
+        "title": "CallResponse",
+        "type": "object"
+      },
+      "CallSource": {
+        "description": "How the record reached us.",
+        "enum": [
+          "live_capture",
+          "call_log_recovery"
+        ],
+        "title": "CallSource",
+        "type": "string"
+      },
+      "CallType": {
+        "description": "Internal vs external (UC-25). ``unknown`` is the mandatory default.\n\nAn empty line directory yields ``unknown``, never ``external``:\nBonviZvonki defaulted to external and 82 of 98 calls were mislabelled.",
+        "enum": [
+          "internal",
+          "external",
+          "unknown"
+        ],
+        "title": "CallType",
+        "type": "string"
+      },
+      "CaptureRoute": {
+        "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
+        "enum": [
+          "oem_file_harvest",
+          "app_voice_recognition",
+          "app_voice_communication",
+          "app_mic",
+          "none"
+        ],
+        "title": "CaptureRoute",
+        "type": "string"
+      },
+      "ChangePasswordRequest": {
+        "description": "``POST /api/v1/auth/password`` — the user's own password.",
+        "properties": {
+          "current_password": {
+            "description": "Wrong value gives 401.",
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "description": "Minimum 10 characters and no other composition rule (SPEC §4.7): a rule people cannot follow is a rule they write on a sticky note.",
+            "minLength": 10,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordRequest",
+        "type": "object"
+      },
+      "CloseAssignmentRequest": {
+        "description": "``PATCH /api/v1/assignments/{id}`` — end a holding period.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "valid_to": {
+            "description": "Must be after valid_from.",
+            "format": "date-time",
+            "title": "Valid To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valid_to"
+        ],
+        "title": "CloseAssignmentRequest",
+        "type": "object"
+      },
+      "CommandFailureReason": {
+        "description": "Why a command did not happen. UC-16 requires the panel to say which.",
+        "enum": [
+          "device_offline",
+          "no_permission",
+          "os_refused",
+          "ack_timeout",
+          "discarded_stale",
+          "unsupported",
+          "busy"
+        ],
+        "title": "CommandFailureReason",
+        "type": "string"
+      },
+      "CommandKind": {
+        "description": "Server-to-device commands. No ``send_sms`` — SMS is out of scope.",
+        "enum": [
+          "dial",
+          "config",
+          "logout",
+          "ping",
+          "recheck"
+        ],
+        "title": "CommandKind",
+        "type": "string"
+      },
+      "CommandListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommandResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CommandListResponse",
+        "type": "object"
+      },
+      "CommandResponse": {
+        "properties": {
+          "acked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acked At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandFailureReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CommandKind"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "acked_at - created_at, stored so UC-16's five-second bar is **measured** rather than assumed. R3 flags that bar as possibly unachievable on doze-restricted OEMs; this column is what turns that into a conversation with evidence.",
+            "title": "Latency Ms"
+          },
+          "result_call_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Call Id"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          }
+        },
+        "required": [
+          "id",
+          "installation_id",
+          "kind",
+          "status",
+          "failure_reason",
+          "created_at",
+          "sent_at",
+          "acked_at",
+          "expires_at",
+          "result_call_id",
+          "latency_ms"
+        ],
+        "title": "CommandResponse",
+        "type": "object"
+      },
+      "CommandStatus": {
+        "enum": [
+          "pending",
+          "sent",
+          "acknowledged",
+          "failed",
+          "expired"
+        ],
+        "title": "CommandStatus",
+        "type": "string"
+      },
+      "CreateAgentRequest": {
+        "description": "``POST /api/v1/agents``. Creating an agent never creates a login.",
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The roster import key; unique where set.",
+            "title": "Employee Code"
+          },
+          "full_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "hired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hired At"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "title": "CreateAgentRequest",
+        "type": "object"
+      },
+      "CreateAssignmentRequest": {
+        "description": "``POST /api/v1/numbers/{id}/assignments`` — hand a line to an agent.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Defaults to now. The period is [valid_from, valid_to).",
+            "title": "Valid From"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL means open-ended — they hold it now.",
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "agent_id"
+        ],
+        "title": "CreateAssignmentRequest",
+        "type": "object"
+      },
+      "CreateCommandRequest": {
+        "description": "``POST /api/v1/devices/{installation_id}/commands``.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CommandKind"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For kind='dial'. Named, not a free-form payload map (§8).",
+            "title": "Number"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "CreateCommandRequest",
+        "type": "object"
+      },
+      "CreateDirectoryEntryRequest": {
+        "description": "``POST /api/v1/line-directory`` — an admin extra for UC-25.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DirectoryRuleKind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pattern": {
+            "description": "Digits to match. UC-25's '*700' is the suffix rule '700'.",
+            "maxLength": 32,
+            "minLength": 2,
+            "title": "Pattern",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern",
+          "kind"
+        ],
+        "title": "CreateDirectoryEntryRequest",
+        "type": "object"
+      },
+      "CreateNumberRequest": {
+        "description": "``POST /api/v1/numbers``.\n\nThe number is normalised to E.164 before it is stored, so the same line\ntyped three ways is one row — the uniqueness lives on the generated\n``phone_key`` column, not on this string.",
+        "properties": {
+          "e164": {
+            "description": "Any format; normalised here.",
+            "maxLength": 32,
+            "minLength": 6,
+            "title": "E164",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "beeline | ucell | mobiuz | uzmobile | other. A reporting axis (R19).",
+            "title": "Operator"
+          },
+          "sim_owner": {
+            "default": "company",
+            "description": "R10: which SIM relationships are not Bonvi's to keep.",
+            "pattern": "^(company|employee)$",
+            "title": "Sim Owner",
+            "type": "string"
+          }
+        },
+        "required": [
+          "e164"
+        ],
+        "title": "CreateNumberRequest",
+        "type": "object"
+      },
+      "CreateUserRequest": {
+        "description": "``POST /api/v1/users`` — creates a **login**, not a salesperson.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when role='sales' — it is what own-scope narrowing filters on, and the database has a CHECK saying so.",
+            "title": "Agent Id"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "password": {
+            "minLength": 10,
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "required": [
+          "email",
+          "full_name",
+          "role",
+          "password"
+        ],
+        "title": "CreateUserRequest",
+        "type": "object"
+      },
+      "CurrentUserResponse": {
+        "description": "``GET /api/v1/auth/me`` — what the panel's ``can()`` reads.\n\nThe permission list is resolved server-side and sent whole. The panel never\nholds a role-to-permission map: a second copy of the matrix is a second\nthing to forget to update.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for a 'sales' account; what own-scope filters on.",
+            "title": "Agent Id"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "must_change_password": {
+            "description": "The panel forces the change before anything else loads.",
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "permissions": {
+            "description": "Resolved from the role, sorted.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "full_name",
+          "role",
+          "must_change_password",
+          "permissions"
+        ],
+        "title": "CurrentUserResponse",
+        "type": "object"
+      },
+      "DataUsageResponse": {
+        "properties": {
+          "cap_bytes_month": {
+            "title": "Cap Bytes Month",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DataUsageRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "cap_bytes_month"
+        ],
+        "title": "DataUsageResponse",
+        "type": "object"
+      },
+      "DataUsageRowOut": {
+        "description": "One installation's traffic against the cap the employee pays for.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "cap_bytes_month": {
+            "title": "Cap Bytes Month",
+            "type": "integer"
+          },
+          "cellular_bytes_month": {
+            "title": "Cellular Bytes Month",
+            "type": "integer"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "over_cap": {
+            "description": "Past N14's cap: the app stops uploading audio over cellular.",
+            "title": "Over Cap",
+            "type": "boolean"
+          },
+          "requests_month": {
+            "title": "Requests Month",
+            "type": "integer"
+          },
+          "wifi_bytes_month": {
+            "title": "Wifi Bytes Month",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "installation_id",
+          "agent_name",
+          "cellular_bytes_month",
+          "wifi_bytes_month",
+          "requests_month",
+          "cap_bytes_month",
+          "over_cap"
+        ],
+        "title": "DataUsageRowOut",
+        "type": "object"
+      },
+      "DeviceHealthListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceHealthResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "DeviceHealthListResponse",
+        "type": "object"
+      },
+      "DeviceHealthResponse": {
+        "description": "Every UC-17 field, plus the identity the panel needs to name a person.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "android_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Android Release"
+          },
+          "api_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Level"
+          },
+          "app_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "battery_charging": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Charging"
+          },
+          "battery_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Level"
+          },
+          "battery_optimisation_exempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Optimisation Exempt"
+          },
+          "capture_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Enabled"
+          },
+          "cellular_bytes_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cellular Bytes Month"
+          },
+          "clock_skew_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clock Skew Sec"
+          },
+          "device_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Timezone"
+          },
+          "free_storage_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Storage Bytes"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "installation_status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "is_online": {
+            "description": "Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.",
+            "title": "Is Online",
+            "type": "boolean"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Call At"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "parked_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parked Records"
+          },
+          "power_save_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Save Mode"
+          },
+          "queue_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Bytes"
+          },
+          "queue_oldest_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Oldest At"
+          },
+          "queue_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Records"
+          },
+          "recording_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recording_route_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Route Ok"
+          },
+          "service_running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Running"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "ws_connected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.",
+            "title": "Ws Connected"
+          }
+        },
+        "required": [
+          "installation_id",
+          "agent_id",
+          "number_id",
+          "installation_status",
+          "manufacturer",
+          "model",
+          "android_release",
+          "api_level",
+          "app_version",
+          "app_variant",
+          "last_heartbeat_at",
+          "last_call_at",
+          "is_online",
+          "battery_level",
+          "battery_charging",
+          "battery_optimisation_exempt",
+          "power_save_mode",
+          "free_storage_bytes",
+          "queue_records",
+          "queue_bytes",
+          "queue_oldest_at",
+          "parked_records",
+          "clock_skew_sec",
+          "device_timezone",
+          "network_type",
+          "cellular_bytes_month",
+          "service_running",
+          "capture_enabled",
+          "recording_route",
+          "recording_route_ok",
+          "updated_at"
+        ],
+        "title": "DeviceHealthResponse",
+        "type": "object"
+      },
+      "DirectoryEntryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DirectoryEntryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "DirectoryEntryListResponse",
+        "type": "object"
+      },
+      "DirectoryEntryResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DirectoryRuleKind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "pattern",
+          "kind",
+          "label",
+          "is_active",
+          "created_at"
+        ],
+        "title": "DirectoryEntryResponse",
+        "type": "object"
+      },
+      "DirectoryRuleKind": {
+        "description": "UC-25's ``*700`` is a ``suffix`` rule.",
+        "enum": [
+          "exact",
+          "prefix",
+          "suffix"
+        ],
+        "title": "DirectoryRuleKind",
+        "type": "string"
+      },
+      "EnrolmentAttemptKind": {
+        "description": "``step_timing`` carries the per-screen durations that make N40 measurable.",
+        "enum": [
+          "code_redeem",
+          "msisdn_check",
+          "callback_start",
+          "callback_match",
+          "admin_attest",
+          "step_timing"
+        ],
+        "title": "EnrolmentAttemptKind",
+        "type": "string"
+      },
+      "EnrolmentAttemptListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EnrolmentAttemptResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "EnrolmentAttemptListResponse",
+        "type": "object"
+      },
+      "EnrolmentAttemptResponse": {
+        "description": "Where UC-01's failures appear, with timestamps.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "device_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Model"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "installation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EnrolmentAttemptKind"
+          },
+          "number_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Id"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/EnrolmentOutcome"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "outcome",
+          "number_id",
+          "installation_id",
+          "agent_id",
+          "step",
+          "duration_ms",
+          "app_version",
+          "device_model",
+          "created_at"
+        ],
+        "title": "EnrolmentAttemptResponse",
+        "type": "object"
+      },
+      "EnrolmentCodeListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EnrolmentCodeResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "EnrolmentCodeListResponse",
+        "type": "object"
+      },
+      "EnrolmentCodeResponse": {
+        "description": "The code plus everything the admin has to pass on.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "attempt_count": {
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "redeemed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redeemed At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "number_id",
+          "agent_id",
+          "expires_at",
+          "redeemed_at",
+          "revoked_at",
+          "attempt_count",
+          "created_at"
+        ],
+        "title": "EnrolmentCodeResponse",
+        "type": "object"
+      },
+      "EnrolmentOutcome": {
+        "description": "Every way an enrolment step can end. The funnel's evidence base.",
+        "enum": [
+          "ok",
+          "code_not_found",
+          "code_already_used",
+          "code_expired",
+          "code_revoked",
+          "number_mismatch",
+          "msisdn_empty",
+          "no_caller_id",
+          "timeout",
+          "receiver_down",
+          "already_bound",
+          "rejected"
+        ],
+        "title": "EnrolmentOutcome",
+        "type": "string"
+      },
+      "FunnelStage": {
+        "description": "Where an agent is in the rollout (UC-17, SPEC §10.1).\n\n``verified_by_admin`` is visibly distinct from ``number_verified`` because\nattested is weaker evidence than proven, and the identity anchor must never\ndegrade silently (T142).",
+        "enum": [
+          "invited",
+          "installed",
+          "permitted",
+          "number_verified",
+          "verified_by_admin",
+          "capturing",
+          "needs_assisted_install",
+          "install_disappeared",
+          "revoked"
+        ],
+        "title": "FunnelStage",
+        "type": "string"
+      },
+      "GapByAgentOut": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "answered_calls": {
+            "title": "Answered Calls",
+            "type": "integer"
+          },
+          "calls_with_audio": {
+            "title": "Calls With Audio",
+            "type": "integer"
+          },
+          "capture_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Percent. NUMERIC, never float.",
+            "title": "Capture Rate"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_name",
+          "answered_calls",
+          "calls_with_audio",
+          "capture_rate"
+        ],
+        "title": "GapByAgentOut",
+        "type": "object"
+      },
+      "GapByModelOut": {
+        "properties": {
+          "answered_calls": {
+            "title": "Answered Calls",
+            "type": "integer"
+          },
+          "baseline_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the M0 baseline (T14).",
+            "title": "Baseline Rate"
+          },
+          "calls_with_audio": {
+            "title": "Calls With Audio",
+            "type": "integer"
+          },
+          "capture_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Rate"
+          },
+          "delta_pp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Below the threshold raises N4's alert.",
+            "title": "Delta Pp"
+          },
+          "manufacturer": {
+            "title": "Manufacturer",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "regression": {
+            "title": "Regression",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "manufacturer",
+          "model",
+          "answered_calls",
+          "calls_with_audio",
+          "capture_rate",
+          "baseline_rate",
+          "delta_pp",
+          "regression"
+        ],
+        "title": "GapByModelOut",
+        "type": "object"
+      },
+      "GapByReasonOut": {
+        "description": "Why audio is missing, and how often. The closed enum, never free text.",
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "counts_against_capture_rate": {
+            "description": "``pending_upload`` and ``not_expected`` are excluded from the denominator: an unanswered call in it makes '% of answered calls with audio' meaningless (SPEC §3.9).",
+            "title": "Counts Against Capture Rate",
+            "type": "boolean"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AudioMissingReason"
+          }
+        },
+        "required": [
+          "reason",
+          "calls",
+          "counts_against_capture_rate"
+        ],
+        "title": "GapByReasonOut",
+        "type": "object"
+      },
+      "GapReportResponse": {
+        "description": "UC-23. Totals reconcile exactly with ``/calls?has_audio=false``.",
+        "properties": {
+          "answered_calls": {
+            "title": "Answered Calls",
+            "type": "integer"
+          },
+          "by_agent": {
+            "items": {
+              "$ref": "#/components/schemas/GapByAgentOut"
+            },
+            "title": "By Agent",
+            "type": "array"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/GapByModelOut"
+            },
+            "title": "By Model",
+            "type": "array"
+          },
+          "by_reason": {
+            "items": {
+              "$ref": "#/components/schemas/GapByReasonOut"
+            },
+            "title": "By Reason",
+            "type": "array"
+          },
+          "calls_with_audio": {
+            "title": "Calls With Audio",
+            "type": "integer"
+          },
+          "capture_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Rate"
+          },
+          "missing_total": {
+            "description": "Matches the filtered call list, because the same rows are counted.",
+            "title": "Missing Total",
+            "type": "integer"
+          },
+          "open_deltas": {
+            "items": {
+              "$ref": "#/components/schemas/OpenDeltaOut"
+            },
+            "title": "Open Deltas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answered_calls",
+          "calls_with_audio",
+          "capture_rate",
+          "missing_total",
+          "by_reason",
+          "by_agent",
+          "by_model",
+          "open_deltas"
+        ],
+        "title": "GapReportResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Process liveness.",
+        "properties": {
+          "status": {
+            "description": "Always 'ok' when the process is serving.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "ImportAgentsRequest": {
+        "description": "``POST /api/v1/agents/import`` — CSV text, not a file upload.\n\nA one-off for ~33 people (T59), not a live integration. Text rather than a\nmultipart file because the realistic input is a paste out of a spreadsheet,\nand asking somebody to save a file first is a step that fails.",
+        "properties": {
+          "csv": {
+            "description": "Header row plus data: full_name[,employee_code[,hired_at]].",
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Csv",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": true,
+            "description": "Default true, deliberately: the diff is shown before anything is written, because a roster import that half-succeeded is worse than one that did not run.",
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "title": "ImportAgentsRequest",
+        "type": "object"
+      },
+      "ImportAgentsResponse": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowResult"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dry_run",
+          "created",
+          "updated",
+          "skipped",
+          "errors",
+          "rows"
+        ],
+        "title": "ImportAgentsResponse",
+        "type": "object"
+      },
+      "ImportRowResult": {
+        "description": "What would happen, or did happen, to one roster line.",
+        "properties": {
+          "action": {
+            "description": "create | update | skip | error",
+            "title": "Action",
+            "type": "string"
+          },
+          "employee_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Code"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it was skipped or refused.",
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "line",
+          "full_name",
+          "employee_code",
+          "action"
+        ],
+        "title": "ImportRowResult",
+        "type": "object"
+      },
+      "InstallationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstallationResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "InstallationListResponse",
+        "type": "object"
+      },
+      "InstallationResponse": {
+        "description": "One installation, as the panel reads it.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "app_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "attest_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attest Reason"
+          },
+          "bound_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bound At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "funnel_changed_at": {
+            "format": "date-time",
+            "title": "Funnel Changed At",
+            "type": "string"
+          },
+          "funnel_stage": {
+            "$ref": "#/components/schemas/FunnelStage"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "number_id": {
+            "format": "uuid",
+            "title": "Number Id",
+            "type": "string"
+          },
+          "replaced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced At"
+          },
+          "revoke_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoke Confirmed At"
+          },
+          "revoke_pending_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoke Pending Bytes"
+          },
+          "revoke_pending_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoke Pending Records"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "sim_slot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Slot"
+          },
+          "sim_subscription_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Subscription Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "verification_method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "id",
+          "number_id",
+          "agent_id",
+          "device_id",
+          "status",
+          "verification_method",
+          "verified_at",
+          "attest_reason",
+          "bound_at",
+          "replaced_at",
+          "revoked_at",
+          "revoke_confirmed_at",
+          "revoke_pending_records",
+          "revoke_pending_bytes",
+          "app_version",
+          "app_variant",
+          "sim_subscription_id",
+          "sim_slot",
+          "funnel_stage",
+          "funnel_changed_at",
+          "created_at"
+        ],
+        "title": "InstallationResponse",
+        "type": "object"
+      },
+      "InstallationStatus": {
+        "description": "Lifecycle of one app installation bound to one registered number.",
+        "enum": [
+          "pending",
+          "active",
+          "replaced",
+          "revoked",
+          "revoked_pending_confirmation"
+        ],
+        "title": "InstallationStatus",
+        "type": "string"
+      },
+      "LoginRequest": {
+        "description": "``POST /api/v1/auth/login`` — public, rate-limited.",
+        "properties": {
+          "email": {
+            "description": "Case-insensitive; the column is CITEXT.",
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "description": "Never logged, never echoed.",
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "description": "The user *and* their access token, so the panel needs one round trip.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for a 'sales' account; what own-scope filters on.",
+            "title": "Agent Id"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "must_change_password": {
+            "description": "The panel forces the change before anything else loads.",
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "permissions": {
+            "description": "Resolved from the role, sorted.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "full_name",
+          "role",
+          "must_change_password",
+          "permissions",
+          "access_token",
+          "expires_in"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
+      "NetworkType": {
+        "enum": [
+          "wifi",
+          "cellular",
+          "none"
+        ],
+        "title": "NetworkType",
+        "type": "string"
+      },
+      "NumberListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NumberResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "NumberListResponse",
+        "type": "object"
+      },
+      "NumberResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "e164": {
+            "title": "E164",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "phone_key": {
+            "description": "Last 9 digits, generated by the database (N37).",
+            "title": "Phone Key",
+            "type": "string"
+          },
+          "sim_owner": {
+            "title": "Sim Owner",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "e164",
+          "phone_key",
+          "operator",
+          "sim_owner",
+          "label",
+          "is_active",
+          "created_at"
+        ],
+        "title": "NumberResponse",
+        "type": "object"
+      },
+      "OpenDeltaOut": {
+        "description": "A device whose own call-log count never reconciled (N3, §4.1 B).",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "integer"
+          },
+          "device_counted": {
+            "title": "Device Counted",
+            "type": "integer"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "period_date": {
+            "format": "date",
+            "title": "Period Date",
+            "type": "string"
+          },
+          "subscription_unknown_count": {
+            "description": "Never folded into either side of the rate — the fail-closed rule made visible.",
+            "title": "Subscription Unknown Count",
+            "type": "integer"
+          },
+          "uploaded_count": {
+            "title": "Uploaded Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "installation_id",
+          "agent_name",
+          "period_date",
+          "device_counted",
+          "uploaded_count",
+          "delta",
+          "subscription_unknown_count"
+        ],
+        "title": "OpenDeltaOut",
+        "type": "object"
+      },
+      "ReadyResponse": {
+        "description": "Dependency readiness, one flag per dependency.",
+        "properties": {
+          "database": {
+            "description": "A trivial query succeeded.",
+            "title": "Database",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "'ok' when every dependency is usable.",
+            "title": "Status",
+            "type": "string"
+          },
+          "storage": {
+            "description": "The audio root exists and is writable.",
+            "title": "Storage",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "storage"
+        ],
+        "title": "ReadyResponse",
+        "type": "object"
+      },
+      "ReclassifyResponse": {
+        "description": "A directory change is only half done until the calls agree with it.",
+        "properties": {
+          "calls_reclassified": {
+            "description": "Calls whose call_type changed as a result of this edit.",
+            "title": "Calls Reclassified",
+            "type": "integer"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/DirectoryEntryResponse"
+          }
+        },
+        "required": [
+          "entry",
+          "calls_reclassified"
+        ],
+        "title": "ReclassifyResponse",
+        "type": "object"
+      },
+      "RevokeRequest": {
+        "description": "``POST /api/v1/installations/{id}/revoke`` (UC-08).",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "RevokeRequest",
+        "type": "object"
+      },
+      "RevokeResponse": {
+        "description": "What was still queued when contact was lost.\n\nBonvi does not own the handset, so a revoke that claims a completed wipe\nwould be lying. ``revoke_confirmed_at`` stays NULL until the phone comes\nback and says the local audio is gone.",
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "pending_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Bytes"
+          },
+          "pending_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Records"
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "title": "Revoked At",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          }
+        },
+        "required": [
+          "installation_id",
+          "status",
+          "revoked_at",
+          "pending_records",
+          "pending_bytes",
+          "confirmed"
+        ],
+        "title": "RevokeResponse",
+        "type": "object"
+      },
+      "SetPasswordRequest": {
+        "description": "``POST /api/v1/users/{id}/password`` — an admin resetting somebody else's.",
+        "properties": {
+          "password": {
+            "minLength": 10,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "SetPasswordRequest",
+        "type": "object"
+      },
+      "SettingListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SettingResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "SettingListResponse",
+        "type": "object"
+      },
+      "SettingResponse": {
+        "properties": {
+          "description_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Uz"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "value_type": {
+            "title": "Value Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "value_type",
+          "description_uz",
+          "updated_by",
+          "updated_at"
+        ],
+        "title": "SettingResponse",
+        "type": "object"
+      },
+      "StoragePointOut": {
+        "description": "One day of the growth curve.",
+        "properties": {
+          "audio_bytes_total": {
+            "title": "Audio Bytes Total",
+            "type": "integer"
+          },
+          "audio_files": {
+            "title": "Audio Files",
+            "type": "integer"
+          },
+          "bytes_added": {
+            "title": "Bytes Added",
+            "type": "integer"
+          },
+          "bytes_deleted": {
+            "title": "Bytes Deleted",
+            "type": "integer"
+          },
+          "period_date": {
+            "format": "date",
+            "title": "Period Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_date",
+          "audio_bytes_total",
+          "audio_files",
+          "bytes_added",
+          "bytes_deleted"
+        ],
+        "title": "StoragePointOut",
+        "type": "object"
+      },
+      "StorageReportResponse": {
+        "description": "N18: current usage, 30-day growth, and the projection it implies.",
+        "properties": {
+          "audio_bytes_total": {
+            "title": "Audio Bytes Total",
+            "type": "integer"
+          },
+          "audio_files": {
+            "title": "Audio Files",
+            "type": "integer"
+          },
+          "bytes_added_30d": {
+            "title": "Bytes Added 30D",
+            "type": "integer"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/StoragePointOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "projected_bytes_12m": {
+            "description": "Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.",
+            "title": "Projected Bytes 12M",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "audio_bytes_total",
+          "audio_files",
+          "bytes_added_30d",
+          "projected_bytes_12m",
+          "history"
+        ],
+        "title": "StorageReportResponse",
+        "type": "object"
+      },
+      "UpdateAgentRequest": {
+        "description": "``PATCH /api/v1/agents/{id}``. Absent fields are unchanged.",
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "employee_code": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Code"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "hired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hired At"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "UpdateAgentRequest",
+        "type": "object"
+      },
+      "UpdateCallNoteRequest": {
+        "description": "``PATCH /api/v1/calls/{id}`` — the note and nothing else.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "UpdateCallNoteRequest",
+        "type": "object"
+      },
+      "UpdateNumberRequest": {
+        "description": "``PATCH /api/v1/numbers/{id}``. The number itself is not editable.",
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "sim_owner": {
+            "anyOf": [
+              {
+                "pattern": "^(company|employee)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Owner"
+          }
+        },
+        "title": "UpdateNumberRequest",
+        "type": "object"
+      },
+      "UpdateSettingRequest": {
+        "description": "``PUT /api/v1/settings``.\n\n``confirm`` exists for one case: lowering the retention period below\n``retention.confirm_below_months`` destroys recordings that still exist.\nWithout it the server changes nothing and returns 409 (SPEC §3.11).",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "description": "Required when the change would delete data that still exists.",
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "key": {
+            "maxLength": 100,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "UpdateSettingRequest",
+        "type": "object"
+      },
+      "UpdateUserRequest": {
+        "description": "``PATCH /api/v1/users/{id}``. Every field optional; absent means unchanged.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "UpdateUserRequest",
+        "type": "object"
+      },
+      "UserListResponse": {
+        "description": "A page of accounts. Small table, so no cursor: the panel shows them all.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "UserListResponse",
+        "type": "object"
+      },
+      "UserResponse": {
+        "description": "A panel account. Never carries the hash.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "full_name",
+          "role",
+          "agent_id",
+          "is_active",
+          "must_change_password",
+          "last_login_at",
+          "created_at"
+        ],
+        "title": "UserResponse",
+        "type": "object"
+      },
+      "UserRole": {
+        "description": "A panel login's role (SPEC §3.2).\n\n``service`` is deliberately absent: machine access is a ``service_tokens``\nrow, because a machine has no password, no session and no navigation. The\nauthorisation registry in ``core/permissions.py`` covers both and a test\nasserts these four are a subset of it.",
+        "enum": [
+          "admin",
+          "manager",
+          "sales",
+          "viewer"
+        ],
+        "title": "UserRole",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VerificationMethod": {
+        "description": "How we proved the phone holds the registered number (UC-04, T142).",
+        "enum": [
+          "sim_msisdn",
+          "callback",
+          "admin_attested"
+        ],
+        "title": "VerificationMethod",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "description": "Generated from the Pydantic schemas. Prefix: /api/v1",
+    "title": "BonviCall panel API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/agents": {
+      "get": {
+        "operationId": "list_agents_api_v1_agents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Agents",
+        "tags": [
+          "Agents"
+        ]
+      },
+      "post": {
+        "operationId": "create_agent_api_v1_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Agent",
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/api/v1/agents/import": {
+      "post": {
+        "description": "A one-off roster import, dry-run by default (T59).\n\n~33 people, pasted out of a spreadsheet. The diff is shown before anything\nis written, because a roster import that half-succeeded is harder to\nrecover from than one that did not run.",
+        "operationId": "import_agents_api_v1_agents_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportAgentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAgentsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Agents",
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/api/v1/agents/{agent_id}": {
+      "get": {
+        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent",
+        "tags": [
+          "Agents"
+        ]
+      },
+      "patch": {
+        "operationId": "update_agent_api_v1_agents__agent_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Agent",
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/api/v1/agents/{agent_id}/archive": {
+      "post": {
+        "description": "409 while the agent still holds an open number assignment.",
+        "operationId": "archive_agent_api_v1_agents__agent_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Agent",
+        "tags": [
+          "Agents"
+        ]
+      }
+    },
+    "/api/v1/alerts": {
+      "get": {
+        "description": "Severity, cause, agent, device, first/last seen and the repeat count.",
+        "operationId": "list_alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertSeverity"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Alerts",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/alerts/{alert_id}/ack": {
+      "post": {
+        "description": "Admin only. An alert can be acknowledged, never deleted.",
+        "operationId": "acknowledge_alert_api_v1_alerts__alert_id__ack_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Alert Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge Alert",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignment_id}": {
+      "patch": {
+        "description": "Close a holding period. Calls already attributed keep their agent.",
+        "operationId": "close_assignment_api_v1_assignments__assignment_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Assignment",
+        "tags": [
+          "Numbers"
+        ]
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "description": "Who, what, which object, when, from which IP.",
+        "operationId": "list_audit_api_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AuditAction"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor User Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit",
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Public. A wrong e-mail and a wrong password give the same answer.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "End this session. Idempotent — logging out twice is not an error.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "The caller and their resolved permissions.\n\nThe panel's ``can()`` reads this list. It never holds a role-to-permission\nmap: a second copy of the matrix is a second thing to forget to update.",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "description": "Self-service change. Succeeding revokes every other session.",
+        "operationId": "change_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "Rotate the session. Reuse of a spent token revokes the whole chain.",
+        "operationId": "refresh_api_v1_auth_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/calls": {
+      "get": {
+        "description": "A cursor page. Default and guaranteed-stable sort is ``received_at DESC``.\n\nKeyset, not offset: no row that existed when paging started is skipped or\nreturned twice, which is what UC-19 asks for and what an OFFSET cannot give\nwhile calls keep arriving. **Every sort pairs with ``id``**, or paging\nduplicates the rows whose sort values tie — and duration ties constantly.",
+        "operationId": "list_calls_api_v1_calls_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "With Total",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "received_at",
+              "enum": [
+                "received_at",
+                "started_at",
+                "duration_sec"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "number_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Number Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "installation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installation Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDirection"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disposition",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDisposition"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Disposition"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "has_audio",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Audio"
+            }
+          },
+          {
+            "in": "query",
+            "name": "audio_missing_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AudioMissingReason"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Audio Missing Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "capture_route",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/CaptureRoute"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Capture Route"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remote_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Remote Number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppVariant"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "App Variant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Calls",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/api/v1/calls/export": {
+      "get": {
+        "description": "Streaming CSV for the same filter as the list (T48, UC-22).\n\nUTF-8 **with a BOM** and a ``;`` delimiter: Excel in a ru/uz locale renders\na comma-separated UTF-8 file as one column, and the person who opens it has\nno way to know that is what happened.\n\nA ``sales`` export is own-rows-only and carries no other agent's name,\nbecause the same scoped query builds it.",
+        "operationId": "export_calls_api_v1_calls_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "number_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Number Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "installation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installation Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDirection"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disposition",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDisposition"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Disposition"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "has_audio",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Audio"
+            }
+          },
+          {
+            "in": "query",
+            "name": "audio_missing_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AudioMissingReason"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Audio Missing Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "capture_route",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/CaptureRoute"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Capture Route"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remote_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Remote Number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppVariant"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "App Variant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Calls",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/api/v1/calls/{call_id}": {
+      "delete": {
+        "description": "**405 for every role, including admin** (UC-26, T45).\n\nThe route exists precisely so that the refusal is explicit and testable.\nWithout it a DELETE would 405 from the router with FastAPI's own body, and\n\"nobody can delete a call\" would be an absence rather than a decision.\nOnly the retention job removes audio, and it never removes a call.\n\n**No permission dependency on purpose.** T45 asserts 405 for all five\nroles, so the refusal has to outrank authorisation: a ``viewer`` getting\n403 here would mean the answer depends on who is asking, and it does not.\nA caller with no token still gets 401 — that is the principal dependency.",
+        "operationId": "delete_call_api_v1_calls__call_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Call Api V1 Calls  Call Id  Delete",
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Call",
+        "tags": [
+          "Calls"
+        ]
+      },
+      "get": {
+        "description": "404 for a call that belongs to another agent.",
+        "operationId": "get_call_api_v1_calls__call_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Call",
+        "tags": [
+          "Calls"
+        ]
+      },
+      "patch": {
+        "description": "The note and nothing else — every other field is the device's.",
+        "operationId": "update_call_note_api_v1_calls__call_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCallNoteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Call Note",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/api/v1/calls/{call_id}/audio": {
+      "delete": {
+        "description": "405 for every role, for the same reason (UC-26).",
+        "operationId": "delete_call_audio_api_v1_calls__call_id__audio_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Call Audio Api V1 Calls  Call Id  Audio Delete",
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Call Audio",
+        "tags": [
+          "Calls"
+        ]
+      },
+      "get": {
+        "description": "Stream a recording. 200 whole, 206 partial, 410 once retention took it.",
+        "operationId": "stream_audio_api_v1_calls__call_id__audio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Download",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Audio",
+        "tags": [
+          "Audio"
+        ]
+      }
+    },
+    "/api/v1/commands/{command_id}": {
+      "get": {
+        "description": "Status, latency and the failure reason — UC-16 requires the reason.",
+        "operationId": "get_command_api_v1_commands__command_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Command",
+        "tags": [
+          "Commands"
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "description": "Every device the caller may see, most recently heard from first.",
+        "operationId": "list_devices_api_v1_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceHealthListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Devices",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{installation_id}": {
+      "get": {
+        "description": "One device. Another agent's phone is 404, like every other scoped read.",
+        "operationId": "get_device_api_v1_devices__installation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Device",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{installation_id}/commands": {
+      "get": {
+        "description": "History with ``latency_ms``, which is how UC-16's bar is measured.",
+        "operationId": "list_commands_api_v1_devices__installation_id__commands_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Commands",
+        "tags": [
+          "Commands"
+        ]
+      },
+      "post": {
+        "description": "202: accepted for delivery, not yet done.\n\nIssuing a command reaches into an employee's personally owned phone, so it\nis audited under ``command_issued`` — the only action in the product that\nacts on hardware the company does not own.",
+        "operationId": "issue_command_api_v1_devices__installation_id__commands_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Issue Command",
+        "tags": [
+          "Commands"
+        ]
+      }
+    },
+    "/api/v1/enrolment-codes": {
+      "get": {
+        "operationId": "list_codes_api_v1_enrolment_codes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "number_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Number Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "active_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Active Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentCodeListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Codes",
+        "tags": [
+          "Enrolment"
+        ]
+      }
+    },
+    "/api/v1/enrolment-codes/{code_id}/revoke": {
+      "post": {
+        "operationId": "revoke_code_api_v1_enrolment_codes__code_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Code Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentCodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Code",
+        "tags": [
+          "Enrolment"
+        ]
+      }
+    },
+    "/api/v1/enrolment/attempts": {
+      "get": {
+        "description": "Where UC-01's failures appear, with timestamps.\n\nA stalled enrolment must be an event, not silence — this is the list an\nadmin watches during a rollout.",
+        "operationId": "list_attempts_api_v1_enrolment_attempts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "number_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Number Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "installation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentAttemptListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Attempts",
+        "tags": [
+          "Enrolment"
+        ]
+      }
+    },
+    "/api/v1/enrolment/receiver-status": {
+      "get": {
+        "description": "The banner at the top of the rollout page.\n\nIf every receiver is down nobody can enrol, and the page says so **before**\nanyone tries. Absence of enrolment must be an event, not a quiet stall.",
+        "operationId": "receiver_status_api_v1_enrolment_receiver_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  "title": "Response Receiver Status Api V1 Enrolment Receiver Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Receiver Status",
+        "tags": [
+          "Enrolment"
+        ]
+      }
+    },
+    "/api/v1/installations": {
+      "get": {
+        "operationId": "list_installations_api_v1_installations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InstallationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Installations",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/installations/{installation_id}": {
+      "get": {
+        "operationId": "get_installation_api_v1_installations__installation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Installation",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/installations/{installation_id}/attest": {
+      "post": {
+        "description": "Admin attestation (T142) — weaker than proven, and shown as such.\n\nThe reason is mandatory and lands in the audit log. The funnel stage\nbecomes ``verified_by_admin``, which the panel renders differently from\n``number_verified`` everywhere it appears.",
+        "operationId": "attest_installation_api_v1_installations__installation_id__attest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attest Installation",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/installations/{installation_id}/revoke": {
+      "post": {
+        "description": "Stop capture and kill every issued token (UC-08).\n\nThe response carries what was still queued at last contact, because the\nadmin's next question is always \"did we lose anything\".",
+        "operationId": "revoke_installation_api_v1_installations__installation_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Installation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Installation",
+        "tags": [
+          "Installations"
+        ]
+      }
+    },
+    "/api/v1/line-directory": {
+      "get": {
+        "operationId": "list_entries_api_v1_line_directory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryEntryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Entries",
+        "tags": [
+          "Line directory"
+        ]
+      },
+      "post": {
+        "description": "Add a rule and re-run the classification in the same transaction.",
+        "operationId": "create_entry_api_v1_line_directory_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectoryEntryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReclassifyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Entry",
+        "tags": [
+          "Line directory"
+        ]
+      }
+    },
+    "/api/v1/line-directory/{entry_id}": {
+      "delete": {
+        "description": "Deactivate a rule and re-run the classification.",
+        "operationId": "delete_entry_api_v1_line_directory__entry_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReclassifyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Entry",
+        "tags": [
+          "Line directory"
+        ]
+      }
+    },
+    "/api/v1/numbers": {
+      "get": {
+        "operationId": "list_numbers_api_v1_numbers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Numbers",
+        "tags": [
+          "Numbers"
+        ]
+      },
+      "post": {
+        "description": "The number is normalised first, so three formats are one row (N37).",
+        "operationId": "create_number_api_v1_numbers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNumberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Number",
+        "tags": [
+          "Numbers"
+        ]
+      }
+    },
+    "/api/v1/numbers/{number_id}": {
+      "get": {
+        "operationId": "get_number_api_v1_numbers__number_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Number Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Number",
+        "tags": [
+          "Numbers"
+        ]
+      },
+      "patch": {
+        "operationId": "update_number_api_v1_numbers__number_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Number Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Number",
+        "tags": [
+          "Numbers"
+        ]
+      }
+    },
+    "/api/v1/numbers/{number_id}/assignments": {
+      "get": {
+        "description": "Full history — this is where the time-boxed mapping becomes visible.",
+        "operationId": "list_assignments_api_v1_numbers__number_id__assignments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Number Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Assignments",
+        "tags": [
+          "Numbers"
+        ]
+      },
+      "post": {
+        "description": "409 ``number_already_assigned``, with the current holder in ``detail``.",
+        "operationId": "create_assignment_api_v1_numbers__number_id__assignments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Number Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Assignment",
+        "tags": [
+          "Numbers"
+        ]
+      }
+    },
+    "/api/v1/numbers/{number_id}/enrolment-code": {
+      "post": {
+        "description": "Single-use, 24 h. The agent is frozen at issue.",
+        "operationId": "issue_enrolment_code_api_v1_numbers__number_id__enrolment_code_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Number Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentCodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Issue Enrolment Code",
+        "tags": [
+          "Numbers"
+        ]
+      }
+    },
+    "/api/v1/reports/data-usage": {
+      "get": {
+        "description": "Per-device cellular traffic against the cap (N14, R14).\n\nThe employee pays for this, so it is a first-class report rather than a\ndebug counter — an unexplained data charge on a personal phone is exactly\nwhat gets an app uninstalled.",
+        "operationId": "data_usage_report_api_v1_reports_data_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataUsageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Data Usage Report",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/gap": {
+      "get": {
+        "description": "Calls without audio by reason, agent and handset model, plus the deltas.\n\nThe denominator is **answered** calls: an unanswered call in it makes the\npercentage meaningless, which is why ``not_expected`` is a reason rather\nthan a gap.",
+        "operationId": "gap_report_api_v1_reports_gap_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gap Report",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/storage": {
+      "get": {
+        "description": "Current GB and 30-day growth, without a ``du`` over 200 GB (N18).",
+        "operationId": "storage_report_api_v1_reports_storage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Storage Report",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "list_settings_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Settings",
+        "tags": [
+          "Settings"
+        ]
+      },
+      "put": {
+        "description": "409 ``retention_confirmation_required`` when the change deletes data.\n\nShortening retention removes recordings that still exist. Refusing without\nan explicit confirmation is the difference between a policy change and an\naccident nobody can undo.",
+        "operationId": "update_setting_api_v1_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Setting",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "description": "Panel accounts only — **not** agents. Never returns a hash or a token.",
+        "operationId": "list_users_api_v1_users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserRole"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "Users"
+        ]
+      },
+      "post": {
+        "description": "Create a login. ``role='sales'`` requires ``agent_id`` (409 otherwise).",
+        "operationId": "create_user_api_v1_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}": {
+      "get": {
+        "operationId": "get_user_api_v1_users__user_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User",
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "description": "Guarded: no self-demotion, and never the last active admin.",
+        "operationId": "update_user_api_v1_users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update User",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/v1/users/{user_id}/password": {
+      "post": {
+        "description": "An admin sets a password. Every session of that user dies with it.",
+        "operationId": "set_password_api_v1_users__user_id__password_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Password",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "description": "Liveness. Touches nothing, so a slow database cannot restart the app.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Healthz",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Readiness: the database answers and the audio root is writable.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readyz",
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  }
+}

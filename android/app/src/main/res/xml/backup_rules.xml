@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nothing is backed up. The installation-bound credential (N24) must not survive
+  a restore onto a different handset — a restored token is exactly the
+  installation_mismatch the server refuses, and the queue is device state, not
+  user data. android:allowBackup="false" already says so; this file is here
+  because the manifest attribute references it.
+-->
+<full-backup-content>
+    <exclude domain="root" />
+    <exclude domain="database" />
+    <exclude domain="sharedpref" />
+    <exclude domain="file" />
+</full-backup-content>

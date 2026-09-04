@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The `-v26` qualifier is required by AAPT even though minSdk is 26: an
+     <adaptive-icon> in a plain `anydpi` folder fails resource linking with
+     "resource mipmap/ic_launcher not found". Lint's ObsoleteSdkInt says to drop
+     it; the build says otherwise, and the build wins. The <monochrome> layer is
+     used by themed icons from API 33 and ignored below it — without it some
+     launchers draw a white square. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

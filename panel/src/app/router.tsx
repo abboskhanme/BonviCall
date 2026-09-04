@@ -1,0 +1,206 @@
+/**
+ * The route table. Every page of SPEC §5.2, registered once.
+ *
+ * ═══ RBAC ═══════════════════════════════════════════════════════════════
+ * This file is the FIRST of the two frontend permission checks
+ * (CONVENTIONS.md §11, SPEC §5.1); the second is `NAV[].anyOf` in
+ * `shared/layout/AppShell.tsx`. **Both are required.** The nav filter exists so
+ * people are not shown doors they cannot open; the gate exists so a bookmark or
+ * a pasted URL does not render a page the user has no business seeing. Neither
+ * is security — the server check is the only one that decides anything, and a
+ * gated page whose API call returns 403 is still the correct outcome.
+ *
+ * A user who reaches a route they lack the permission for is sent to `/`
+ * (SPEC §5.1), not shown a 403 screen: the panel does not confirm that a page
+ * exists to somebody who may not use it, for the same reason the server answers
+ * 404 rather than 403 for a row owned by somebody else.
+ * ════════════════════════════════════════════════════════════════════════
+ *
+ * `ROUTES` is exported as data so `nav.parity.test.ts` can assert that every
+ * permission which shows a menu entry also opens that entry's gate. That test
+ * is what stops the two lists drifting apart.
+ *
+ * Phase 5 tasks replace page BODIES. Nobody edits this table again until the
+ * wiring phase (T103) — that is the whole point of T21.
+ */
+import { useEffect, type ReactElement } from 'react'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+
+import { LoginPage } from '@/modules/auth/LoginPage'
+import { useAuth } from '@/modules/auth/store'
+import { AgentDetailPage } from '@/modules/agents/AgentDetailPage'
+import { AgentsPage } from '@/modules/agents/AgentsPage'
+import { AlertsPage } from '@/modules/alerts/AlertsPage'
+import { AuditPage } from '@/modules/audit/AuditPage'
+import { CallDetailPage } from '@/modules/calls/CallDetailPage'
+import { CallsPage } from '@/modules/calls/CallsPage'
+import { DashboardPage } from '@/modules/dashboard/DashboardPage'
+import { DeviceDetailPage } from '@/modules/devices/DeviceDetailPage'
+import { DevicesPage } from '@/modules/devices/DevicesPage'
+import { EnrolmentPage } from '@/modules/enrolment/EnrolmentPage'
+import { MonitorPage } from '@/modules/monitor/MonitorPage'
+import { NumbersPage } from '@/modules/numbers/NumbersPage'
+import { GapReportPage } from '@/modules/reports/GapReportPage'
+import { StorageReportPage } from '@/modules/reports/StorageReportPage'
+import { AppVersionsPage } from '@/modules/settings/AppVersionsPage'
+import { SettingsPage } from '@/modules/settings/SettingsPage'
+import { UsersPage } from '@/modules/users/UsersPage'
+import { landingPath } from '@/shared/auth/landing'
+import { Perm, type Permission } from '@/shared/auth/permissions'
+import { t } from '@/shared/i18n'
+import { AppShell, NotFoundNotice } from '@/shared/layout/AppShell'
+import { Skeleton } from '@/shared/ui/primitives'
+
+export interface RouteSpec {
+  /** The URL pattern, exactly as SPEC §5.2 writes it. */
+  path: string
+  element: ReactElement
+  /** The gate. Absent means "any authenticated user" (the dashboard only). */
+  anyOf?: readonly Permission[]
+  /** No token required at all. */
+  isPublic?: boolean
+  /** Rendered outside the AppShell: full screen, no sidebar. */
+  fullScreen?: boolean
+}
+
+export const ROUTES: readonly RouteSpec[] = [
+  // ── Public ────────────────────────────────────────────────────────────
+  { path: '/login', element: <LoginPage />, isPublic: true, fullScreen: true },
+  //
+  // `/i/:code` — the install landing page of SPEC §8.1 — is deliberately NOT
+  // here. The SERVER answers it (`core/permissions.py::PUBLIC_ROUTES` already
+  // lists `GET /i/{code}`) with server-rendered HTML. It is the first thing a
+  // non-technical salesperson touches, on their own phone, over mobile data,
+  // inside N40's 15 unaided minutes and against R17, the project's top
+  // practical risk. Shipping a React bundle to that moment costs a download
+  // before the first word appears and fails to a blank screen; a few KB of
+  // HTML works without JS and serves the APK directly.
+
+  // ── Authenticated, no permission of its own ───────────────────────────
+  { path: '/', element: <DashboardPage /> },
+
+  // ── Operations ────────────────────────────────────────────────────────
+  { path: '/enrolment', element: <EnrolmentPage />, anyOf: [Perm.ENROLMENT_READ] },
+  { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
+  { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
+  { path: '/numbers', element: <NumbersPage />, anyOf: [Perm.NUMBERS_READ] },
+  {
+    // Own-scope passes the gate and the SERVER narrows the query to the
+    // caller's own installations — the house rule (CONVENTIONS.md §11), the
+    // same shape `calls:read:own` already has. SPEC §5.2 gates this list on
+    // `devices:read` alone, which left a `sales` user with a device detail
+    // page and no way to reach it; the gate is widened and the narrowing lives
+    // in `DeviceService.list()`, never in a second permission.
+    path: '/devices',
+    element: <DevicesPage />,
+    anyOf: [Perm.DEVICES_READ, Perm.DEVICES_READ_OWN],
+  },
+  {
+    path: '/devices/:installationId',
+    element: <DeviceDetailPage />,
+    anyOf: [Perm.DEVICES_READ, Perm.DEVICES_READ_OWN],
+  },
+  { path: '/calls', element: <CallsPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  { path: '/calls/:id', element: <CallDetailPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  { path: '/alerts', element: <AlertsPage />, anyOf: [Perm.ALERTS_READ] },
+
+  // ── Reports ───────────────────────────────────────────────────────────
+  { path: '/reports/gap', element: <GapReportPage />, anyOf: [Perm.REPORTS_READ] },
+  { path: '/reports/storage', element: <StorageReportPage />, anyOf: [Perm.REPORTS_READ] },
+
+  // ── Administration ────────────────────────────────────────────────────
+  { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },
+  { path: '/audit', element: <AuditPage />, anyOf: [Perm.AUDIT_READ] },
+  { path: '/settings', element: <SettingsPage />, anyOf: [Perm.SETTINGS_READ] },
+  {
+    path: '/settings/app-versions',
+    element: <AppVersionsPage />,
+    anyOf: [Perm.APPVERSIONS_READ],
+  },
+
+  // ── The TV board: authenticated, gated, and outside the shell ─────────
+  {
+    path: '/monitor',
+    element: <MonitorPage />,
+    anyOf: [Perm.MONITOR_READ],
+    fullScreen: true,
+  },
+]
+
+function FullPageLoader() {
+  return (
+    <div className="grid min-h-screen place-items-center bg-bg" role="status" aria-live="polite">
+      <Skeleton className="size-10 rounded-xl" />
+      <span className="sr-only">{t('auth.checking')}</span>
+    </div>
+  )
+}
+
+/** A token is required. Remembers where the user was, so an expiry mid-session
+ *  returns them to that page after logging back in. */
+function Protected({ children }: { children: ReactElement }) {
+  const status = useAuth((state) => state.status)
+  const location = useLocation()
+
+  if (status === 'idle' || status === 'loading') return <FullPageLoader />
+  if (status === 'anonymous') {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  return children
+}
+
+/**
+ * At least one of `anyOf`, or back to wherever this user belongs — which is the
+ * dashboard for everybody except a `viewer`, whose dashboard would be five
+ * tiles of 403 (see `shared/auth/landing.ts`).
+ */
+export function Gate({ anyOf, children }: { anyOf?: readonly Permission[]; children: ReactElement }) {
+  const canAny = useAuth((state) => state.canAny)
+  const permissions = useAuth((state) => state.permissions)
+  if (anyOf && !canAny(anyOf)) return <Navigate to={landingPath(permissions)} replace />
+  return children
+}
+
+function guarded(route: RouteSpec): ReactElement {
+  return <Gate anyOf={route.anyOf}>{route.element}</Gate>
+}
+
+export function AppRouter() {
+  const status = useAuth((state) => state.status)
+  const restore = useAuth((state) => state.restore)
+
+  useEffect(() => {
+    if (status === 'idle') void restore()
+  }, [status, restore])
+
+  const publicRoutes = ROUTES.filter((route) => route.isPublic)
+  const fullScreenRoutes = ROUTES.filter((route) => !route.isPublic && route.fullScreen)
+  const shellRoutes = ROUTES.filter((route) => !route.isPublic && !route.fullScreen)
+
+  return (
+    <Routes>
+      {publicRoutes.map((route) => (
+        <Route key={route.path} path={route.path} element={route.element} />
+      ))}
+
+      <Route
+        element={
+          <Protected>
+            <Outlet />
+          </Protected>
+        }
+      >
+        {fullScreenRoutes.map((route) => (
+          <Route key={route.path} path={route.path} element={guarded(route)} />
+        ))}
+
+        <Route element={<AppShell />}>
+          {shellRoutes.map((route) => (
+            <Route key={route.path} path={route.path} element={guarded(route)} />
+          ))}
+          <Route path="*" element={<NotFoundNotice />} />
+        </Route>
+      </Route>
+    </Routes>
+  )
+}

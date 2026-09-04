@@ -1,0 +1,2963 @@
+{
+  "components": {
+    "schemas": {
+      "AppInfoIn": {
+        "properties": {
+          "variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "version": {
+            "maxLength": 20,
+            "title": "Version",
+            "type": "string"
+          },
+          "version_code": {
+            "minimum": 1.0,
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "version_code",
+          "variant"
+        ],
+        "title": "AppInfoIn",
+        "type": "object"
+      },
+      "AppVariant": {
+        "description": "The ``targetSdk`` product flavour (D-06).\n\nReported on every heartbeat, stored on every call, so capture rate is\nmeasurable per variant and not only per handset model.",
+        "enum": [
+          "legacy28",
+          "modern34"
+        ],
+        "title": "AppVariant",
+        "type": "string"
+      },
+      "AudioCodec": {
+        "description": "Opus is the target; AAC-LC is the decided fallback and is counted (§7.6).",
+        "enum": [
+          "opus",
+          "aac_lc"
+        ],
+        "title": "AudioCodec",
+        "type": "string"
+      },
+      "AudioContainer": {
+        "description": "Pairs with the codec: Opus in Ogg, AAC-LC in MP4.",
+        "enum": [
+          "ogg",
+          "mp4"
+        ],
+        "title": "AudioContainer",
+        "type": "string"
+      },
+      "AudioMissingReason": {
+        "description": "Why a call has no audio. Closed, ``NOT NULL`` whenever audio is absent (N5).\n\nUC-14 names six; SPEC §3.9 justifies the other four one by one. The gap\nreport's denominator excludes ``pending_upload`` and ``not_expected``,\nwhich is what keeps \"% of answered calls with audio\" honest.",
+        "enum": [
+          "pending_upload",
+          "not_expected",
+          "recording_route_unavailable",
+          "oem_recorder_off",
+          "no_permission",
+          "capture_returned_silence",
+          "app_not_running",
+          "upload_expired",
+          "queue_space_exhausted",
+          "attribution_failed"
+        ],
+        "title": "AudioMissingReason",
+        "type": "string"
+      },
+      "CallDirection": {
+        "description": "Ours, not BonviZvonki's ``inbound``/``outbound``.\n\nThe export (SPEC §4.9) maps ours onto theirs in exactly one place, so the\ntwo vocabularies never leak into each other.",
+        "enum": [
+          "incoming",
+          "outgoing"
+        ],
+        "title": "CallDirection",
+        "type": "string"
+      },
+      "CallDisposition": {
+        "description": "UC-11's five classes are direction x disposition.\n\n``missed`` and ``rejected`` are incoming-only, ``no_answer`` is\noutgoing-only — enforced by a CHECK, so the invalid combinations are\nunrepresentable rather than merely unused.",
+        "enum": [
+          "answered",
+          "missed",
+          "rejected",
+          "no_answer"
+        ],
+        "title": "CallDisposition",
+        "type": "string"
+      },
+      "CallSource": {
+        "description": "How the record reached us.",
+        "enum": [
+          "live_capture",
+          "call_log_recovery"
+        ],
+        "title": "CallSource",
+        "type": "string"
+      },
+      "Capability": {
+        "description": "One row per installation per capability (UC-03, §7.8).\n\nEvery one of these is verified by exercising it, never by reading a\npermission flag — that is what makes ``granted_not_working`` expressible.",
+        "enum": [
+          "phone_state",
+          "call_log",
+          "microphone",
+          "contacts",
+          "notifications",
+          "call_phone",
+          "battery_exemption",
+          "storage_access",
+          "oem_autostart",
+          "foreground_service",
+          "oem_recorder",
+          "subscription_resolution"
+        ],
+        "title": "Capability",
+        "type": "string"
+      },
+      "CapabilityState": {
+        "description": "``granted_not_working`` is the OEM-permission-manager case UC-03 names.",
+        "enum": [
+          "granted_working",
+          "granted_not_working",
+          "denied",
+          "denied_permanently",
+          "not_applicable",
+          "unknown"
+        ],
+        "title": "CapabilityState",
+        "type": "string"
+      },
+      "CaptureRoute": {
+        "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
+        "enum": [
+          "oem_file_harvest",
+          "app_voice_recognition",
+          "app_voice_communication",
+          "app_mic",
+          "none"
+        ],
+        "title": "CaptureRoute",
+        "type": "string"
+      },
+      "ChunkAcceptedOut": {
+        "description": "``200`` for an accepted chunk.",
+        "properties": {
+          "received_bytes": {
+            "title": "Received Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "received_bytes"
+        ],
+        "title": "ChunkAcceptedOut",
+        "type": "object"
+      },
+      "CommandFailureReason": {
+        "description": "Why a command did not happen. UC-16 requires the panel to say which.",
+        "enum": [
+          "device_offline",
+          "no_permission",
+          "os_refused",
+          "ack_timeout",
+          "discarded_stale",
+          "unsupported",
+          "busy"
+        ],
+        "title": "CommandFailureReason",
+        "type": "string"
+      },
+      "CommandKind": {
+        "description": "Server-to-device commands. No ``send_sms`` — SMS is out of scope.",
+        "enum": [
+          "dial",
+          "config",
+          "logout",
+          "ping",
+          "recheck"
+        ],
+        "title": "CommandKind",
+        "type": "string"
+      },
+      "CommitOut": {
+        "description": "``200``, and **idempotent**: committing twice returns the same body.\n\nOnly after this response does the device delete its local file (N11).",
+        "properties": {
+          "audio_id": {
+            "format": "uuid",
+            "title": "Audio Id",
+            "type": "string"
+          },
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "duration_mismatch": {
+            "description": "The file's length differs from the call log's by > 2 s (UC-14).",
+            "title": "Duration Mismatch",
+            "type": "boolean"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "audio_id",
+          "sha256",
+          "bytes",
+          "stored",
+          "duration_mismatch"
+        ],
+        "title": "CommitOut",
+        "type": "object"
+      },
+      "DeviceAckIn": {
+        "description": "``POST /api/device/v1/commands/{id}/ack``.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommandFailureReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result_client_call_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The call the dial produced, if it produced one.",
+            "title": "Result Client Call Id"
+          },
+          "status": {
+            "pattern": "^(acknowledged|failed)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DeviceAckIn",
+        "type": "object"
+      },
+      "DeviceCallBatchIn": {
+        "description": "``POST /api/device/v1/calls``.",
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCallIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "calls"
+        ],
+        "title": "DeviceCallBatchIn",
+        "type": "object"
+      },
+      "DeviceCallBatchOut": {
+        "description": "``200`` for the batch, whatever happened to the individual items.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCallResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "server_time": {
+            "description": "So the app can compute skew without an extra round trip.",
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "results",
+          "server_time"
+        ],
+        "title": "DeviceCallBatchOut",
+        "type": "object"
+      },
+      "DeviceCallErrorOut": {
+        "description": "The error half of a per-item result.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "DeviceCallErrorOut",
+        "type": "object"
+      },
+      "DeviceCallIn": {
+        "description": "One call as the handset reports it.",
+        "properties": {
+          "answered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL means there was never a conversation (UC-09).",
+            "title": "Answered At"
+          },
+          "app_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "audio_expected": {
+            "default": false,
+            "description": "Whether the device will follow up with audio.",
+            "title": "Audio Expected",
+            "type": "boolean"
+          },
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From the closed enum, never free text (N5). NULL lets the server decide."
+          },
+          "capture_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which strategy produced (or failed to produce) audio."
+          },
+          "client_call_id": {
+            "description": "UUIDv5 the device derives from call-log facts that survive a reinstall (SPEC §3.10). The idempotency key: a replay returns the same server id and creates no second row.",
+            "format": "uuid",
+            "title": "Client Call Id",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this call answered a click-to-call command.",
+            "title": "Command Id"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resolved on-device. Decoration, never identity (L3).",
+            "title": "Contact Name"
+          },
+          "device_epoch_ms": {
+            "description": "System.currentTimeMillis() at call start — raw evidence for skew.",
+            "title": "Device Epoch Ms",
+            "type": "integer"
+          },
+          "device_rtt_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client's round-trip estimate, for skew.",
+            "title": "Device Rtt Ms"
+          },
+          "device_timezone": {
+            "description": "IANA name.",
+            "maxLength": 64,
+            "title": "Device Timezone",
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "default": 0,
+            "description": "Whole seconds, truncated not rounded.",
+            "minimum": 0.0,
+            "title": "Duration Sec",
+            "type": "integer"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "reconciled_with_call_log": {
+            "default": false,
+            "title": "Reconciled With Call Log",
+            "type": "boolean"
+          },
+          "remote_number": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As the device saw it. NULL when the caller withheld it.",
+            "title": "Remote Number"
+          },
+          "ring_sec": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ring Sec"
+          },
+          "sim_slot": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Slot"
+          },
+          "sim_subscription_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The registered subscription only — Guard 1 refused the rest.",
+            "title": "Sim Subscription Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CallSource",
+            "default": "live_capture"
+          },
+          "started_at": {
+            "description": "ISO-8601 with an explicit offset (N36).",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_call_id",
+          "direction",
+          "disposition",
+          "started_at",
+          "device_epoch_ms",
+          "device_timezone"
+        ],
+        "title": "DeviceCallIn",
+        "type": "object"
+      },
+      "DeviceCallLogDeltaIn": {
+        "description": "``POST /api/device/v1/call-log-delta`` — the production rig (§4.1 B).\n\nWithout this, capture rate becomes unverifiable the day the acceptance\nwindow ends: there is no adb on a phone Bonvi does not own.",
+        "properties": {
+          "device_counted": {
+            "description": "Rows the device saw in its own log.",
+            "minimum": 0.0,
+            "title": "Device Counted",
+            "type": "integer"
+          },
+          "period_date": {
+            "description": "Asia/Tashkent calendar date.",
+            "format": "date",
+            "title": "Period Date",
+            "type": "string"
+          },
+          "subscription_unknown_count": {
+            "default": 0,
+            "description": "Calls the OS could not attribute to a subscription. Reported separately and never folded into either side of the rate — that is the fail-closed rule made visible.",
+            "minimum": 0.0,
+            "title": "Subscription Unknown Count",
+            "type": "integer"
+          },
+          "swept_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swept At"
+          },
+          "uploaded_count": {
+            "minimum": 0.0,
+            "title": "Uploaded Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "period_date",
+          "device_counted",
+          "uploaded_count"
+        ],
+        "title": "DeviceCallLogDeltaIn",
+        "type": "object"
+      },
+      "DeviceCallLogDeltaOut": {
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "integer"
+          },
+          "device_counted": {
+            "title": "Device Counted",
+            "type": "integer"
+          },
+          "period_date": {
+            "format": "date",
+            "title": "Period Date",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "uploaded_count": {
+            "title": "Uploaded Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "period_date",
+          "device_counted",
+          "uploaded_count",
+          "delta",
+          "server_time"
+        ],
+        "title": "DeviceCallLogDeltaOut",
+        "type": "object"
+      },
+      "DeviceCallResultOut": {
+        "description": "One item's outcome.\n\nFailure is **per item, not per batch**: a batch that fails wholesale is a\nbatch the device will retry forever (SPEC §4.4 rule 6).",
+        "properties": {
+          "audio_upload": {
+            "anyOf": [
+              {
+                "enum": [
+                  "required",
+                  "not_expected",
+                  "already_present"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Upload"
+          },
+          "client_call_id": {
+            "format": "uuid",
+            "title": "Client Call Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceCallErrorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The server id. Same value on every replay.",
+            "title": "Id"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "unchanged",
+              "updated",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_call_id",
+          "status"
+        ],
+        "title": "DeviceCallResultOut",
+        "type": "object"
+      },
+      "DeviceCallbackStartOut": {
+        "description": "``POST /api/device/v1/enrolment/verify/callback/start`` — route 2.",
+        "properties": {
+          "callback_msisdn": {
+            "title": "Callback Msisdn",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "poll_after_ms": {
+            "default": 2000,
+            "title": "Poll After Ms",
+            "type": "integer"
+          },
+          "verification_id": {
+            "format": "uuid",
+            "title": "Verification Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verification_id",
+          "callback_msisdn",
+          "expires_at"
+        ],
+        "title": "DeviceCallbackStartOut",
+        "type": "object"
+      },
+      "DeviceCapabilityBatchIn": {
+        "description": "``POST /api/device/v1/capabilities``.",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCapabilityIn"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Capabilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "capabilities"
+        ],
+        "title": "DeviceCapabilityBatchIn",
+        "type": "object"
+      },
+      "DeviceCapabilityBatchOut": {
+        "description": "Alerts are raised inside this request, so the 10-minute bound of UC-06\nis a device-reporting-interval question and not a server-latency one.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "alerts_raised": {
+            "title": "Alerts Raised",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "transitions": {
+            "title": "Transitions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "transitions",
+          "alerts_raised",
+          "server_time"
+        ],
+        "title": "DeviceCapabilityBatchOut",
+        "type": "object"
+      },
+      "DeviceCapabilityIn": {
+        "description": "One capability report. The result of *exercising* it, never a flag read.",
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the check saw, e.g. '1s test capture 32 kB'.",
+            "title": "Detail"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CapabilityState"
+          }
+        },
+        "required": [
+          "capability",
+          "state",
+          "checked_at"
+        ],
+        "title": "DeviceCapabilityIn",
+        "type": "object"
+      },
+      "DeviceCommandListOut": {
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCommandOut"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "commands",
+          "server_time"
+        ],
+        "title": "DeviceCommandListOut",
+        "type": "object"
+      },
+      "DeviceCommandOut": {
+        "description": "A pending command, as the app collects it.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CommandKind"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          }
+        },
+        "required": [
+          "command_id",
+          "kind",
+          "issued_at",
+          "expires_at"
+        ],
+        "title": "DeviceCommandOut",
+        "type": "object"
+      },
+      "DeviceEventBatchIn": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceEventIn"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "DeviceEventBatchIn",
+        "type": "object"
+      },
+      "DeviceEventBatchOut": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "alerts_raised": {
+            "title": "Alerts Raised",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accepted",
+          "alerts_raised",
+          "server_time"
+        ],
+        "title": "DeviceEventBatchOut",
+        "type": "object"
+      },
+      "DeviceEventDetailIn": {
+        "additionalProperties": false,
+        "description": "The **only** context a device event may carry (§8 rule 5, §15).\n\nEvery field is named here, and that is the whole point: the wire schema is\nthe allow-list, so a field the contract does not name cannot leave the\nphone. An open map — even one whose *values* are typed — leaves the *keys*\nunconstrained, and the handset belongs to the employee.\n\n``CONVENTIONS.md`` §8 enforces the same boundary on the Android side with a\ntype signature (``OemHarvestStrategy.locate(Decision.Capture, …)``) so that\nit cannot be widened in one line. This is the other end of the same pipe,\nand adding a field here shows up as a diff in ``contract/``.\n\nAll optional: one event kind uses two of these, another uses none.",
+        "properties": {
+          "attempts": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempts"
+          },
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "by_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the employee did it, or the OS did.",
+            "title": "By User"
+          },
+          "capture_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "client_call_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which queued record was parked.",
+            "title": "Client Call Id"
+          },
+          "deleted_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Bytes"
+          },
+          "deleted_records": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Records"
+          },
+          "discarded_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discarded Count"
+          },
+          "free_storage_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Storage Bytes"
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version"
+          },
+          "queue_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Bytes"
+          },
+          "queue_records": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Records"
+          },
+          "to_version": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Version"
+          }
+        },
+        "title": "DeviceEventDetailIn",
+        "type": "object"
+      },
+      "DeviceEventIn": {
+        "description": "``POST /api/device/v1/events`` — device events that are not calls.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceEventDetailIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Named fields only; see DeviceEventDetailIn."
+          },
+          "kind": {
+            "description": "One of the names in SPEC §4.4. Unknown names are accepted on purpose — an event we do not understand raises 'info' rather than being dropped — but the shape is constrained to a lower-case identifier: an unbounded free-text field is itself a way off the phone.",
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_]{2,63}$",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DeviceEventIn",
+        "type": "object"
+      },
+      "DeviceHeartbeatIn": {
+        "description": "``POST /api/device/v1/heartbeat`` — every 120 s while the service lives.",
+        "properties": {
+          "api_level": {
+            "anyOf": [
+              {
+                "maximum": 99.0,
+                "minimum": 21.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Level"
+          },
+          "app_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppVariant"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "battery_charging": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Charging"
+          },
+          "battery_level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Battery Level"
+          },
+          "battery_optimisation_exempt": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "isIgnoringBatteryOptimizations(). False is the usual cause of a dead service.",
+            "title": "Battery Optimisation Exempt"
+          },
+          "capture_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture Enabled"
+          },
+          "cellular_bytes_month": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cellular Bytes Month"
+          },
+          "device_epoch_ms": {
+            "description": "Raw device clock; the skew evidence (N36).",
+            "title": "Device Epoch Ms",
+            "type": "integer"
+          },
+          "device_rtt_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Rtt Ms"
+          },
+          "device_timezone": {
+            "maxLength": 64,
+            "title": "Device Timezone",
+            "type": "string"
+          },
+          "free_storage_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Storage Bytes"
+          },
+          "network_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parked_records": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parked Records"
+          },
+          "pending_commands_seen": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Commands Seen"
+          },
+          "power_save_mode": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Save Mode"
+          },
+          "queue_bytes": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Bytes"
+          },
+          "queue_oldest_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Oldest At"
+          },
+          "queue_records": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Zero is what the stale-version gate waits for (SPEC §4.3).",
+            "title": "Queue Records"
+          },
+          "recording_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recording_route_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Route Ok"
+          },
+          "service_running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Running"
+          },
+          "ws_connected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ws Connected"
+          }
+        },
+        "required": [
+          "device_epoch_ms",
+          "device_timezone"
+        ],
+        "title": "DeviceHeartbeatIn",
+        "type": "object"
+      },
+      "DeviceHeartbeatOut": {
+        "description": "``server_time`` lets the app compute skew without an extra round trip.",
+        "properties": {
+          "clock_skew_sec": {
+            "title": "Clock Skew Sec",
+            "type": "integer"
+          },
+          "config_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The app re-fetches config only when this changes.",
+            "title": "Config Hash"
+          },
+          "pending_command_count": {
+            "default": 0,
+            "title": "Pending Command Count",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "update": {
+            "$ref": "#/components/schemas/UpdateBlockOut"
+          }
+        },
+        "required": [
+          "server_time",
+          "clock_skew_sec",
+          "update"
+        ],
+        "title": "DeviceHeartbeatOut",
+        "type": "object"
+      },
+      "DeviceInfoIn": {
+        "description": "The handset, as it describes itself. No raw hardware identifier.",
+        "properties": {
+          "android_release": {
+            "maxLength": 16,
+            "title": "Android Release",
+            "type": "string"
+          },
+          "api_level": {
+            "maximum": 99.0,
+            "minimum": 21.0,
+            "title": "Api Level",
+            "type": "integer"
+          },
+          "build_fingerprint_hash": {
+            "description": "sha256 of Build.FINGERPRINT.",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Build Fingerprint Hash",
+            "type": "string"
+          },
+          "manufacturer": {
+            "maxLength": 64,
+            "title": "Manufacturer",
+            "type": "string"
+          },
+          "marketing_name": {
+            "anyOf": [
+              {
+                "maxLength": 96,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketing Name"
+          },
+          "model": {
+            "maxLength": 96,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manufacturer",
+          "model",
+          "android_release",
+          "api_level",
+          "build_fingerprint_hash"
+        ],
+        "title": "DeviceInfoIn",
+        "type": "object"
+      },
+      "DeviceMsisdnVerifyIn": {
+        "description": "``POST /api/device/v1/enrolment/verify/msisdn`` — route 1.",
+        "properties": {
+          "carrier_name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "line1_number": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "TelephonyManager.getLine1Number(). NULL, empty or fewer than nine digits is never a match (UC-04) — it is 'I don't know', not 'yes'.",
+            "title": "Line1 Number"
+          },
+          "sim_slot": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Slot"
+          },
+          "subscription_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscription Id"
+          }
+        },
+        "title": "DeviceMsisdnVerifyIn",
+        "type": "object"
+      },
+      "DeviceRedeemIn": {
+        "description": "``POST /api/device/v1/enrolment/redeem`` — public, rate-limited.",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/AppInfoIn"
+          },
+          "code": {
+            "maxLength": 16,
+            "minLength": 4,
+            "title": "Code",
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceInfoIn"
+          },
+          "device_epoch_ms": {
+            "title": "Device Epoch Ms",
+            "type": "integer"
+          },
+          "device_fingerprint": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Device Fingerprint",
+            "type": "string"
+          },
+          "device_timezone": {
+            "maxLength": 64,
+            "title": "Device Timezone",
+            "type": "string"
+          },
+          "sim_slot": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Slot"
+          },
+          "sim_subscription_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sim Subscription Id"
+          }
+        },
+        "required": [
+          "code",
+          "device",
+          "app",
+          "device_fingerprint",
+          "device_epoch_ms",
+          "device_timezone"
+        ],
+        "title": "DeviceRedeemIn",
+        "type": "object"
+      },
+      "DeviceRedeemOut": {
+        "description": "``201``. The provisional token is scoped — an unverified phone cannot\nupload a single call (SPEC §4.2).",
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/RedeemAgentOut"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "number": {
+            "$ref": "#/components/schemas/RedeemNumberOut"
+          },
+          "provisional_token": {
+            "title": "Provisional Token",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/RedeemVerificationOut"
+          }
+        },
+        "required": [
+          "installation_id",
+          "status",
+          "provisional_token",
+          "expires_in",
+          "agent",
+          "number",
+          "verification",
+          "server_time"
+        ],
+        "title": "DeviceRedeemOut",
+        "type": "object"
+      },
+      "DeviceRefreshIn": {
+        "description": "``POST /api/device/v1/auth/refresh``.",
+        "properties": {
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "title": "DeviceRefreshIn",
+        "type": "object"
+      },
+      "DeviceTokenPairOut": {
+        "description": "Issued once the installation is verified.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "verification_method": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in",
+          "installation_id",
+          "status",
+          "server_time"
+        ],
+        "title": "DeviceTokenPairOut",
+        "type": "object"
+      },
+      "DeviceVerificationStatusOut": {
+        "description": "Polled every two seconds for at most five minutes.",
+        "properties": {
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrolmentOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/VerificationState"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstallationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IssuedTokensOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present only on 'matched'; the full pair."
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "DeviceVerificationStatusOut",
+        "type": "object"
+      },
+      "EnrolmentOutcome": {
+        "description": "Every way an enrolment step can end. The funnel's evidence base.",
+        "enum": [
+          "ok",
+          "code_not_found",
+          "code_already_used",
+          "code_expired",
+          "code_revoked",
+          "number_mismatch",
+          "msisdn_empty",
+          "no_caller_id",
+          "timeout",
+          "receiver_down",
+          "already_bound",
+          "rejected"
+        ],
+        "title": "EnrolmentOutcome",
+        "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "InstallationStatus": {
+        "description": "Lifecycle of one app installation bound to one registered number.",
+        "enum": [
+          "pending",
+          "active",
+          "replaced",
+          "revoked",
+          "revoked_pending_confirmation"
+        ],
+        "title": "InstallationStatus",
+        "type": "string"
+      },
+      "IssuedTokensOut": {
+        "description": "The pair handed over once verification succeeds.\n\nNamed rather than a map because the generated Kotlin DTO is what the app\nreads: a ``Map<String, Any>`` there makes a renamed field a runtime\n``null`` on a fleet we cannot force-update, which is exactly what\nCONVENTIONS.md §1 generates clients to prevent.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "IssuedTokensOut",
+        "type": "object"
+      },
+      "NetworkType": {
+        "enum": [
+          "wifi",
+          "cellular",
+          "none"
+        ],
+        "title": "NetworkType",
+        "type": "string"
+      },
+      "OpenUploadIn": {
+        "description": "``POST /calls/{client_call_id}/audio/session`` — step 1 of three.",
+        "properties": {
+          "bitrate_bps": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Bps"
+          },
+          "bytes_total": {
+            "description": "Declared file size.",
+            "exclusiveMinimum": 0.0,
+            "title": "Bytes Total",
+            "type": "integer"
+          },
+          "capture_route": {
+            "$ref": "#/components/schemas/CaptureRoute"
+          },
+          "capture_route_detail": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder *name* only, never a path from the phone (§8).",
+            "title": "Capture Route Detail"
+          },
+          "channels": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          },
+          "codec": {
+            "$ref": "#/components/schemas/AudioCodec"
+          },
+          "container": {
+            "$ref": "#/components/schemas/AudioContainer"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "recorded_at": {
+            "description": "When the file was written. Checked against the call's window — a recording that does not overlap is refused and never stored (N28).",
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate Hz"
+          },
+          "sha256": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bytes_total",
+          "sha256",
+          "codec",
+          "container",
+          "capture_route",
+          "recorded_at"
+        ],
+        "title": "OpenUploadIn",
+        "type": "object"
+      },
+      "OpenUploadOut": {
+        "description": "``201``, or the **existing** open session — that is the resume path.",
+        "properties": {
+          "chunk_size": {
+            "description": "The client always obeys this value.",
+            "title": "Chunk Size",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "received_bytes": {
+            "description": "Resume from here. After an app restart this is not zero.",
+            "title": "Received Bytes",
+            "type": "integer"
+          },
+          "upload_id": {
+            "format": "uuid",
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "chunk_size",
+          "received_bytes",
+          "expires_at"
+        ],
+        "title": "OpenUploadOut",
+        "type": "object"
+      },
+      "ReceiverStatus": {
+        "description": "No heartbeat for 3 min -> degraded, 5 min -> down + a critical alert.",
+        "enum": [
+          "up",
+          "degraded",
+          "down"
+        ],
+        "title": "ReceiverStatus",
+        "type": "string"
+      },
+      "RedeemAgentOut": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "full_name"
+        ],
+        "title": "RedeemAgentOut",
+        "type": "object"
+      },
+      "RedeemNumberOut": {
+        "properties": {
+          "display": {
+            "description": "Grouped for reading aloud, e.g. +998 90 111-22-33.",
+            "title": "Display",
+            "type": "string"
+          },
+          "e164": {
+            "title": "E164",
+            "type": "string"
+          }
+        },
+        "required": [
+          "e164",
+          "display"
+        ],
+        "title": "RedeemNumberOut",
+        "type": "object"
+      },
+      "RedeemVerificationOut": {
+        "description": "What the app needs to run screen E5.",
+        "properties": {
+          "callback_msisdn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL when no receiver is available.",
+            "title": "Callback Msisdn"
+          },
+          "receiver_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReceiverStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "window_seconds": {
+            "title": "Window Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "required",
+          "window_seconds"
+        ],
+        "title": "RedeemVerificationOut",
+        "type": "object"
+      },
+      "UpdateBlockOut": {
+        "description": "Carried on every device response (SPEC §4.3).\n\nThe app keeps capturing and draining while ``required`` is true; it blocks\nonly new enrolment actions. Refusing an old version must never destroy data.",
+        "properties": {
+          "apk_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apk Url"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "latest_version_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version Code"
+          },
+          "message_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Uz"
+          },
+          "min_version_code": {
+            "title": "Min Version Code",
+            "type": "integer"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "required",
+          "min_version_code"
+        ],
+        "title": "UpdateBlockOut",
+        "type": "object"
+      },
+      "UploadStatus": {
+        "description": "Resumable audio upload session state (SPEC §4.5).",
+        "enum": [
+          "open",
+          "committed",
+          "expired",
+          "aborted"
+        ],
+        "title": "UploadStatus",
+        "type": "string"
+      },
+      "UploadStatusOut": {
+        "description": "``GET /audio/{upload_id}`` — the probe (step 4).",
+        "properties": {
+          "bytes_total": {
+            "title": "Bytes Total",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "received_bytes": {
+            "title": "Received Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UploadStatus"
+          },
+          "upload_id": {
+            "format": "uuid",
+            "title": "Upload Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "status",
+          "received_bytes",
+          "bytes_total",
+          "expires_at"
+        ],
+        "title": "UploadStatusOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VerificationMethod": {
+        "description": "How we proved the phone holds the registered number (UC-04, T142).",
+        "enum": [
+          "sim_msisdn",
+          "callback",
+          "admin_attested"
+        ],
+        "title": "VerificationMethod",
+        "type": "string"
+      },
+      "VerificationState": {
+        "description": "State of one verification attempt.",
+        "enum": [
+          "pending",
+          "matched",
+          "failed",
+          "expired",
+          "attested"
+        ],
+        "title": "VerificationState",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "description": "Generated from the Pydantic schemas. Prefix: /api/device/v1",
+    "title": "BonviCall device API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/device/v1/audio/{upload_id}": {
+      "get": {
+        "description": "Step 4. How far did we get, after a crash.",
+        "operationId": "probe_api_device_v1_audio__upload_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Probe",
+        "tags": [
+          "Device audio"
+        ]
+      }
+    },
+    "/api/device/v1/audio/{upload_id}/chunk": {
+      "put": {
+        "description": "Step 2. ``409`` carries the expected offset so the client seeks.",
+        "operationId": "put_chunk_api_device_v1_audio__upload_id__chunk_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-chunk-sha256",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Chunk-Sha256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChunkAcceptedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Chunk",
+        "tags": [
+          "Device audio"
+        ]
+      }
+    },
+    "/api/device/v1/audio/{upload_id}/commit": {
+      "post": {
+        "description": "Step 3. Idempotent — and only after this does the device delete its copy.",
+        "operationId": "commit_api_device_v1_audio__upload_id__commit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit",
+        "tags": [
+          "Device audio"
+        ]
+      }
+    },
+    "/api/device/v1/auth/refresh": {
+      "post": {
+        "description": "Rotate the installation's token pair.\n\nGuarded by the refresh token itself: there is no access token to check,\nbecause the whole reason to call this is that the access token expired.\nReuse of a spent token increments ``token_version``, which kills every\ntoken already issued to that installation.",
+        "operationId": "refresh_api_device_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenPairOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "Device auth"
+        ]
+      }
+    },
+    "/api/device/v1/call-log-delta": {
+      "post": {
+        "description": "The production measurement rig (N1, N3, §4.1 B).\n\nThe device sweeps its own call log and reports what it counted next to what\nit uploaded. Without this, capture rate is unverifiable the day the\nacceptance window ends.",
+        "operationId": "report_call_log_delta_api_device_v1_call_log_delta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCallLogDeltaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCallLogDeltaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Call Log Delta",
+        "tags": [
+          "Device telemetry"
+        ]
+      }
+    },
+    "/api/device/v1/calls": {
+      "post": {
+        "description": "Batch upsert, at most 50 items.\n\n``number_id`` and ``agent_id`` are resolved from the installation and the\ntime-boxed assignment — never from the payload. The device does not get to\nsay which number it is, and it does not get to move a call to another agent\nby re-sending it.",
+        "operationId": "ingest_calls_api_device_v1_calls_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCallBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCallBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Calls",
+        "tags": [
+          "Device calls"
+        ]
+      }
+    },
+    "/api/device/v1/calls/{client_call_id}/audio/session": {
+      "post": {
+        "description": "Step 1. Repeating it returns the **existing** session — the resume path.\n\nKeyed on ``client_call_id`` rather than the server id, so the device can\nstart uploading without having seen a response first.",
+        "operationId": "open_session_api_device_v1_calls__client_call_id__audio_session_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "client_call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Client Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenUploadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenUploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Session",
+        "tags": [
+          "Device audio"
+        ]
+      }
+    },
+    "/api/device/v1/capabilities": {
+      "post": {
+        "description": "Capability drift (UC-06, UC-18, R3).\n\nThe alert is raised inside this request, so the ten-minute bound is a\nreporting-interval question. An OEM battery manager killing the capture\nservice is invisible unless the server notices the absence — this is where\nit notices.",
+        "operationId": "report_capabilities_api_device_v1_capabilities_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCapabilityBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCapabilityBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Capabilities",
+        "tags": [
+          "Device telemetry"
+        ]
+      }
+    },
+    "/api/device/v1/commands": {
+      "get": {
+        "description": "Anything the phone should act on now. Expired commands are not returned.",
+        "operationId": "pending_commands_api_device_v1_commands_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCommandListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pending Commands",
+        "tags": [
+          "Device commands"
+        ]
+      }
+    },
+    "/api/device/v1/commands/{command_id}/ack": {
+      "post": {
+        "description": "Record the outcome and the latency.\n\nReturns whatever else is pending, so an app that just acknowledged a dial\ndoes not need a second round trip to find the next command.",
+        "operationId": "acknowledge_api_device_v1_commands__command_id__ack_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCommandListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge",
+        "tags": [
+          "Device commands"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/redeem": {
+      "post": {
+        "description": "Public, rate-limited. Turns a code into a ``pending`` installation.",
+        "operationId": "redeem_api_device_v1_enrolment_redeem_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRedeemIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRedeemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redeem",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/token": {
+      "get": {
+        "description": "Re-issue the pair for an installation that already holds a valid token.\n\nUsed by the app after an update, when it has a live access token but lost\nits stored refresh token. Cheap, and it saves an agent re-enrolling.",
+        "operationId": "current_token_api_device_v1_enrolment_token_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenPairOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Current Token",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/verify/callback/start": {
+      "post": {
+        "description": "Route 2 — the load-bearing one, since SMS is out of scope.\n\n409 ``callback_receiver_down`` when no receiver has checked in recently:\nraising a challenge the agent cannot possibly satisfy is worse than saying\nso, and the Uzbek message tells them to contact the admin.",
+        "operationId": "start_callback_api_device_v1_enrolment_verify_callback_start_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCallbackStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Callback",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/verify/callback/status": {
+      "get": {
+        "description": "Polled every two seconds for at most five minutes.",
+        "operationId": "callback_status_api_device_v1_enrolment_verify_callback_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "verification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Verification Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceVerificationStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Callback Status",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/verify/msisdn": {
+      "post": {
+        "description": "Route 1: the SIM's own MSISDN (SPEC §9.1).\n\nA null, empty or short ``line1_number`` is **never** a match — it is\n``msisdn_empty`` and the app moves to route 2. Treating \"I don't know\" as\n\"yes\" would attribute a phone to a number it does not hold.",
+        "operationId": "verify_msisdn_api_device_v1_enrolment_verify_msisdn_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceMsisdnVerifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceVerificationStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Msisdn",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/events": {
+      "post": {
+        "description": "Device events that are not calls (SPEC §4.4).\n\nAn unknown event name still raises, at ``info``: a phone telling us\nsomething we do not understand is itself news, and dropping it is the\nsilence this subsystem exists to prevent.",
+        "operationId": "report_events_api_device_v1_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceEventBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceEventBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Events",
+        "tags": [
+          "Device telemetry"
+        ]
+      }
+    },
+    "/api/device/v1/heartbeat": {
+      "post": {
+        "description": "Every 120 seconds while the foreground service is alive (UC-17).\n\nFive missed beats is OFFLINE within ten minutes. The 120-second timer is a\ncoroutine inside the service, not a WorkManager job — WorkManager's floor\nis fifteen minutes, and that distinction is the difference between UC-17's\ndetection window working and not.",
+        "operationId": "heartbeat_api_device_v1_heartbeat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceHeartbeatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceHeartbeatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Heartbeat",
+        "tags": [
+          "Device telemetry"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose owns the real theme (ui/theme/). This exists so the window has
+         a background before the first frame and the splash is not white. -->
+    <style name="Theme.BonviCall" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/brand_navy</item>
+        <item name="android:statusBarColor">@color/brand_navy</item>
+    </style>
+</resources>

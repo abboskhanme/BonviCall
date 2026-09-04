@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Design tokens.
+
+   Colour is a CSS custom property and nothing else. The `dark:` variant is NOT
+   used anywhere in the product (CONVENTIONS-CLIENT.md §3): in "system" theme
+   mode there is no `data-theme` attribute at all, so a `dark:` class would be
+   dead code in the default case. All three cases are written out here, once:
+
+     1. :root                        light, the default
+     2. prefers-color-scheme: dark   system dark, only while the user has not
+                                     pinned a theme
+     3. [data-theme="dark"|"light"]  the user's explicit choice
+
+   Accent is Bonvi's navy (#1D4E79) expressed in HSL so Tailwind can apply
+   opacity modifiers: hsl(var(--accent) / 0.1).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --bg: 214 32% 98%;
+    --surface: 0 0% 100%;
+    --surface-2: 214 28% 96.5%;
+    --border: 214 22% 91%;
+
+    --text: 214 32% 12%;
+    --muted: 214 12% 46%;
+
+    --accent: 208 62% 34%;
+    --accent-fg: 0 0% 100%;
+    --accent-soft: 208 72% 95.5%;
+
+    /* Semantic colours are read as TEXT on a light surface, so they carry a
+       contrast budget: good 4.92:1, warn 4.73:1, bad 5.51:1 against white.
+       A brighter yellow fails WCAG AA and the number nobody can read is
+       always the important one. */
+    --good: 152 62% 31%;
+    --warn: 30 95% 36%;
+    --bad: 352 74% 46%;
+
+    --shadow: 214 45% 22%;
+
+    color-scheme: light;
+  }
+
+  :root:not([data-theme='light']) {
+    @media (prefers-color-scheme: dark) {
+      --bg: 214 26% 7%;
+      --surface: 214 22% 10.5%;
+      --surface-2: 214 20% 14%;
+      --border: 214 16% 19%;
+
+      --text: 214 24% 96%;
+      --muted: 214 10% 60%;
+
+      --accent: 208 78% 64%;
+      --accent-fg: 214 30% 8%;
+      --accent-soft: 208 45% 18%;
+
+      --good: 152 55% 52%;
+      --warn: 36 88% 60%;
+      --bad: 352 76% 66%;
+
+      --shadow: 214 60% 2%;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --bg: 214 26% 7%;
+    --surface: 214 22% 10.5%;
+    --surface-2: 214 20% 14%;
+    --border: 214 16% 19%;
+
+    --text: 214 24% 96%;
+    --muted: 214 10% 60%;
+
+    --accent: 208 78% 64%;
+    --accent-fg: 214 30% 8%;
+    --accent-soft: 208 45% 18%;
+
+    --good: 152 55% 52%;
+    --warn: 36 88% 60%;
+    --bad: 352 76% 66%;
+
+    --shadow: 214 60% 2%;
+
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: hsl(var(--bg));
+    color: hsl(var(--text));
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.021em;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 2px;
+  }
+}

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  modern34 — targetSdk 34, scoped storage.
+
+  Reaches the same OEM recordings through MediaStore plus All-files access
+  instead of raw paths. Better on every axis except the one S1 measured, which
+  is why both flavours ship and M0 decides.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- UC-14: the OEM recordings folder is not a media collection this app
+         owns, and under scoped storage nothing narrower reaches it. This is the
+         single most alarming screen in the whole install (R17) and it is the
+         price of the preferred capture route on a modern target. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- UC-14: the MediaStore audio query that locates the recording, on the
+         API 33+ split of READ_EXTERNAL_STORAGE. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!--
+      ⚠️ DO NOT ADD `FOREGROUND_SERVICE_PHONE_CALL` OR THE `phoneCall`
+      FOREGROUND-SERVICE TYPE HERE. SPEC §7.2 lists them; they are wrong, and
+      this comment exists so nobody adds them back from the SPEC.
+
+      On API 34 the `phoneCall` type requires the app to be the default dialer,
+      to hold MANAGE_OWN_CALLS, or to be a device owner. BonviCall is none of
+      the three and CANNOT BECOME ANY OF THEM: it observes calls rather than
+      managing them, and the handsets are the employees' own, so device-owner
+      provisioning is out of scope (REQUIREMENTS.md §5.7). Starting a foreground
+      service of a type the app does not qualify for throws SecurityException —
+      so this is not an M0 measurement, it is a crash on every API 34 device.
+
+      This flavour therefore runs on `microphone|dataSync`, which is what
+      src/main/AndroidManifest.xml already declares. Nothing is overridden here.
+      S1-RECORDING.md's finding that "targetSdk 29+ restricts the phoneCall FGS
+      type" is the same fact, arrived at from the other direction.
+    -->
+
+</manifest>

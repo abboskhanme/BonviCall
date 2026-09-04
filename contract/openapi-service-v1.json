@@ -1,0 +1,711 @@
+{
+  "components": {
+    "schemas": {
+      "AppVariant": {
+        "description": "The ``targetSdk`` product flavour (D-06).\n\nReported on every heartbeat, stored on every call, so capture rate is\nmeasurable per variant and not only per handset model.",
+        "enum": [
+          "legacy28",
+          "modern34"
+        ],
+        "title": "AppVariant",
+        "type": "string"
+      },
+      "AudioMissingReason": {
+        "description": "Why a call has no audio. Closed, ``NOT NULL`` whenever audio is absent (N5).\n\nUC-14 names six; SPEC §3.9 justifies the other four one by one. The gap\nreport's denominator excludes ``pending_upload`` and ``not_expected``,\nwhich is what keeps \"% of answered calls with audio\" honest.",
+        "enum": [
+          "pending_upload",
+          "not_expected",
+          "recording_route_unavailable",
+          "oem_recorder_off",
+          "no_permission",
+          "capture_returned_silence",
+          "app_not_running",
+          "upload_expired",
+          "queue_space_exhausted",
+          "attribution_failed"
+        ],
+        "title": "AudioMissingReason",
+        "type": "string"
+      },
+      "CallDirection": {
+        "description": "Ours, not BonviZvonki's ``inbound``/``outbound``.\n\nThe export (SPEC §4.9) maps ours onto theirs in exactly one place, so the\ntwo vocabularies never leak into each other.",
+        "enum": [
+          "incoming",
+          "outgoing"
+        ],
+        "title": "CallDirection",
+        "type": "string"
+      },
+      "CallDisposition": {
+        "description": "UC-11's five classes are direction x disposition.\n\n``missed`` and ``rejected`` are incoming-only, ``no_answer`` is\noutgoing-only — enforced by a CHECK, so the invalid combinations are\nunrepresentable rather than merely unused.",
+        "enum": [
+          "answered",
+          "missed",
+          "rejected",
+          "no_answer"
+        ],
+        "title": "CallDisposition",
+        "type": "string"
+      },
+      "CallType": {
+        "description": "Internal vs external (UC-25). ``unknown`` is the mandatory default.\n\nAn empty line directory yields ``unknown``, never ``external``:\nBonviZvonki defaulted to external and 82 of 98 calls were mislabelled.",
+        "enum": [
+          "internal",
+          "external",
+          "unknown"
+        ],
+        "title": "CallType",
+        "type": "string"
+      },
+      "CallbackEventIn": {
+        "description": "``POST /api/service/v1/callback-events`` — from the receiver (§9.4).\n\nA heartbeat is an event with no caller, which is why every field below is\noptional: the receiver proves it is alive by posting, not by having seen a\ncall.",
+        "properties": {
+          "caller_e164": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller E164"
+          },
+          "cli_presented": {
+            "default": false,
+            "description": "False means the operator suppressed the number — that is R19.",
+            "title": "Cli Presented",
+            "type": "boolean"
+          },
+          "heartbeat": {
+            "default": false,
+            "description": "True for a keepalive with no call.",
+            "title": "Heartbeat",
+            "type": "boolean"
+          },
+          "receiver_epoch_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiver Epoch Ms"
+          }
+        },
+        "title": "CallbackEventIn",
+        "type": "object"
+      },
+      "CallbackEventOut": {
+        "description": "What the receiver learns: whether its report matched anything.",
+        "properties": {
+          "matched": {
+            "title": "Matched",
+            "type": "boolean"
+          },
+          "receiver_status": {
+            "$ref": "#/components/schemas/ReceiverStatus"
+          },
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stored",
+          "matched",
+          "receiver_status"
+        ],
+        "title": "CallbackEventOut",
+        "type": "object"
+      },
+      "CaptureRoute": {
+        "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
+        "enum": [
+          "oem_file_harvest",
+          "app_voice_recognition",
+          "app_voice_communication",
+          "app_mic",
+          "none"
+        ],
+        "title": "CaptureRoute",
+        "type": "string"
+      },
+      "ExportAgentDetailOut": {
+        "description": "An agent plus their number history.\n\nNeeded because BonviZvonki's L3 failure was exactly this mapping arriving\nwrong — a single ``agents.phone`` column cannot express a handover.",
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "numbers": {
+            "items": {
+              "$ref": "#/components/schemas/ExportNumberPeriodOut"
+            },
+            "title": "Numbers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "is_active",
+          "numbers"
+        ],
+        "title": "ExportAgentDetailOut",
+        "type": "object"
+      },
+      "ExportAgentOut": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "full_name"
+        ],
+        "title": "ExportAgentOut",
+        "type": "object"
+      },
+      "ExportAgentsResponse": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExportAgentDetailOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "count"
+        ],
+        "title": "ExportAgentsResponse",
+        "type": "object"
+      },
+      "ExportCallOut": {
+        "description": "One call, in the shape release 2 consumes.",
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/ExportAgentOut"
+          },
+          "agent_number_e164": {
+            "title": "Agent Number E164",
+            "type": "string"
+          },
+          "agent_number_key": {
+            "description": "Last 9 digits — their join key too (N37).",
+            "title": "Agent Number Key",
+            "type": "string"
+          },
+          "answered": {
+            "title": "Answered",
+            "type": "boolean"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "app_variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "audio_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Duration Ms"
+          },
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "audio_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A stable reference, never a public URL (N20, §5.4).",
+            "title": "Audio Ref"
+          },
+          "audio_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Sha256"
+          },
+          "bonvizvonki_direction": {
+            "description": "Their vocabulary, mapped here so ours never leaks into theirs.",
+            "title": "Bonvizvonki Direction",
+            "type": "string"
+          },
+          "call_type": {
+            "$ref": "#/components/schemas/CallType"
+          },
+          "capture_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "title": "Duration Sec",
+            "type": "integer"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "has_audio": {
+            "title": "Has Audio",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "remote_number_e164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Number E164"
+          },
+          "remote_number_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Number Key"
+          },
+          "seq": {
+            "description": "The cursor. Monotonic, server-assigned.",
+            "title": "Seq",
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "agent",
+          "agent_number_e164",
+          "agent_number_key",
+          "remote_number_e164",
+          "remote_number_key",
+          "direction",
+          "bonvizvonki_direction",
+          "disposition",
+          "answered",
+          "call_type",
+          "started_at",
+          "answered_at",
+          "ended_at",
+          "duration_sec",
+          "received_at",
+          "has_audio",
+          "audio_missing_reason",
+          "audio_ref",
+          "audio_sha256",
+          "audio_duration_ms",
+          "capture_route",
+          "app_variant"
+        ],
+        "title": "ExportCallOut",
+        "type": "object"
+      },
+      "ExportCallsResponse": {
+        "description": "``seq ASC`` with a settling window, so two full passes agree (UC-29).",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExportCallOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_since": {
+            "title": "Next Since",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_since",
+          "count"
+        ],
+        "title": "ExportCallsResponse",
+        "type": "object"
+      },
+      "ExportNumberPeriodOut": {
+        "description": "One line an agent held, and when.",
+        "properties": {
+          "e164": {
+            "title": "E164",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "title": "Valid From",
+            "type": "string"
+          },
+          "valid_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To"
+          }
+        },
+        "required": [
+          "e164",
+          "key",
+          "valid_from",
+          "valid_to"
+        ],
+        "title": "ExportNumberPeriodOut",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ReceiverStatus": {
+        "description": "No heartbeat for 3 min -> degraded, 5 min -> down + a critical alert.",
+        "enum": [
+          "up",
+          "degraded",
+          "down"
+        ],
+        "title": "ReceiverStatus",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Generated from the Pydantic schemas. Prefix: /api/service/v1",
+    "title": "BonviCall service API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/service/v1/callback-events": {
+      "post": {
+        "description": "Record what the receiver saw, and match it to a pending verification.\n\nThe permission dependency proves the caller is a receiver-scoped service\ntoken; the lookup below proves it is *this* receiver, so two gateways\ncannot report on each other's behalf.",
+        "operationId": "report_callback_event_api_service_v1_callback_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallbackEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Callback Event",
+        "tags": [
+          "Callback receiver"
+        ]
+      }
+    },
+    "/api/service/v1/export/agents": {
+      "get": {
+        "description": "Agents with their number history — the mapping L3 got wrong.",
+        "operationId": "export_agents_api_service_v1_export_agents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportAgentsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Export Agents",
+        "tags": [
+          "Service export"
+        ]
+      }
+    },
+    "/api/service/v1/export/calls": {
+      "get": {
+        "description": "``seq ASC`` with a ten-second settling window.\n\nThe window is what makes \"two consecutive full passes over an unchanging\ndataset return identical row sets\" true rather than nearly true: ``seq``\ncomes from a sequence, and a lower one can commit after a higher one.",
+        "operationId": "export_calls_api_service_v1_export_calls_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportCallsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Calls",
+        "tags": [
+          "Service export"
+        ]
+      }
+    },
+    "/api/service/v1/export/calls/{call_id}/audio": {
+      "get": {
+        "description": "**Range is mandatory here too** (N43, §5.4 consequence 2).\n\nBonviZvonki streams audio rather than copying it, so 206 with\n``Content-Range`` is the whole point. Every access writes an audit row with\n``actor_type='service'``.",
+        "operationId": "export_audio_api_service_v1_export_calls__call_id__audio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Audio",
+        "tags": [
+          "Service export"
+        ]
+      }
+    }
+  }
+}

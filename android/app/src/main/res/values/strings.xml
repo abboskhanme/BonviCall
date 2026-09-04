@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Uzbek string catalogue. This file is ONE OF EXACTLY THREE places in the
+  product where Uzbek text is legal inside source (CONVENTIONS.md §14); the
+  others are server/src/core/messages_uz.py and panel/src/shared/i18n/uz.json.
+  Identifiers and comments here are English, like everywhere else.
+-->
+<resources>
+    <string name="app_name">BonviCall</string>
+
+    <!-- Foreground service notification (UC-05). It is permanent and an
+         employee reads it every day, so it says what the app is doing and on
+         which number — N41 transparency, not a blank "app is running". -->
+    <string name="service_channel_name">Qo\'ng\'iroqlar nazorati</string>
+    <string name="service_channel_description">Ish raqamidagi qo\'ng\'iroqlarni qayd etadi</string>
+    <string name="service_notification_title">Ish qo\'ng\'iroqlari qayd etilmoqda</string>
+    <string name="service_notification_text">Faqat ish raqamingizdagi qo\'ng\'iroqlar</string>
+
+    <!-- Enrolment E1–E6 (SPEC §8.2). Bodies are filled by T61/T62/T63. -->
+    <string name="enrol_code_title">Kodni kiriting</string>
+    <string name="enrol_permissions_title">Ruxsatlar</string>
+    <string name="enrol_oem_title">Qurilma sozlamalari</string>
+    <string name="enrol_sim_title">Qaysi SIM ish raqami?</string>
+    <string name="enrol_verify_title">Raqamni tasdiqlash</string>
+    <string name="enrol_done_title">Tayyor</string>
+
+    <!-- Main destinations -->
+    <string name="home_title">Bosh sahifa</string>
+    <string name="calls_title">Qo\'ng\'iroqlar</string>
+    <string name="diagnostics_title">Tashxis</string>
+
+    <string name="common_not_ready">Bu ekran hali tayyor emas.</string>
+</resources>

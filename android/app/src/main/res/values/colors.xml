@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bonvi navy, the same accent the panel uses. -->
+    <color name="brand_navy">#FF1D4E79</color>
+    <color name="ic_launcher_background">#FF1D4E79</color>
+</resources>
