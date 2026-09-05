@@ -94,6 +94,36 @@ def _routes_for(app: FastAPI, prefix: str) -> list[APIRoute]:
     return sorted(routes, key=lambda route: (route.path, sorted(route.methods)))
 
 
+def _strip_generated_property_titles(document: dict[str, Any]) -> None:
+    """Remove the ``title`` Pydantic puts on every property. Mutates in place.
+
+    Pydantic titles each property with its own field name restated —
+    ``attempts`` becomes ``"title": "Attempts"`` — and openapi-generator treats
+    a *titled inline schema* as a type worth minting. So
+    ``attempts: int | None`` generated as ``class Attempts()``: a named, empty
+    Kotlin class with no properties, thirteen of them on
+    ``DeviceEventDetailIn`` alone, and the fields could not be set.
+
+    This is the fourth defect of its shape (``int64``, the missing Moshi
+    adapters, the UUID converter, this): the server is correct Python, the
+    document is valid OpenAPI, the generated client compiles, and the thing
+    still does not work — because each side is individually right and the
+    defect lives only where they meet. None of them is visible from one side.
+
+    **Only auto-generated titles are removed**, matched against the exact form
+    Pydantic derives from the field name. A title somebody wrote on purpose
+    carries information and survives; nothing in this codebase sets one today,
+    and the check is what keeps that safe if one ever does. Schema-level titles
+    are untouched — those name the model, and the generator needs them.
+    """
+    for schema in document.get("components", {}).get("schemas", {}).values():
+        for name, spec in (schema.get("properties") or {}).items():
+            if not isinstance(spec, dict):
+                continue
+            if spec.get("title") == name.replace("_", " ").title():
+                del spec["title"]
+
+
 def _dump(path: Path, document: dict[str, Any]) -> bool:
     """Write ``document`` deterministically. True when the bytes changed."""
     text = json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
@@ -114,6 +144,8 @@ def build_documents(app: FastAPI | None = None) -> dict[str, dict[str, Any]]:
         )
         for stem, title, prefix in SURFACES
     }
+    for document in documents.values():
+        _strip_generated_property_titles(document)
     documents["device-ws-frames"] = _ws_frames_document()
     documents["error-codes"] = {
         "description": (

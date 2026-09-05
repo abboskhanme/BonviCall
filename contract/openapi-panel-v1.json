@@ -18,11 +18,9 @@
             "items": {
               "$ref": "#/components/schemas/AgentResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -44,16 +42,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Archived At"
+            ]
           },
           "color": {
-            "title": "Color",
             "type": "string"
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "employee_code": {
@@ -64,11 +59,9 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Employee Code"
+            ]
           },
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "hired_at": {
@@ -80,16 +73,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Hired At"
+            ]
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_active": {
-            "title": "Is Active",
             "type": "boolean"
           },
           "note": {
@@ -100,8 +90,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           }
         },
         "required": [
@@ -158,16 +147,13 @@
             "items": {
               "$ref": "#/components/schemas/AlertResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "open_count": {
             "description": "Neither acknowledged nor resolved.",
-            "title": "Open Count",
             "type": "integer"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -191,8 +177,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Acknowledged At"
+            ]
           },
           "acknowledged_by": {
             "anyOf": [
@@ -203,8 +188,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Acknowledged By"
+            ]
           },
           "agent_id": {
             "anyOf": [
@@ -215,8 +199,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Agent Id"
+            ]
           },
           "body_uz": {
             "anyOf": [
@@ -227,8 +210,7 @@
                 "type": "null"
               }
             ],
-            "description": "What to do about it. Derived from `kind`, not stored.",
-            "title": "Body Uz"
+            "description": "What to do about it. Derived from `kind`, not stored."
           },
           "detail": {
             "anyOf": [
@@ -238,8 +220,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Detail"
+            ]
           },
           "device_model": {
             "anyOf": [
@@ -249,17 +230,14 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Device Model"
+            ]
           },
           "first_seen_at": {
             "format": "date-time",
-            "title": "First Seen At",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "installation_id": {
@@ -271,15 +249,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Installation Id"
+            ]
           },
           "kind": {
             "$ref": "#/components/schemas/AlertKind"
           },
           "last_seen_at": {
             "format": "date-time",
-            "title": "Last Seen At",
             "type": "string"
           },
           "number_id": {
@@ -291,12 +267,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Number Id"
+            ]
           },
           "occurrence_count": {
             "description": "Repeats bump this rather than inserting a row: a phone reporting every two minutes must not produce 720 rows a day.",
-            "title": "Occurrence Count",
             "type": "integer"
           },
           "resolved_at": {
@@ -308,15 +282,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Resolved At"
+            ]
           },
           "severity": {
             "$ref": "#/components/schemas/AlertSeverity"
           },
           "title_uz": {
             "description": "What happened, in Uzbek. Derived from `kind`, not stored.",
-            "title": "Title Uz",
             "type": "string"
           }
         },
@@ -365,16 +337,13 @@
             "items": {
               "$ref": "#/components/schemas/AppVersionResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "signing_sha256_configured": {
             "description": "Whether a signing fingerprint is configured. False means uploads are accepted without the key check — see docs/APK-SIGNING.md.",
-            "title": "Signing Sha256 Configured",
             "type": "boolean"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -391,12 +360,10 @@
         "properties": {
           "apk_sha256": {
             "description": "Computed server-side, never accepted.",
-            "title": "Apk Sha256",
             "type": "string"
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "created_by": {
@@ -408,30 +375,24 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Created By"
+            ]
           },
           "created_by_name": {
             "default": "",
             "description": "Who uploaded it, resolved server-side. The id alone would make every page re-solve it through `GET /users`, which a manager cannot read — so a manager would see a bare uuid.",
-            "title": "Created By Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_current": {
-            "title": "Is Current",
             "type": "boolean"
           },
           "is_mandatory": {
-            "title": "Is Mandatory",
             "type": "boolean"
           },
           "min_api_level": {
-            "title": "Min Api Level",
             "type": "integer"
           },
           "published_at": {
@@ -444,8 +405,7 @@
                 "type": "null"
               }
             ],
-            "description": "NULL means uploaded but not published — reaches nobody.",
-            "title": "Published At"
+            "description": "NULL means uploaded but not published — reaches nobody."
           },
           "release_notes_uz": {
             "anyOf": [
@@ -455,23 +415,19 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Release Notes Uz"
+            ]
           },
           "size_bytes": {
             "format": "int64",
-            "title": "Size Bytes",
             "type": "integer"
           },
           "variant": {
             "$ref": "#/components/schemas/AppVariant"
           },
           "version": {
-            "title": "Version",
             "type": "string"
           },
           "version_code": {
-            "title": "Version Code",
             "type": "integer"
           }
         },
@@ -500,11 +456,9 @@
             "items": {
               "$ref": "#/components/schemas/AssignmentResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -519,17 +473,14 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "note": {
@@ -540,17 +491,14 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "valid_from": {
             "format": "date-time",
-            "title": "Valid From",
             "type": "string"
           },
           "valid_to": {
@@ -562,8 +510,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Valid To"
+            ]
           }
         },
         "required": [
@@ -584,7 +531,6 @@
           "reason": {
             "maxLength": 255,
             "minLength": 3,
-            "title": "Reason",
             "type": "string"
           }
         },
@@ -662,11 +608,9 @@
             "items": {
               "$ref": "#/components/schemas/AuditResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -692,8 +636,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Actor Service Token Id"
+            ]
           },
           "actor_type": {
             "$ref": "#/components/schemas/ActorType"
@@ -707,12 +650,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Actor User Id"
+            ]
           },
           "at": {
             "format": "date-time",
-            "title": "At",
             "type": "string"
           },
           "detail": {
@@ -724,12 +665,10 @@
                 "type": "null"
               }
             ],
-            "description": "Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply.",
-            "title": "Detail"
+            "description": "Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply."
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "ip": {
@@ -740,8 +679,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ip"
+            ]
           },
           "object_id": {
             "anyOf": [
@@ -752,11 +690,9 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Object Id"
+            ]
           },
           "object_type": {
-            "title": "Object Type",
             "type": "string"
           },
           "user_agent": {
@@ -767,8 +703,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "User Agent"
+            ]
           }
         },
         "required": [
@@ -791,17 +726,14 @@
           "apk": {
             "description": "The signed APK.",
             "format": "binary",
-            "title": "Apk",
             "type": "string"
           },
           "is_mandatory": {
             "default": false,
-            "title": "Is Mandatory",
             "type": "boolean"
           },
           "min_api_level": {
             "default": 26,
-            "title": "Min Api Level",
             "type": "integer"
           },
           "release_notes_uz": {
@@ -812,18 +744,15 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Release Notes Uz"
+            ]
           },
           "variant": {
             "$ref": "#/components/schemas/AppVariant"
           },
           "version": {
-            "title": "Version",
             "type": "string"
           },
           "version_code": {
-            "title": "Version Code",
             "type": "integer"
           }
         },
@@ -852,7 +781,6 @@
           },
           "available": {
             "description": "Playable now — stored and not yet expired.",
-            "title": "Available",
             "type": "boolean"
           },
           "capture_route": {
@@ -875,13 +803,11 @@
                 "type": "null"
               }
             ],
-            "description": "The folder name only, never a path from the phone.",
-            "title": "Capture Route Detail"
+            "description": "The folder name only, never a path from the phone."
           },
           "duration_mismatch": {
             "default": false,
             "description": "The file's length disagrees with the call log (UC-14).",
-            "title": "Duration Mismatch",
             "type": "boolean"
           },
           "duration_ms": {
@@ -892,8 +818,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Duration Ms"
+            ]
           },
           "expired_at": {
             "anyOf": [
@@ -905,8 +830,7 @@
                 "type": "null"
               }
             ],
-            "description": "Removed by retention; playback answers 410 (UC-26).",
-            "title": "Expired At"
+            "description": "Removed by retention; playback answers 410 (UC-26)."
           },
           "url": {
             "anyOf": [
@@ -917,8 +841,7 @@
                 "type": "null"
               }
             ],
-            "description": "Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43).",
-            "title": "Url"
+            "description": "Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43)."
           }
         },
         "required": [
@@ -951,14 +874,12 @@
         "description": "A cursor page of calls (SPEC §4.0).\n\n``total`` is computed only when the caller asks: a COUNT(*) over a filtered\n500k table is affordable once per filter change and not once per page.",
         "properties": {
           "has_more": {
-            "title": "Has More",
             "type": "boolean"
           },
           "items": {
             "items": {
               "$ref": "#/components/schemas/CallResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "next_cursor": {
@@ -969,8 +890,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Next Cursor"
+            ]
           },
           "total": {
             "anyOf": [
@@ -980,8 +900,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Total"
+            ]
           }
         },
         "required": [
@@ -997,12 +916,10 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "agent_name": {
             "description": "Resolved server-side; the panel renders it.",
-            "title": "Agent Name",
             "type": "string"
           },
           "answered_at": {
@@ -1014,21 +931,18 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Answered At"
+            ]
           },
           "app_variant": {
             "$ref": "#/components/schemas/AppVariant"
           },
           "app_version": {
-            "title": "App Version",
             "type": "string"
           },
           "audio": {
             "$ref": "#/components/schemas/CallAudioSummary"
           },
           "audio_duration_mismatch": {
-            "title": "Audio Duration Mismatch",
             "type": "boolean"
           },
           "audio_missing_reason": {
@@ -1045,7 +959,6 @@
             "$ref": "#/components/schemas/CallType"
           },
           "clock_skew_sec": {
-            "title": "Clock Skew Sec",
             "type": "integer"
           },
           "contact_name": {
@@ -1056,8 +969,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Contact Name"
+            ]
           },
           "device_model": {
             "anyOf": [
@@ -1068,11 +980,9 @@
                 "type": "null"
               }
             ],
-            "description": "'Xiaomi Redmi Note 12'. The device_model filter needs it.",
-            "title": "Device Model"
+            "description": "'Xiaomi Redmi Note 12'. The device_model filter needs it."
           },
           "device_timezone": {
-            "title": "Device Timezone",
             "type": "string"
           },
           "direction": {
@@ -1082,7 +992,6 @@
             "$ref": "#/components/schemas/CallDisposition"
           },
           "duration_sec": {
-            "title": "Duration Sec",
             "type": "integer"
           },
           "ended_at": {
@@ -1094,21 +1003,17 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ended At"
+            ]
           },
           "has_audio": {
-            "title": "Has Audio",
             "type": "boolean"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "note": {
@@ -1119,27 +1024,22 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           },
           "number_e164": {
             "description": "The registered line the call happened on.",
-            "title": "Number E164",
             "type": "string"
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "received_at": {
             "description": "Authoritative for ordering (N36).",
             "format": "date-time",
-            "title": "Received At",
             "type": "string"
           },
           "reconciled_with_call_log": {
-            "title": "Reconciled With Call Log",
             "type": "boolean"
           },
           "remote_number": {
@@ -1150,8 +1050,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Remote Number"
+            ]
           },
           "remote_number_key": {
             "anyOf": [
@@ -1161,8 +1060,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Remote Number Key"
+            ]
           },
           "ring_sec": {
             "anyOf": [
@@ -1172,12 +1070,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ring Sec"
+            ]
           },
           "seq": {
             "format": "int64",
-            "title": "Seq",
             "type": "integer"
           },
           "source": {
@@ -1185,7 +1081,6 @@
           },
           "started_at": {
             "format": "date-time",
-            "title": "Started At",
             "type": "string"
           }
         },
@@ -1283,12 +1178,10 @@
           },
           "changed_at": {
             "format": "date-time",
-            "title": "Changed At",
             "type": "string"
           },
           "checked_at": {
             "format": "date-time",
-            "title": "Checked At",
             "type": "string"
           },
           "detail": {
@@ -1299,8 +1192,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Detail"
+            ]
           },
           "state": {
             "$ref": "#/components/schemas/CapabilityState"
@@ -1334,13 +1226,11 @@
           "current_password": {
             "description": "Wrong value gives 401.",
             "minLength": 1,
-            "title": "Current Password",
             "type": "string"
           },
           "new_password": {
             "description": "Minimum 10 characters and no other composition rule (SPEC §4.7): a rule people cannot follow is a rule they write on a sticky note.",
             "minLength": 10,
-            "title": "New Password",
             "type": "string"
           }
         },
@@ -1363,13 +1253,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           },
           "valid_to": {
             "description": "Must be after valid_from.",
             "format": "date-time",
-            "title": "Valid To",
             "type": "string"
           }
         },
@@ -1411,11 +1299,9 @@
             "items": {
               "$ref": "#/components/schemas/CommandResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -1437,17 +1323,14 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Acked At"
+            ]
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "failure_reason": {
@@ -1462,12 +1345,10 @@
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "kind": {
@@ -1482,8 +1363,7 @@
                 "type": "null"
               }
             ],
-            "description": "acked_at - created_at, stored so UC-16's five-second bar is **measured** rather than assumed. R3 flags that bar as possibly unachievable on doze-restricted OEMs; this column is what turns that into a conversation with evidence.",
-            "title": "Latency Ms"
+            "description": "acked_at - created_at, stored so UC-16's five-second bar is **measured** rather than assumed. R3 flags that bar as possibly unachievable on doze-restricted OEMs; this column is what turns that into a conversation with evidence."
           },
           "result_call_id": {
             "anyOf": [
@@ -1494,8 +1374,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Result Call Id"
+            ]
           },
           "sent_at": {
             "anyOf": [
@@ -1506,8 +1385,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sent At"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/CommandStatus"
@@ -1552,8 +1430,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Color"
+            ]
           },
           "employee_code": {
             "anyOf": [
@@ -1565,13 +1442,11 @@
                 "type": "null"
               }
             ],
-            "description": "The roster import key; unique where set.",
-            "title": "Employee Code"
+            "description": "The roster import key; unique where set."
           },
           "full_name": {
             "maxLength": 255,
             "minLength": 1,
-            "title": "Full Name",
             "type": "string"
           },
           "hired_at": {
@@ -1583,8 +1458,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Hired At"
+            ]
           },
           "note": {
             "anyOf": [
@@ -1594,8 +1468,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           }
         },
         "required": [
@@ -1609,7 +1482,6 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "note": {
@@ -1621,8 +1493,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           },
           "valid_from": {
             "anyOf": [
@@ -1634,8 +1505,7 @@
                 "type": "null"
               }
             ],
-            "description": "Defaults to now. The period is [valid_from, valid_to).",
-            "title": "Valid From"
+            "description": "Defaults to now. The period is [valid_from, valid_to)."
           },
           "valid_to": {
             "anyOf": [
@@ -1647,8 +1517,7 @@
                 "type": "null"
               }
             ],
-            "description": "NULL means open-ended — they hold it now.",
-            "title": "Valid To"
+            "description": "NULL means open-ended — they hold it now."
           }
         },
         "required": [
@@ -1673,8 +1542,7 @@
                 "type": "null"
               }
             ],
-            "description": "For kind='dial'. Named, not a free-form payload map (§8).",
-            "title": "Number"
+            "description": "For kind='dial'. Named, not a free-form payload map (§8)."
           },
           "reason": {
             "anyOf": [
@@ -1685,8 +1553,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Reason"
+            ]
           }
         },
         "required": [
@@ -1710,14 +1577,12 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Label"
+            ]
           },
           "pattern": {
             "description": "Digits to match. UC-25's '*700' is the suffix rule '700'.",
             "maxLength": 32,
             "minLength": 2,
-            "title": "Pattern",
             "type": "string"
           }
         },
@@ -1735,7 +1600,6 @@
             "description": "Any format; normalised here.",
             "maxLength": 32,
             "minLength": 6,
-            "title": "E164",
             "type": "string"
           },
           "label": {
@@ -1747,8 +1611,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Label"
+            ]
           },
           "operator": {
             "anyOf": [
@@ -1760,14 +1623,12 @@
                 "type": "null"
               }
             ],
-            "description": "beeline | ucell | mobiuz | uzmobile | other. A reporting axis (R19).",
-            "title": "Operator"
+            "description": "beeline | ucell | mobiuz | uzmobile | other. A reporting axis (R19)."
           },
           "sim_owner": {
             "default": "company",
             "description": "R10: which SIM relationships are not Bonvi's to keep.",
             "pattern": "^(company|employee)$",
-            "title": "Sim Owner",
             "type": "string"
           }
         },
@@ -1790,23 +1651,19 @@
                 "type": "null"
               }
             ],
-            "description": "Required when role='sales' — it is what own-scope narrowing filters on, and the database has a CHECK saying so.",
-            "title": "Agent Id"
+            "description": "Required when role='sales' — it is what own-scope narrowing filters on, and the database has a CHECK saying so."
           },
           "email": {
             "format": "email",
-            "title": "Email",
             "type": "string"
           },
           "full_name": {
             "maxLength": 255,
             "minLength": 1,
-            "title": "Full Name",
             "type": "string"
           },
           "password": {
             "minLength": 10,
-            "title": "Password",
             "type": "string"
           },
           "role": {
@@ -1835,25 +1692,20 @@
                 "type": "null"
               }
             ],
-            "description": "Set for a 'sales' account; what own-scope filters on.",
-            "title": "Agent Id"
+            "description": "Set for a 'sales' account; what own-scope filters on."
           },
           "email": {
-            "title": "Email",
             "type": "string"
           },
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "must_change_password": {
             "description": "The panel forces the change before anything else loads.",
-            "title": "Must Change Password",
             "type": "boolean"
           },
           "permissions": {
@@ -1861,7 +1713,6 @@
             "items": {
               "type": "string"
             },
-            "title": "Permissions",
             "type": "array"
           },
           "role": {
@@ -1883,18 +1734,15 @@
         "properties": {
           "cap_bytes_month": {
             "format": "int64",
-            "title": "Cap Bytes Month",
             "type": "integer"
           },
           "items": {
             "items": {
               "$ref": "#/components/schemas/DataUsageRowOut"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -1910,36 +1758,29 @@
         "description": "One installation's traffic against the cap the employee pays for.",
         "properties": {
           "agent_name": {
-            "title": "Agent Name",
             "type": "string"
           },
           "cap_bytes_month": {
             "format": "int64",
-            "title": "Cap Bytes Month",
             "type": "integer"
           },
           "cellular_bytes_month": {
             "format": "int64",
-            "title": "Cellular Bytes Month",
             "type": "integer"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "over_cap": {
             "description": "Past N14's cap: the app stops uploading audio over cellular.",
-            "title": "Over Cap",
             "type": "boolean"
           },
           "requests_month": {
-            "title": "Requests Month",
             "type": "integer"
           },
           "wifi_bytes_month": {
             "format": "int64",
-            "title": "Wifi Bytes Month",
             "type": "integer"
           }
         },
@@ -1960,7 +1801,6 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "android_release": {
@@ -1971,8 +1811,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Android Release"
+            ]
           },
           "api_level": {
             "anyOf": [
@@ -1982,8 +1821,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Api Level"
+            ]
           },
           "app_variant": {
             "anyOf": [
@@ -2003,8 +1841,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "battery_charging": {
             "anyOf": [
@@ -2014,8 +1851,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Charging"
+            ]
           },
           "battery_level": {
             "anyOf": [
@@ -2025,8 +1861,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Level"
+            ]
           },
           "battery_optimisation_exempt": {
             "anyOf": [
@@ -2036,15 +1871,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Optimisation Exempt"
+            ]
           },
           "capabilities": {
             "description": "Empty for a phone that has never reported — not missing.",
             "items": {
               "$ref": "#/components/schemas/CapabilityStateResponse"
             },
-            "title": "Capabilities",
             "type": "array"
           },
           "capture_enabled": {
@@ -2055,13 +1888,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Capture Enabled"
+            ]
           },
           "capturing": {
             "default": false,
             "description": "UC-03's never-false-ready rule: every required capability working, a verified installation and a live service. One function computes it, so the phone and the panel cannot disagree.",
-            "title": "Capturing",
             "type": "boolean"
           },
           "cellular_bytes_month": {
@@ -2073,8 +1904,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Cellular Bytes Month"
+            ]
           },
           "clock_skew_sec": {
             "anyOf": [
@@ -2084,8 +1914,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Clock Skew Sec"
+            ]
           },
           "device_timezone": {
             "anyOf": [
@@ -2095,8 +1924,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Device Timezone"
+            ]
           },
           "free_storage_bytes": {
             "anyOf": [
@@ -2107,12 +1935,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Free Storage Bytes"
+            ]
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "installation_status": {
@@ -2120,7 +1946,6 @@
           },
           "is_online": {
             "description": "Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.",
-            "title": "Is Online",
             "type": "boolean"
           },
           "last_call_at": {
@@ -2132,8 +1957,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Call At"
+            ]
           },
           "last_heartbeat_at": {
             "anyOf": [
@@ -2144,8 +1968,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Heartbeat At"
+            ]
           },
           "manufacturer": {
             "anyOf": [
@@ -2155,8 +1978,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Manufacturer"
+            ]
           },
           "model": {
             "anyOf": [
@@ -2166,8 +1988,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Model"
+            ]
           },
           "network_type": {
             "anyOf": [
@@ -2181,12 +2002,10 @@
           },
           "never_reported": {
             "description": "Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.",
-            "title": "Never Reported",
             "type": "boolean"
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "parked_records": {
@@ -2197,8 +2016,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Parked Records"
+            ]
           },
           "power_save_mode": {
             "anyOf": [
@@ -2208,8 +2026,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Power Save Mode"
+            ]
           },
           "queue_bytes": {
             "anyOf": [
@@ -2220,8 +2037,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Bytes"
+            ]
           },
           "queue_oldest_at": {
             "anyOf": [
@@ -2232,8 +2048,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Oldest At"
+            ]
           },
           "queue_records": {
             "anyOf": [
@@ -2243,8 +2058,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Records"
+            ]
           },
           "recording_route": {
             "anyOf": [
@@ -2264,8 +2078,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Recording Route Ok"
+            ]
           },
           "service_running": {
             "anyOf": [
@@ -2275,8 +2088,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Service Running"
+            ]
           },
           "updated_at": {
             "anyOf": [
@@ -2287,8 +2099,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Updated At"
+            ]
           },
           "ws_connected": {
             "anyOf": [
@@ -2299,8 +2110,7 @@
                 "type": "null"
               }
             ],
-            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.",
-            "title": "Ws Connected"
+            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine."
           }
         },
         "required": [
@@ -2346,11 +2156,9 @@
             "items": {
               "$ref": "#/components/schemas/DeviceHealthResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -2366,7 +2174,6 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "android_release": {
@@ -2377,8 +2184,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Android Release"
+            ]
           },
           "api_level": {
             "anyOf": [
@@ -2388,8 +2194,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Api Level"
+            ]
           },
           "app_variant": {
             "anyOf": [
@@ -2409,8 +2214,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "battery_charging": {
             "anyOf": [
@@ -2420,8 +2224,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Charging"
+            ]
           },
           "battery_level": {
             "anyOf": [
@@ -2431,8 +2234,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Level"
+            ]
           },
           "battery_optimisation_exempt": {
             "anyOf": [
@@ -2442,8 +2244,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Optimisation Exempt"
+            ]
           },
           "capture_enabled": {
             "anyOf": [
@@ -2453,8 +2254,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Capture Enabled"
+            ]
           },
           "cellular_bytes_month": {
             "anyOf": [
@@ -2465,8 +2265,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Cellular Bytes Month"
+            ]
           },
           "clock_skew_sec": {
             "anyOf": [
@@ -2476,8 +2275,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Clock Skew Sec"
+            ]
           },
           "device_timezone": {
             "anyOf": [
@@ -2487,8 +2285,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Device Timezone"
+            ]
           },
           "free_storage_bytes": {
             "anyOf": [
@@ -2499,12 +2296,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Free Storage Bytes"
+            ]
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "installation_status": {
@@ -2512,7 +2307,6 @@
           },
           "is_online": {
             "description": "Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.",
-            "title": "Is Online",
             "type": "boolean"
           },
           "last_call_at": {
@@ -2524,8 +2318,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Call At"
+            ]
           },
           "last_heartbeat_at": {
             "anyOf": [
@@ -2536,8 +2329,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Heartbeat At"
+            ]
           },
           "manufacturer": {
             "anyOf": [
@@ -2547,8 +2339,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Manufacturer"
+            ]
           },
           "model": {
             "anyOf": [
@@ -2558,8 +2349,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Model"
+            ]
           },
           "network_type": {
             "anyOf": [
@@ -2573,12 +2363,10 @@
           },
           "never_reported": {
             "description": "Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.",
-            "title": "Never Reported",
             "type": "boolean"
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "parked_records": {
@@ -2589,8 +2377,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Parked Records"
+            ]
           },
           "power_save_mode": {
             "anyOf": [
@@ -2600,8 +2387,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Power Save Mode"
+            ]
           },
           "queue_bytes": {
             "anyOf": [
@@ -2612,8 +2398,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Bytes"
+            ]
           },
           "queue_oldest_at": {
             "anyOf": [
@@ -2624,8 +2409,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Oldest At"
+            ]
           },
           "queue_records": {
             "anyOf": [
@@ -2635,8 +2419,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Records"
+            ]
           },
           "recording_route": {
             "anyOf": [
@@ -2656,8 +2439,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Recording Route Ok"
+            ]
           },
           "service_running": {
             "anyOf": [
@@ -2667,8 +2449,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Service Running"
+            ]
           },
           "updated_at": {
             "anyOf": [
@@ -2679,8 +2460,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Updated At"
+            ]
           },
           "ws_connected": {
             "anyOf": [
@@ -2691,8 +2471,7 @@
                 "type": "null"
               }
             ],
-            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.",
-            "title": "Ws Connected"
+            "description": "Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine."
           }
         },
         "required": [
@@ -2738,11 +2517,9 @@
             "items": {
               "$ref": "#/components/schemas/DirectoryEntryResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -2757,16 +2534,13 @@
         "properties": {
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_active": {
-            "title": "Is Active",
             "type": "boolean"
           },
           "kind": {
@@ -2780,11 +2554,9 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Label"
+            ]
           },
           "pattern": {
-            "title": "Pattern",
             "type": "string"
           }
         },
@@ -2828,11 +2600,9 @@
             "items": {
               "$ref": "#/components/schemas/EnrolmentAttemptResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -2855,8 +2625,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Agent Id"
+            ]
           },
           "app_version": {
             "anyOf": [
@@ -2866,12 +2635,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "device_model": {
@@ -2882,8 +2649,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Device Model"
+            ]
           },
           "duration_ms": {
             "anyOf": [
@@ -2893,12 +2659,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Duration Ms"
+            ]
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "installation_id": {
@@ -2910,8 +2674,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Installation Id"
+            ]
           },
           "kind": {
             "$ref": "#/components/schemas/EnrolmentAttemptKind"
@@ -2925,8 +2688,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Number Id"
+            ]
           },
           "outcome": {
             "$ref": "#/components/schemas/EnrolmentOutcome"
@@ -2939,8 +2701,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Step"
+            ]
           }
         },
         "required": [
@@ -2965,11 +2726,9 @@
             "items": {
               "$ref": "#/components/schemas/EnrolmentCodeResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -2985,35 +2744,28 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "attempt_count": {
-            "title": "Attempt Count",
             "type": "integer"
           },
           "code": {
-            "title": "Code",
             "type": "string"
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "redeemed_at": {
@@ -3025,8 +2777,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Redeemed At"
+            ]
           },
           "revoked_at": {
             "anyOf": [
@@ -3037,8 +2788,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Revoked At"
+            ]
           }
         },
         "required": [
@@ -3094,19 +2844,15 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "agent_name": {
-            "title": "Agent Name",
             "type": "string"
           },
           "answered_calls": {
-            "title": "Answered Calls",
             "type": "integer"
           },
           "calls_with_audio": {
-            "title": "Calls With Audio",
             "type": "integer"
           },
           "capture_rate": {
@@ -3118,8 +2864,7 @@
                 "type": "null"
               }
             ],
-            "description": "Percent. NUMERIC, never float.",
-            "title": "Capture Rate"
+            "description": "Percent. NUMERIC, never float."
           }
         },
         "required": [
@@ -3135,12 +2880,10 @@
       "GapByModelOut": {
         "properties": {
           "answered_calls": {
-            "title": "Answered Calls",
             "type": "integer"
           },
           "api_level": {
             "description": "Part of the M0 baseline's identity.",
-            "title": "Api Level",
             "type": "integer"
           },
           "app_variant": {
@@ -3156,11 +2899,9 @@
                 "type": "null"
               }
             ],
-            "description": "From the M0 baseline (T14).",
-            "title": "Baseline Rate"
+            "description": "From the M0 baseline (T14)."
           },
           "calls_with_audio": {
-            "title": "Calls With Audio",
             "type": "integer"
           },
           "capture_rate": {
@@ -3171,8 +2912,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Capture Rate"
+            ]
           },
           "delta_pp": {
             "anyOf": [
@@ -3183,19 +2923,15 @@
                 "type": "null"
               }
             ],
-            "description": "Below the threshold raises N4's alert.",
-            "title": "Delta Pp"
+            "description": "Below the threshold raises N4's alert."
           },
           "manufacturer": {
-            "title": "Manufacturer",
             "type": "string"
           },
           "model": {
-            "title": "Model",
             "type": "string"
           },
           "regression": {
-            "title": "Regression",
             "type": "boolean"
           }
         },
@@ -3218,12 +2954,10 @@
         "description": "Why audio is missing, and how often. The closed enum, never free text.",
         "properties": {
           "calls": {
-            "title": "Calls",
             "type": "integer"
           },
           "counts_against_capture_rate": {
             "description": "``pending_upload`` and ``not_expected`` are excluded from the denominator: an unanswered call in it makes '% of answered calls with audio' meaningless (SPEC §3.9).",
-            "title": "Counts Against Capture Rate",
             "type": "boolean"
           },
           "reason": {
@@ -3242,32 +2976,27 @@
         "description": "UC-23. Totals reconcile exactly with ``/calls?has_audio=false``.",
         "properties": {
           "answered_calls": {
-            "title": "Answered Calls",
             "type": "integer"
           },
           "by_agent": {
             "items": {
               "$ref": "#/components/schemas/GapByAgentOut"
             },
-            "title": "By Agent",
             "type": "array"
           },
           "by_model": {
             "items": {
               "$ref": "#/components/schemas/GapByModelOut"
             },
-            "title": "By Model",
             "type": "array"
           },
           "by_reason": {
             "items": {
               "$ref": "#/components/schemas/GapByReasonOut"
             },
-            "title": "By Reason",
             "type": "array"
           },
           "calls_with_audio": {
-            "title": "Calls With Audio",
             "type": "integer"
           },
           "capture_rate": {
@@ -3278,19 +3007,16 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Capture Rate"
+            ]
           },
           "missing_total": {
             "description": "Matches the filtered call list, because the same rows are counted.",
-            "title": "Missing Total",
             "type": "integer"
           },
           "open_deltas": {
             "items": {
               "$ref": "#/components/schemas/OpenDeltaOut"
             },
-            "title": "Open Deltas",
             "type": "array"
           }
         },
@@ -3313,7 +3039,6 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "title": "Detail",
             "type": "array"
           }
         },
@@ -3325,7 +3050,6 @@
         "properties": {
           "status": {
             "description": "Always 'ok' when the process is serving.",
-            "title": "Status",
             "type": "string"
           }
         },
@@ -3342,13 +3066,11 @@
             "description": "Header row plus data: full_name[,employee_code[,hired_at]].",
             "maxLength": 200000,
             "minLength": 1,
-            "title": "Csv",
             "type": "string"
           },
           "dry_run": {
             "default": true,
             "description": "Default true, deliberately: the diff is shown before anything is written, because a roster import that half-succeeded is worse than one that did not run.",
-            "title": "Dry Run",
             "type": "boolean"
           }
         },
@@ -3361,30 +3083,24 @@
       "ImportAgentsResponse": {
         "properties": {
           "created": {
-            "title": "Created",
             "type": "integer"
           },
           "dry_run": {
-            "title": "Dry Run",
             "type": "boolean"
           },
           "errors": {
-            "title": "Errors",
             "type": "integer"
           },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/ImportRowResult"
             },
-            "title": "Rows",
             "type": "array"
           },
           "skipped": {
-            "title": "Skipped",
             "type": "integer"
           },
           "updated": {
-            "title": "Updated",
             "type": "integer"
           }
         },
@@ -3404,7 +3120,6 @@
         "properties": {
           "action": {
             "description": "create | update | skip | error",
-            "title": "Action",
             "type": "string"
           },
           "employee_code": {
@@ -3415,15 +3130,12 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Employee Code"
+            ]
           },
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "line": {
-            "title": "Line",
             "type": "integer"
           },
           "reason": {
@@ -3435,8 +3147,7 @@
                 "type": "null"
               }
             ],
-            "description": "Why it was skipped or refused.",
-            "title": "Reason"
+            "description": "Why it was skipped or refused."
           }
         },
         "required": [
@@ -3454,11 +3165,9 @@
             "items": {
               "$ref": "#/components/schemas/InstallationResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -3474,7 +3183,6 @@
         "properties": {
           "agent_id": {
             "format": "uuid",
-            "title": "Agent Id",
             "type": "string"
           },
           "app_variant": {
@@ -3495,8 +3203,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "attest_reason": {
             "anyOf": [
@@ -3506,8 +3213,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Attest Reason"
+            ]
           },
           "bound_at": {
             "anyOf": [
@@ -3518,22 +3224,18 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Bound At"
+            ]
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "device_id": {
             "format": "uuid",
-            "title": "Device Id",
             "type": "string"
           },
           "funnel_changed_at": {
             "format": "date-time",
-            "title": "Funnel Changed At",
             "type": "string"
           },
           "funnel_stage": {
@@ -3541,12 +3243,10 @@
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "number_id": {
             "format": "uuid",
-            "title": "Number Id",
             "type": "string"
           },
           "replaced_at": {
@@ -3558,8 +3258,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Replaced At"
+            ]
           },
           "revoke_confirmed_at": {
             "anyOf": [
@@ -3570,8 +3269,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Revoke Confirmed At"
+            ]
           },
           "revoke_pending_bytes": {
             "anyOf": [
@@ -3582,8 +3280,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Revoke Pending Bytes"
+            ]
           },
           "revoke_pending_records": {
             "anyOf": [
@@ -3593,8 +3290,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Revoke Pending Records"
+            ]
           },
           "revoked_at": {
             "anyOf": [
@@ -3605,8 +3301,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Revoked At"
+            ]
           },
           "sim_slot": {
             "anyOf": [
@@ -3616,8 +3311,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Slot"
+            ]
           },
           "sim_subscription_id": {
             "anyOf": [
@@ -3627,8 +3321,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Subscription Id"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/InstallationStatus"
@@ -3652,8 +3345,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Verified At"
+            ]
           }
         },
         "required": [
@@ -3700,13 +3392,11 @@
           "email": {
             "description": "Case-insensitive; the column is CITEXT.",
             "format": "email",
-            "title": "Email",
             "type": "string"
           },
           "password": {
             "description": "Never logged, never echoed.",
             "minLength": 1,
-            "title": "Password",
             "type": "string"
           }
         },
@@ -3721,7 +3411,6 @@
         "description": "The user *and* their access token, so the panel needs one round trip.",
         "properties": {
           "access_token": {
-            "title": "Access Token",
             "type": "string"
           },
           "agent_id": {
@@ -3734,29 +3423,23 @@
                 "type": "null"
               }
             ],
-            "description": "Set for a 'sales' account; what own-scope filters on.",
-            "title": "Agent Id"
+            "description": "Set for a 'sales' account; what own-scope filters on."
           },
           "email": {
-            "title": "Email",
             "type": "string"
           },
           "expires_in": {
-            "title": "Expires In",
             "type": "integer"
           },
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "must_change_password": {
             "description": "The panel forces the change before anything else loads.",
-            "title": "Must Change Password",
             "type": "boolean"
           },
           "permissions": {
@@ -3764,7 +3447,6 @@
             "items": {
               "type": "string"
             },
-            "title": "Permissions",
             "type": "array"
           },
           "role": {
@@ -3772,7 +3454,6 @@
           },
           "token_type": {
             "default": "bearer",
-            "title": "Token Type",
             "type": "string"
           }
         },
@@ -3804,11 +3485,9 @@
             "items": {
               "$ref": "#/components/schemas/NumberResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -3823,20 +3502,16 @@
         "properties": {
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "e164": {
-            "title": "E164",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_active": {
-            "title": "Is Active",
             "type": "boolean"
           },
           "label": {
@@ -3847,8 +3522,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Label"
+            ]
           },
           "operator": {
             "anyOf": [
@@ -3858,16 +3532,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Operator"
+            ]
           },
           "phone_key": {
             "description": "Last 9 digits, generated by the database (N37).",
-            "title": "Phone Key",
             "type": "string"
           },
           "sim_owner": {
-            "title": "Sim Owner",
             "type": "string"
           }
         },
@@ -3888,34 +3559,27 @@
         "description": "A device whose own call-log count never reconciled (N3, §4.1 B).",
         "properties": {
           "agent_name": {
-            "title": "Agent Name",
             "type": "string"
           },
           "delta": {
-            "title": "Delta",
             "type": "integer"
           },
           "device_counted": {
-            "title": "Device Counted",
             "type": "integer"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "period_date": {
             "format": "date",
-            "title": "Period Date",
             "type": "string"
           },
           "subscription_unknown_count": {
             "description": "Never folded into either side of the rate — the fail-closed rule made visible.",
-            "title": "Subscription Unknown Count",
             "type": "integer"
           },
           "uploaded_count": {
-            "title": "Uploaded Count",
             "type": "integer"
           }
         },
@@ -3936,17 +3600,14 @@
         "properties": {
           "database": {
             "description": "A trivial query succeeded.",
-            "title": "Database",
             "type": "boolean"
           },
           "status": {
             "description": "'ok' when every dependency is usable.",
-            "title": "Status",
             "type": "string"
           },
           "storage": {
             "description": "The audio root exists and is writable.",
-            "title": "Storage",
             "type": "boolean"
           }
         },
@@ -3974,12 +3635,10 @@
           "active_receivers": {
             "default": 0,
             "description": "More than one is a configuration change, not code.",
-            "title": "Active Receivers",
             "type": "integer"
           },
           "enrolment_possible": {
             "description": "False means the rollout is stopped, not slow.",
-            "title": "Enrolment Possible",
             "type": "boolean"
           },
           "receiver_msisdn": {
@@ -3991,8 +3650,7 @@
                 "type": "null"
               }
             ],
-            "description": "The number screen E5 shows the agent.",
-            "title": "Receiver Msisdn"
+            "description": "The number screen E5 shows the agent."
           },
           "receiver_name": {
             "anyOf": [
@@ -4003,8 +3661,7 @@
                 "type": "null"
               }
             ],
-            "description": "Which gateway, for the admin to go and look at.",
-            "title": "Receiver Name"
+            "description": "Which gateway, for the admin to go and look at."
           },
           "status": {
             "$ref": "#/components/schemas/ReceiverStatus",
@@ -4023,7 +3680,6 @@
         "properties": {
           "calls_reclassified": {
             "description": "Calls whose call_type changed as a result of this edit.",
-            "title": "Calls Reclassified",
             "type": "integer"
           },
           "entry": {
@@ -4049,8 +3705,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Reason"
+            ]
           }
         },
         "title": "RevokeRequest",
@@ -4060,12 +3715,10 @@
         "description": "What was still queued when contact was lost.\n\nBonvi does not own the handset, so a revoke that claims a completed wipe\nwould be lying. ``revoke_confirmed_at`` stays NULL until the phone comes\nback and says the local audio is gone.",
         "properties": {
           "confirmed": {
-            "title": "Confirmed",
             "type": "boolean"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "pending_bytes": {
@@ -4077,8 +3730,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Pending Bytes"
+            ]
           },
           "pending_records": {
             "anyOf": [
@@ -4088,12 +3740,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Pending Records"
+            ]
           },
           "revoked_at": {
             "format": "date-time",
-            "title": "Revoked At",
             "type": "string"
           },
           "status": {
@@ -4117,12 +3767,10 @@
           "acknowledged_stranded": {
             "description": "The stranded count you just saw. Must still be true.",
             "minimum": 0.0,
-            "title": "Acknowledged Stranded",
             "type": "integer"
           },
           "version_code": {
             "minimum": 1.0,
-            "title": "Version Code",
             "type": "integer"
           }
         },
@@ -4136,11 +3784,9 @@
       "SetMinimumVersionResponse": {
         "properties": {
           "stranded_count": {
-            "title": "Stranded Count",
             "type": "integer"
           },
           "version_code": {
-            "title": "Version Code",
             "type": "integer"
           }
         },
@@ -4156,7 +3802,6 @@
         "properties": {
           "password": {
             "minLength": 10,
-            "title": "Password",
             "type": "string"
           }
         },
@@ -4172,11 +3817,9 @@
             "items": {
               "$ref": "#/components/schemas/SettingResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -4197,16 +3840,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Description Uz"
+            ]
           },
           "key": {
-            "title": "Key",
             "type": "string"
           },
           "updated_at": {
             "format": "date-time",
-            "title": "Updated At",
             "type": "string"
           },
           "updated_by": {
@@ -4218,14 +3858,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Updated By"
+            ]
           },
-          "value": {
-            "title": "Value"
-          },
+          "value": {},
           "value_type": {
-            "title": "Value Type",
             "type": "string"
           }
         },
@@ -4245,26 +3881,21 @@
         "properties": {
           "audio_bytes_total": {
             "format": "int64",
-            "title": "Audio Bytes Total",
             "type": "integer"
           },
           "audio_files": {
-            "title": "Audio Files",
             "type": "integer"
           },
           "bytes_added": {
             "format": "int64",
-            "title": "Bytes Added",
             "type": "integer"
           },
           "bytes_deleted": {
             "format": "int64",
-            "title": "Bytes Deleted",
             "type": "integer"
           },
           "period_date": {
             "format": "date",
-            "title": "Period Date",
             "type": "string"
           }
         },
@@ -4283,29 +3914,24 @@
         "properties": {
           "audio_bytes_total": {
             "format": "int64",
-            "title": "Audio Bytes Total",
             "type": "integer"
           },
           "audio_files": {
-            "title": "Audio Files",
             "type": "integer"
           },
           "bytes_added_30d": {
             "format": "int64",
-            "title": "Bytes Added 30D",
             "type": "integer"
           },
           "history": {
             "items": {
               "$ref": "#/components/schemas/StoragePointOut"
             },
-            "title": "History",
             "type": "array"
           },
           "projected_bytes_12m": {
             "description": "Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.",
             "format": "int64",
-            "title": "Projected Bytes 12M",
             "type": "integer"
           }
         },
@@ -4323,7 +3949,6 @@
         "description": "One phone a proposed minimum version would refuse.",
         "properties": {
           "agent_name": {
-            "title": "Agent Name",
             "type": "string"
           },
           "app_version": {
@@ -4334,8 +3959,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "app_version_code": {
             "anyOf": [
@@ -4345,16 +3969,13 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version Code"
+            ]
           },
           "device": {
-            "title": "Device",
             "type": "string"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "last_heartbeat_at": {
@@ -4366,8 +3987,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Heartbeat At"
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/InstallationStatus"
@@ -4397,8 +4017,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Color"
+            ]
           },
           "employee_code": {
             "anyOf": [
@@ -4409,8 +4028,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Employee Code"
+            ]
           },
           "full_name": {
             "anyOf": [
@@ -4422,8 +4040,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Full Name"
+            ]
           },
           "hired_at": {
             "anyOf": [
@@ -4434,8 +4051,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Hired At"
+            ]
           },
           "is_active": {
             "anyOf": [
@@ -4445,8 +4061,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Is Active"
+            ]
           },
           "note": {
             "anyOf": [
@@ -4456,8 +4071,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           }
         },
         "title": "UpdateAgentRequest",
@@ -4475,8 +4089,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Note"
+            ]
           }
         },
         "title": "UpdateCallNoteRequest",
@@ -4493,8 +4106,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Is Active"
+            ]
           },
           "label": {
             "anyOf": [
@@ -4505,8 +4117,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Label"
+            ]
           },
           "operator": {
             "anyOf": [
@@ -4517,8 +4128,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Operator"
+            ]
           },
           "sim_owner": {
             "anyOf": [
@@ -4529,8 +4139,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Owner"
+            ]
           }
         },
         "title": "UpdateNumberRequest",
@@ -4542,17 +4151,13 @@
           "confirm": {
             "default": false,
             "description": "Required when the change would delete data that still exists.",
-            "title": "Confirm",
             "type": "boolean"
           },
           "key": {
             "maxLength": 100,
-            "title": "Key",
             "type": "string"
           },
-          "value": {
-            "title": "Value"
-          }
+          "value": {}
         },
         "required": [
           "key",
@@ -4573,8 +4178,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Agent Id"
+            ]
           },
           "full_name": {
             "anyOf": [
@@ -4586,8 +4190,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Full Name"
+            ]
           },
           "is_active": {
             "anyOf": [
@@ -4597,8 +4200,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Is Active"
+            ]
           },
           "role": {
             "anyOf": [
@@ -4619,12 +4221,10 @@
         "properties": {
           "signer_sha256": {
             "description": "SHA-256 of the signing certificate, read from the APK's v2/v3 signing block. Compare it against docs/APK-SIGNING.md by eye if no fingerprint is configured yet — a build signed by another key cannot be installed as an update, only as an uninstall that destroys the phone's unsent queue.",
-            "title": "Signer Sha256",
             "type": "string"
           },
           "signer_verified": {
             "description": "True when it was checked against the configured fingerprint.",
-            "title": "Signer Verified",
             "type": "boolean"
           },
           "version": {
@@ -4646,11 +4246,9 @@
             "items": {
               "$ref": "#/components/schemas/UserResponse"
             },
-            "title": "Items",
             "type": "array"
           },
           "total": {
-            "title": "Total",
             "type": "integer"
           }
         },
@@ -4673,29 +4271,23 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Agent Id"
+            ]
           },
           "created_at": {
             "format": "date-time",
-            "title": "Created At",
             "type": "string"
           },
           "email": {
-            "title": "Email",
             "type": "string"
           },
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_active": {
-            "title": "Is Active",
             "type": "boolean"
           },
           "last_login_at": {
@@ -4707,11 +4299,9 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Last Login At"
+            ]
           },
           "must_change_password": {
-            "title": "Must Change Password",
             "type": "boolean"
           },
           "role": {
@@ -4789,28 +4379,23 @@
         "description": "What raising the floor would cost, **before** it is raised (N34, UC-28).\n\nThese are personally owned handsets. A stranded phone drains its queue,\nis then refused, and stays refused until somebody physically reaches that\nsalesperson — so this is not a preview of a config change, it is the cost\nof a decision, and the panel shows it before the button.",
         "properties": {
           "current_min_version_code": {
-            "title": "Current Min Version Code",
             "type": "integer"
           },
           "stranded": {
             "items": {
               "$ref": "#/components/schemas/StrandedInstallationOut"
             },
-            "title": "Stranded",
             "type": "array"
           },
           "stranded_count": {
-            "title": "Stranded Count",
             "type": "integer"
           },
           "unknown_version_count": {
             "description": "Active phones that have never reported a version code. The gate lets these through, so they are not counted as stranded — but each one might be below the floor and we cannot say.",
-            "title": "Unknown Version Count",
             "type": "integer"
           },
           "version_code": {
             "description": "The minimum being considered.",
-            "title": "Version Code",
             "type": "integer"
           }
         },

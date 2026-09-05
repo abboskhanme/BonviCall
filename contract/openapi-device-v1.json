@@ -8,12 +8,10 @@
           },
           "version": {
             "maxLength": 20,
-            "title": "Version",
             "type": "string"
           },
           "version_code": {
             "minimum": 1.0,
-            "title": "Version Code",
             "type": "integer"
           }
         },
@@ -146,7 +144,6 @@
         "description": "``200`` for an accepted chunk.",
         "properties": {
           "received_bytes": {
-            "title": "Received Bytes",
             "type": "integer"
           }
         },
@@ -187,24 +184,19 @@
         "properties": {
           "audio_id": {
             "format": "uuid",
-            "title": "Audio Id",
             "type": "string"
           },
           "bytes": {
-            "title": "Bytes",
             "type": "integer"
           },
           "duration_mismatch": {
             "description": "The file's length differs from the call log's by > 2 s (UC-14).",
-            "title": "Duration Mismatch",
             "type": "boolean"
           },
           "sha256": {
-            "title": "Sha256",
             "type": "string"
           },
           "stored": {
-            "title": "Stored",
             "type": "boolean"
           }
         },
@@ -230,8 +222,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "At"
+            ]
           },
           "failure_reason": {
             "anyOf": [
@@ -253,12 +244,10 @@
                 "type": "null"
               }
             ],
-            "description": "The call the dial produced, if it produced one.",
-            "title": "Result Client Call Id"
+            "description": "The call the dial produced, if it produced one."
           },
           "status": {
             "pattern": "^(acknowledged|failed)$",
-            "title": "Status",
             "type": "string"
           }
         },
@@ -289,7 +278,6 @@
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "Calls",
             "type": "array"
           }
         },
@@ -306,13 +294,11 @@
             "items": {
               "$ref": "#/components/schemas/DeviceCallResultOut"
             },
-            "title": "Results",
             "type": "array"
           },
           "server_time": {
             "description": "So the app can compute skew without an extra round trip.",
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           }
         },
@@ -327,11 +313,9 @@
         "description": "The error half of a per-item result.",
         "properties": {
           "code": {
-            "title": "Code",
             "type": "string"
           },
           "message": {
-            "title": "Message",
             "type": "string"
           }
         },
@@ -355,8 +339,7 @@
                 "type": "null"
               }
             ],
-            "description": "NULL means there was never a conversation (UC-09).",
-            "title": "Answered At"
+            "description": "NULL means there was never a conversation (UC-09)."
           },
           "app_variant": {
             "anyOf": [
@@ -377,13 +360,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "audio_expected": {
             "default": false,
             "description": "Whether the device will follow up with audio.",
-            "title": "Audio Expected",
             "type": "boolean"
           },
           "audio_missing_reason": {
@@ -411,7 +392,6 @@
           "client_call_id": {
             "description": "UUIDv5 the device derives from call-log facts that survive a reinstall (SPEC §3.10). The idempotency key: a replay returns the same server id and creates no second row.",
             "format": "uuid",
-            "title": "Client Call Id",
             "type": "string"
           },
           "command_id": {
@@ -424,8 +404,7 @@
                 "type": "null"
               }
             ],
-            "description": "Set when this call answered a click-to-call command.",
-            "title": "Command Id"
+            "description": "Set when this call answered a click-to-call command."
           },
           "contact_name": {
             "anyOf": [
@@ -437,13 +416,11 @@
                 "type": "null"
               }
             ],
-            "description": "Resolved on-device. Decoration, never identity (L3).",
-            "title": "Contact Name"
+            "description": "Resolved on-device. Decoration, never identity (L3)."
           },
           "device_epoch_ms": {
             "description": "System.currentTimeMillis() at call start — raw evidence for skew.",
             "format": "int64",
-            "title": "Device Epoch Ms",
             "type": "integer"
           },
           "device_rtt_ms": {
@@ -456,13 +433,11 @@
                 "type": "null"
               }
             ],
-            "description": "The client's round-trip estimate, for skew.",
-            "title": "Device Rtt Ms"
+            "description": "The client's round-trip estimate, for skew."
           },
           "device_timezone": {
             "description": "IANA name.",
             "maxLength": 64,
-            "title": "Device Timezone",
             "type": "string"
           },
           "direction": {
@@ -475,7 +450,6 @@
             "default": 0,
             "description": "Whole seconds, truncated not rounded.",
             "minimum": 0.0,
-            "title": "Duration Sec",
             "type": "integer"
           },
           "ended_at": {
@@ -487,12 +461,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ended At"
+            ]
           },
           "reconciled_with_call_log": {
             "default": false,
-            "title": "Reconciled With Call Log",
             "type": "boolean"
           },
           "remote_number": {
@@ -505,8 +477,7 @@
                 "type": "null"
               }
             ],
-            "description": "As the device saw it. NULL when the caller withheld it.",
-            "title": "Remote Number"
+            "description": "As the device saw it. NULL when the caller withheld it."
           },
           "ring_sec": {
             "anyOf": [
@@ -517,8 +488,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ring Sec"
+            ]
           },
           "sim_slot": {
             "anyOf": [
@@ -530,8 +500,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Slot"
+            ]
           },
           "sim_subscription_id": {
             "anyOf": [
@@ -542,8 +511,7 @@
                 "type": "null"
               }
             ],
-            "description": "The registered subscription only — Guard 1 refused the rest.",
-            "title": "Sim Subscription Id"
+            "description": "The registered subscription only — Guard 1 refused the rest."
           },
           "source": {
             "$ref": "#/components/schemas/CallSource",
@@ -552,7 +520,6 @@
           "started_at": {
             "description": "ISO-8601 with an explicit offset (N36).",
             "format": "date-time",
-            "title": "Started At",
             "type": "string"
           }
         },
@@ -571,14 +538,12 @@
         "description": "A page of the employee's own calls.\n\nSame shape as the panel's list (``items``/``next_cursor``/``has_more``) so\nthere is one pagination convention in the product. ``total`` is left unset:\na phone scrolls, and a COUNT per page is cellular data spent on a number\nnobody reads.",
         "properties": {
           "has_more": {
-            "title": "Has More",
             "type": "boolean"
           },
           "items": {
             "items": {
               "$ref": "#/components/schemas/DeviceCallOut"
             },
-            "title": "Items",
             "type": "array"
           },
           "next_cursor": {
@@ -589,8 +554,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Next Cursor"
+            ]
           },
           "total": {
             "anyOf": [
@@ -600,8 +564,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Total"
+            ]
           }
         },
         "required": [
@@ -618,20 +581,17 @@
           "device_counted": {
             "description": "Rows the device saw in its own log.",
             "minimum": 0.0,
-            "title": "Device Counted",
             "type": "integer"
           },
           "period_date": {
             "description": "Asia/Tashkent calendar date.",
             "format": "date",
-            "title": "Period Date",
             "type": "string"
           },
           "subscription_unknown_count": {
             "default": 0,
             "description": "Calls the OS could not attribute to a subscription. Reported separately and never folded into either side of the rate — that is the fail-closed rule made visible.",
             "minimum": 0.0,
-            "title": "Subscription Unknown Count",
             "type": "integer"
           },
           "swept_at": {
@@ -643,12 +603,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Swept At"
+            ]
           },
           "uploaded_count": {
             "minimum": 0.0,
-            "title": "Uploaded Count",
             "type": "integer"
           }
         },
@@ -663,25 +621,20 @@
       "DeviceCallLogDeltaOut": {
         "properties": {
           "delta": {
-            "title": "Delta",
             "type": "integer"
           },
           "device_counted": {
-            "title": "Device Counted",
             "type": "integer"
           },
           "period_date": {
             "format": "date",
-            "title": "Period Date",
             "type": "string"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           },
           "uploaded_count": {
-            "title": "Uploaded Count",
             "type": "integer"
           }
         },
@@ -727,7 +680,6 @@
           "client_call_id": {
             "description": "So the app can match the row it queued itself.",
             "format": "uuid",
-            "title": "Client Call Id",
             "type": "string"
           },
           "contact_name": {
@@ -738,8 +690,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Contact Name"
+            ]
           },
           "direction": {
             "$ref": "#/components/schemas/CallDirection"
@@ -748,18 +699,15 @@
             "$ref": "#/components/schemas/CallDisposition"
           },
           "duration_sec": {
-            "title": "Duration Sec",
             "type": "integer"
           },
           "has_audio": {
             "description": "What the **server holds**, never what the device believes it sent. A list built locally would show calls that never uploaded and hide calls recovered from the call log.",
-            "title": "Has Audio",
             "type": "boolean"
           },
           "id": {
             "description": "Server id; the audio route takes this.",
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "remote_number": {
@@ -770,12 +718,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Remote Number"
+            ]
           },
           "started_at": {
             "format": "date-time",
-            "title": "Started At",
             "type": "string"
           }
         },
@@ -811,12 +757,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Audio Upload"
+            ]
           },
           "client_call_id": {
             "format": "uuid",
-            "title": "Client Call Id",
             "type": "string"
           },
           "error": {
@@ -839,8 +783,7 @@
                 "type": "null"
               }
             ],
-            "description": "The server id. Same value on every replay.",
-            "title": "Id"
+            "description": "The server id. Same value on every replay."
           },
           "status": {
             "enum": [
@@ -849,7 +792,6 @@
               "updated",
               "failed"
             ],
-            "title": "Status",
             "type": "string"
           }
         },
@@ -864,22 +806,18 @@
         "description": "``POST /api/device/v1/enrolment/verify/callback/start`` — route 2.",
         "properties": {
           "callback_msisdn": {
-            "title": "Callback Msisdn",
             "type": "string"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "poll_after_ms": {
             "default": 2000,
-            "title": "Poll After Ms",
             "type": "integer"
           },
           "verification_id": {
             "format": "uuid",
-            "title": "Verification Id",
             "type": "string"
           }
         },
@@ -900,7 +838,6 @@
             },
             "maxItems": 32,
             "minItems": 1,
-            "title": "Capabilities",
             "type": "array"
           }
         },
@@ -914,20 +851,16 @@
         "description": "Alerts are raised inside this request, so the 10-minute bound of UC-06\nis a device-reporting-interval question and not a server-latency one.",
         "properties": {
           "accepted": {
-            "title": "Accepted",
             "type": "integer"
           },
           "alerts_raised": {
-            "title": "Alerts Raised",
             "type": "integer"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           },
           "transitions": {
-            "title": "Transitions",
             "type": "integer"
           }
         },
@@ -948,7 +881,6 @@
           },
           "checked_at": {
             "format": "date-time",
-            "title": "Checked At",
             "type": "string"
           },
           "detail": {
@@ -961,8 +893,7 @@
                 "type": "null"
               }
             ],
-            "description": "What the check saw, e.g. '1s test capture 32 kB'.",
-            "title": "Detail"
+            "description": "What the check saw, e.g. '1s test capture 32 kB'."
           },
           "state": {
             "$ref": "#/components/schemas/CapabilityState"
@@ -982,12 +913,10 @@
             "items": {
               "$ref": "#/components/schemas/DeviceCommandOut"
             },
-            "title": "Commands",
             "type": "array"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           }
         },
@@ -1003,17 +932,14 @@
         "properties": {
           "command_id": {
             "format": "uuid",
-            "title": "Command Id",
             "type": "string"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "issued_at": {
             "format": "date-time",
-            "title": "Issued At",
             "type": "string"
           },
           "kind": {
@@ -1027,8 +953,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Number"
+            ]
           }
         },
         "required": [
@@ -1048,7 +973,6 @@
             },
             "maxItems": 50,
             "minItems": 1,
-            "title": "Events",
             "type": "array"
           }
         },
@@ -1061,16 +985,13 @@
       "DeviceEventBatchOut": {
         "properties": {
           "accepted": {
-            "title": "Accepted",
             "type": "integer"
           },
           "alerts_raised": {
-            "title": "Alerts Raised",
             "type": "integer"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           }
         },
@@ -1095,8 +1016,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Attempts"
+            ]
           },
           "audio_missing_reason": {
             "anyOf": [
@@ -1117,8 +1037,7 @@
                 "type": "null"
               }
             ],
-            "description": "Whether the employee did it, or the OS did.",
-            "title": "By User"
+            "description": "Whether the employee did it, or the OS did."
           },
           "capture_route": {
             "anyOf": [
@@ -1140,8 +1059,7 @@
                 "type": "null"
               }
             ],
-            "description": "Which queued record was parked.",
-            "title": "Client Call Id"
+            "description": "Which queued record was parked."
           },
           "deleted_bytes": {
             "anyOf": [
@@ -1153,8 +1071,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Deleted Bytes"
+            ]
           },
           "deleted_records": {
             "anyOf": [
@@ -1165,8 +1082,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Deleted Records"
+            ]
           },
           "discarded_count": {
             "anyOf": [
@@ -1177,8 +1093,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Discarded Count"
+            ]
           },
           "free_storage_bytes": {
             "anyOf": [
@@ -1190,8 +1105,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Free Storage Bytes"
+            ]
           },
           "from_version": {
             "anyOf": [
@@ -1202,8 +1116,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "From Version"
+            ]
           },
           "queue_bytes": {
             "anyOf": [
@@ -1215,8 +1128,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Bytes"
+            ]
           },
           "queue_records": {
             "anyOf": [
@@ -1227,8 +1139,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Records"
+            ]
           },
           "to_version": {
             "anyOf": [
@@ -1239,8 +1150,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "To Version"
+            ]
           }
         },
         "title": "DeviceEventDetailIn",
@@ -1258,8 +1168,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "At"
+            ]
           },
           "detail": {
             "anyOf": [
@@ -1276,7 +1185,6 @@
             "description": "One of the names in SPEC §4.4. Unknown names are accepted on purpose — an event we do not understand raises 'info' rather than being dropped — but the shape is constrained to a lower-case identifier: an unbounded free-text field is itself a way off the phone.",
             "maxLength": 64,
             "pattern": "^[a-z][a-z0-9_]{2,63}$",
-            "title": "Kind",
             "type": "string"
           }
         },
@@ -1299,8 +1207,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Api Level"
+            ]
           },
           "app_variant": {
             "anyOf": [
@@ -1321,8 +1228,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "App Version"
+            ]
           },
           "app_version_code": {
             "anyOf": [
@@ -1334,8 +1240,7 @@
                 "type": "null"
               }
             ],
-            "description": "The integer the version gate compares (N34). Reported at enrolment in `AppInfoIn.version_code` and refreshed here, because the code changes when the app updates and nothing else on the wire carries it afterwards. Omitting it leaves the stored value alone.",
-            "title": "App Version Code"
+            "description": "The integer the version gate compares (N34). Reported at enrolment in `AppInfoIn.version_code` and refreshed here, because the code changes when the app updates and nothing else on the wire carries it afterwards. Omitting it leaves the stored value alone."
           },
           "battery_charging": {
             "anyOf": [
@@ -1345,8 +1250,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Charging"
+            ]
           },
           "battery_level": {
             "anyOf": [
@@ -1358,8 +1262,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Battery Level"
+            ]
           },
           "battery_optimisation_exempt": {
             "anyOf": [
@@ -1370,8 +1273,7 @@
                 "type": "null"
               }
             ],
-            "description": "isIgnoringBatteryOptimizations(). False is the usual cause of a dead service.",
-            "title": "Battery Optimisation Exempt"
+            "description": "isIgnoringBatteryOptimizations(). False is the usual cause of a dead service."
           },
           "capture_enabled": {
             "anyOf": [
@@ -1381,8 +1283,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Capture Enabled"
+            ]
           },
           "cellular_bytes_month": {
             "anyOf": [
@@ -1394,13 +1295,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Cellular Bytes Month"
+            ]
           },
           "device_epoch_ms": {
             "description": "Raw device clock; the skew evidence (N36).",
             "format": "int64",
-            "title": "Device Epoch Ms",
             "type": "integer"
           },
           "device_rtt_ms": {
@@ -1412,12 +1311,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Device Rtt Ms"
+            ]
           },
           "device_timezone": {
             "maxLength": 64,
-            "title": "Device Timezone",
             "type": "string"
           },
           "free_storage_bytes": {
@@ -1430,8 +1327,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Free Storage Bytes"
+            ]
           },
           "network_type": {
             "anyOf": [
@@ -1452,8 +1348,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Parked Records"
+            ]
           },
           "pending_commands_seen": {
             "anyOf": [
@@ -1464,8 +1359,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Pending Commands Seen"
+            ]
           },
           "power_save_mode": {
             "anyOf": [
@@ -1475,8 +1369,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Power Save Mode"
+            ]
           },
           "push_token": {
             "anyOf": [
@@ -1488,8 +1381,7 @@
                 "type": "null"
               }
             ],
-            "description": "FCM registration token, sent **only when it changes** — on the first heartbeat after `onNewToken`. Omitting it leaves the stored one alone; sending it on every heartbeat would spend part of the cellular budget (N15) on a value that changes twice a year.",
-            "title": "Push Token"
+            "description": "FCM registration token, sent **only when it changes** — on the first heartbeat after `onNewToken`. Omitting it leaves the stored one alone; sending it on every heartbeat would spend part of the cellular budget (N15) on a value that changes twice a year."
           },
           "queue_bytes": {
             "anyOf": [
@@ -1501,8 +1393,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Bytes"
+            ]
           },
           "queue_oldest_at": {
             "anyOf": [
@@ -1513,8 +1404,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Queue Oldest At"
+            ]
           },
           "queue_records": {
             "anyOf": [
@@ -1526,8 +1416,7 @@
                 "type": "null"
               }
             ],
-            "description": "Zero is what the stale-version gate waits for (SPEC §4.3).",
-            "title": "Queue Records"
+            "description": "Zero is what the stale-version gate waits for (SPEC §4.3)."
           },
           "recording_route": {
             "anyOf": [
@@ -1547,8 +1436,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Recording Route Ok"
+            ]
           },
           "service_running": {
             "anyOf": [
@@ -1558,8 +1446,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Service Running"
+            ]
           },
           "ws_connected": {
             "anyOf": [
@@ -1569,8 +1456,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ws Connected"
+            ]
           }
         },
         "required": [
@@ -1584,7 +1470,6 @@
         "description": "``server_time`` lets the app compute skew without an extra round trip.",
         "properties": {
           "clock_skew_sec": {
-            "title": "Clock Skew Sec",
             "type": "integer"
           },
           "config_hash": {
@@ -1596,17 +1481,14 @@
                 "type": "null"
               }
             ],
-            "description": "The app re-fetches config only when this changes.",
-            "title": "Config Hash"
+            "description": "The app re-fetches config only when this changes."
           },
           "pending_command_count": {
             "default": 0,
-            "title": "Pending Command Count",
             "type": "integer"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           },
           "update": {
@@ -1626,25 +1508,21 @@
         "properties": {
           "android_release": {
             "maxLength": 16,
-            "title": "Android Release",
             "type": "string"
           },
           "api_level": {
             "maximum": 99.0,
             "minimum": 21.0,
-            "title": "Api Level",
             "type": "integer"
           },
           "build_fingerprint_hash": {
             "description": "sha256 of Build.FINGERPRINT.",
             "maxLength": 64,
             "minLength": 64,
-            "title": "Build Fingerprint Hash",
             "type": "string"
           },
           "manufacturer": {
             "maxLength": 64,
-            "title": "Manufacturer",
             "type": "string"
           },
           "marketing_name": {
@@ -1656,12 +1534,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Marketing Name"
+            ]
           },
           "model": {
             "maxLength": 96,
-            "title": "Model",
             "type": "string"
           }
         },
@@ -1687,8 +1563,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Carrier Name"
+            ]
           },
           "line1_number": {
             "anyOf": [
@@ -1700,8 +1575,7 @@
                 "type": "null"
               }
             ],
-            "description": "TelephonyManager.getLine1Number(). NULL, empty or fewer than nine digits is never a match (UC-04) — it is 'I don't know', not 'yes'.",
-            "title": "Line1 Number"
+            "description": "TelephonyManager.getLine1Number(). NULL, empty or fewer than nine digits is never a match (UC-04) — it is 'I don't know', not 'yes'."
           },
           "sim_slot": {
             "anyOf": [
@@ -1713,8 +1587,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Slot"
+            ]
           },
           "subscription_id": {
             "anyOf": [
@@ -1724,8 +1597,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Subscription Id"
+            ]
           }
         },
         "title": "DeviceMsisdnVerifyIn",
@@ -1740,7 +1612,6 @@
           "code": {
             "maxLength": 16,
             "minLength": 4,
-            "title": "Code",
             "type": "string"
           },
           "device": {
@@ -1748,18 +1619,15 @@
           },
           "device_epoch_ms": {
             "format": "int64",
-            "title": "Device Epoch Ms",
             "type": "integer"
           },
           "device_fingerprint": {
             "maxLength": 64,
             "minLength": 64,
-            "title": "Device Fingerprint",
             "type": "string"
           },
           "device_timezone": {
             "maxLength": 64,
-            "title": "Device Timezone",
             "type": "string"
           },
           "sim_slot": {
@@ -1772,8 +1640,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Slot"
+            ]
           },
           "sim_subscription_id": {
             "anyOf": [
@@ -1783,8 +1650,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sim Subscription Id"
+            ]
           }
         },
         "required": [
@@ -1805,24 +1671,20 @@
             "$ref": "#/components/schemas/RedeemAgentOut"
           },
           "expires_in": {
-            "title": "Expires In",
             "type": "integer"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "number": {
             "$ref": "#/components/schemas/RedeemNumberOut"
           },
           "provisional_token": {
-            "title": "Provisional Token",
             "type": "string"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           },
           "status": {
@@ -1849,7 +1711,6 @@
         "description": "``POST /api/device/v1/auth/refresh``.",
         "properties": {
           "refresh_token": {
-            "title": "Refresh Token",
             "type": "string"
           }
         },
@@ -1863,25 +1724,20 @@
         "description": "Issued once the installation is verified.",
         "properties": {
           "access_token": {
-            "title": "Access Token",
             "type": "string"
           },
           "expires_in": {
-            "title": "Expires In",
             "type": "integer"
           },
           "installation_id": {
             "format": "uuid",
-            "title": "Installation Id",
             "type": "string"
           },
           "refresh_token": {
-            "title": "Refresh Token",
             "type": "string"
           },
           "server_time": {
             "format": "date-time",
-            "title": "Server Time",
             "type": "string"
           },
           "status": {
@@ -1889,7 +1745,6 @@
           },
           "token_type": {
             "default": "bearer",
-            "title": "Token Type",
             "type": "string"
           },
           "verification_method": {
@@ -1983,7 +1838,6 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "title": "Detail",
             "type": "array"
           }
         },
@@ -2006,20 +1860,16 @@
         "description": "The pair handed over once verification succeeds.\n\nNamed rather than a map because the generated Kotlin DTO is what the app\nreads: a ``Map<String, Any>`` there makes a renamed field a runtime\n``null`` on a fleet we cannot force-update, which is exactly what\nCONVENTIONS.md §1 generates clients to prevent.",
         "properties": {
           "access_token": {
-            "title": "Access Token",
             "type": "string"
           },
           "expires_in": {
-            "title": "Expires In",
             "type": "integer"
           },
           "refresh_token": {
-            "title": "Refresh Token",
             "type": "string"
           },
           "token_type": {
             "default": "bearer",
-            "title": "Token Type",
             "type": "string"
           }
         },
@@ -2052,13 +1902,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Bitrate Bps"
+            ]
           },
           "bytes_total": {
             "description": "Declared file size.",
             "exclusiveMinimum": 0.0,
-            "title": "Bytes Total",
             "type": "integer"
           },
           "capture_route": {
@@ -2074,8 +1922,7 @@
                 "type": "null"
               }
             ],
-            "description": "The folder *name* only, never a path from the phone (§8).",
-            "title": "Capture Route Detail"
+            "description": "The folder *name* only, never a path from the phone (§8)."
           },
           "channels": {
             "anyOf": [
@@ -2087,8 +1934,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Channels"
+            ]
           },
           "codec": {
             "$ref": "#/components/schemas/AudioCodec"
@@ -2105,13 +1951,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Duration Ms"
+            ]
           },
           "recorded_at": {
             "description": "When the file was written. Checked against the call's window — a recording that does not overlap is refused and never stored (N28).",
             "format": "date-time",
-            "title": "Recorded At",
             "type": "string"
           },
           "sample_rate_hz": {
@@ -2123,13 +1967,11 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Sample Rate Hz"
+            ]
           },
           "sha256": {
             "maxLength": 64,
             "minLength": 64,
-            "title": "Sha256",
             "type": "string"
           }
         },
@@ -2149,22 +1991,18 @@
         "properties": {
           "chunk_size": {
             "description": "The client always obeys this value.",
-            "title": "Chunk Size",
             "type": "integer"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "received_bytes": {
             "description": "Resume from here. After an app restart this is not zero.",
-            "title": "Received Bytes",
             "type": "integer"
           },
           "upload_id": {
             "format": "uuid",
-            "title": "Upload Id",
             "type": "string"
           }
         },
@@ -2190,12 +2028,10 @@
       "RedeemAgentOut": {
         "properties": {
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           }
         },
@@ -2210,11 +2046,9 @@
         "properties": {
           "display": {
             "description": "Grouped for reading aloud, e.g. +998 90 111-22-33.",
-            "title": "Display",
             "type": "string"
           },
           "e164": {
-            "title": "E164",
             "type": "string"
           }
         },
@@ -2237,8 +2071,7 @@
                 "type": "null"
               }
             ],
-            "description": "NULL when no receiver is available.",
-            "title": "Callback Msisdn"
+            "description": "NULL when no receiver is available."
           },
           "receiver_status": {
             "anyOf": [
@@ -2251,11 +2084,9 @@
             ]
           },
           "required": {
-            "title": "Required",
             "type": "boolean"
           },
           "window_seconds": {
-            "title": "Window Seconds",
             "type": "integer"
           }
         },
@@ -2277,8 +2108,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Apk Url"
+            ]
           },
           "latest_version": {
             "anyOf": [
@@ -2288,8 +2118,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Latest Version"
+            ]
           },
           "latest_version_code": {
             "anyOf": [
@@ -2299,8 +2128,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Latest Version Code"
+            ]
           },
           "message_uz": {
             "anyOf": [
@@ -2310,15 +2138,12 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Message Uz"
+            ]
           },
           "min_version_code": {
-            "title": "Min Version Code",
             "type": "integer"
           },
           "required": {
-            "title": "Required",
             "type": "boolean"
           }
         },
@@ -2344,16 +2169,13 @@
         "description": "``GET /audio/{upload_id}`` — the probe (step 4).",
         "properties": {
           "bytes_total": {
-            "title": "Bytes Total",
             "type": "integer"
           },
           "expires_at": {
             "format": "date-time",
-            "title": "Expires At",
             "type": "string"
           },
           "received_bytes": {
-            "title": "Received Bytes",
             "type": "integer"
           },
           "status": {
@@ -2361,7 +2183,6 @@
           },
           "upload_id": {
             "format": "uuid",
-            "title": "Upload Id",
             "type": "string"
           }
         },

@@ -112,3 +112,44 @@ async def test_the_device_surface_uses_the_same_envelope(client) -> None:
     ):
         body = response.json()
         assert ENVELOPE_KEYS <= set(body["error"]), body
+
+
+async def test_no_property_carries_a_title_that_is_just_its_own_name() -> None:
+    """The fourth defect of its shape, and the one nothing could see.
+
+    Pydantic titles every property with its field name restated —
+    ``attempts`` becomes ``"title": "Attempts"`` — and openapi-generator mints a
+    type for a titled inline schema. ``attempts: int | None`` generated as
+    ``class Attempts()``: a named, empty Kotlin class, thirteen of them on
+    ``DeviceEventDetailIn``, and the fields could not be set.
+
+    The server was correct Python, the document was valid OpenAPI and the
+    client compiled. That is why this is checked here, on the artefact clients
+    are built from, rather than on the schemas.
+    """
+    offenders = []
+    for stem, document in build_documents().items():
+        if not stem.startswith("openapi-"):
+            continue
+        for schema_name, schema in document.get("components", {}).get("schemas", {}).items():
+            for name, spec in (schema.get("properties") or {}).items():
+                if isinstance(spec, dict) and spec.get("title") == name.replace("_", " ").title():
+                    offenders.append(f"{stem}: {schema_name}.{name}")
+    assert offenders == [], (
+        f"auto-generated property titles reached the contract: {offenders}. "
+        "Each one generates as an empty named class in Kotlin. "
+        "`contract_export._strip_generated_property_titles` removes them."
+    )
+
+
+async def test_a_deliberate_title_is_left_alone() -> None:
+    """The rule discriminates, rather than stripping every title.
+
+    FastAPI's own ``ValidationError.loc`` is titled "Location" — not the field
+    name restated — and it survives. A title somebody wrote carries
+    information; one Pydantic derived does not.
+    """
+    document = build_documents()["openapi-device-v1"]
+    validation = document["components"]["schemas"].get("ValidationError")
+    assert validation, "FastAPI's ValidationError is expected in the document"
+    assert validation["properties"]["loc"]["title"] == "Location"

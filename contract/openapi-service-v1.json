@@ -69,19 +69,16 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Caller E164"
+            ]
           },
           "cli_presented": {
             "default": false,
             "description": "False means the operator suppressed the number — that is R19.",
-            "title": "Cli Presented",
             "type": "boolean"
           },
           "heartbeat": {
             "default": false,
             "description": "True for a keepalive with no call.",
-            "title": "Heartbeat",
             "type": "boolean"
           },
           "receiver_epoch_ms": {
@@ -93,8 +90,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Receiver Epoch Ms"
+            ]
           }
         },
         "title": "CallbackEventIn",
@@ -104,14 +100,12 @@
         "description": "What the receiver learns: whether its report matched anything.",
         "properties": {
           "matched": {
-            "title": "Matched",
             "type": "boolean"
           },
           "receiver_status": {
             "$ref": "#/components/schemas/ReceiverStatus"
           },
           "stored": {
-            "title": "Stored",
             "type": "boolean"
           }
         },
@@ -139,23 +133,19 @@
         "description": "An agent plus their number history.\n\nNeeded because BonviZvonki's L3 failure was exactly this mapping arriving\nwrong — a single ``agents.phone`` column cannot express a handover.",
         "properties": {
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "is_active": {
-            "title": "Is Active",
             "type": "boolean"
           },
           "numbers": {
             "items": {
               "$ref": "#/components/schemas/ExportNumberPeriodOut"
             },
-            "title": "Numbers",
             "type": "array"
           }
         },
@@ -171,12 +161,10 @@
       "ExportAgentOut": {
         "properties": {
           "full_name": {
-            "title": "Full Name",
             "type": "string"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           }
         },
@@ -190,14 +178,12 @@
       "ExportAgentsResponse": {
         "properties": {
           "count": {
-            "title": "Count",
             "type": "integer"
           },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ExportAgentDetailOut"
             },
-            "title": "Items",
             "type": "array"
           }
         },
@@ -215,16 +201,13 @@
             "$ref": "#/components/schemas/ExportAgentOut"
           },
           "agent_number_e164": {
-            "title": "Agent Number E164",
             "type": "string"
           },
           "agent_number_key": {
             "description": "Last 9 digits — their join key too (N37).",
-            "title": "Agent Number Key",
             "type": "string"
           },
           "answered": {
-            "title": "Answered",
             "type": "boolean"
           },
           "answered_at": {
@@ -236,8 +219,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Answered At"
+            ]
           },
           "app_variant": {
             "$ref": "#/components/schemas/AppVariant"
@@ -250,8 +232,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Audio Duration Ms"
+            ]
           },
           "audio_missing_reason": {
             "anyOf": [
@@ -272,8 +253,7 @@
                 "type": "null"
               }
             ],
-            "description": "A stable reference, never a public URL (N20, §5.4).",
-            "title": "Audio Ref"
+            "description": "A stable reference, never a public URL (N20, §5.4)."
           },
           "audio_sha256": {
             "anyOf": [
@@ -283,12 +263,10 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Audio Sha256"
+            ]
           },
           "bonvizvonki_direction": {
             "description": "Their vocabulary, mapped here so ours never leaks into theirs.",
-            "title": "Bonvizvonki Direction",
             "type": "string"
           },
           "call_type": {
@@ -311,7 +289,6 @@
             "$ref": "#/components/schemas/CallDisposition"
           },
           "duration_sec": {
-            "title": "Duration Sec",
             "type": "integer"
           },
           "ended_at": {
@@ -323,21 +300,17 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Ended At"
+            ]
           },
           "has_audio": {
-            "title": "Has Audio",
             "type": "boolean"
           },
           "id": {
             "format": "uuid",
-            "title": "Id",
             "type": "string"
           },
           "received_at": {
             "format": "date-time",
-            "title": "Received At",
             "type": "string"
           },
           "remote_number_e164": {
@@ -348,8 +321,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Remote Number E164"
+            ]
           },
           "remote_number_key": {
             "anyOf": [
@@ -359,18 +331,15 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Remote Number Key"
+            ]
           },
           "seq": {
             "description": "The cursor. Monotonic, server-assigned.",
             "format": "int64",
-            "title": "Seq",
             "type": "integer"
           },
           "started_at": {
             "format": "date-time",
-            "title": "Started At",
             "type": "string"
           }
         },
@@ -407,19 +376,16 @@
         "description": "``seq ASC`` with a settling window, so two full passes agree (UC-29).",
         "properties": {
           "count": {
-            "title": "Count",
             "type": "integer"
           },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ExportCallOut"
             },
-            "title": "Items",
             "type": "array"
           },
           "next_since": {
             "format": "int64",
-            "title": "Next Since",
             "type": "integer"
           }
         },
@@ -435,16 +401,13 @@
         "description": "One line an agent held, and when.",
         "properties": {
           "e164": {
-            "title": "E164",
             "type": "string"
           },
           "key": {
-            "title": "Key",
             "type": "string"
           },
           "valid_from": {
             "format": "date-time",
-            "title": "Valid From",
             "type": "string"
           },
           "valid_to": {
@@ -456,8 +419,7 @@
               {
                 "type": "null"
               }
-            ],
-            "title": "Valid To"
+            ]
           }
         },
         "required": [
@@ -475,7 +437,6 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "title": "Detail",
             "type": "array"
           }
         },
