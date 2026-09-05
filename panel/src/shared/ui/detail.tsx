@@ -33,7 +33,7 @@ export function Field({
     <div className="min-w-0">
       <dt className="text-2xs font-medium uppercase tracking-wide text-muted">{label}</dt>
       <dd
-        className={cn('text-sm text-text', mono && 'truncate font-mono')}
+        className={cn('mt-0.5 text-sm leading-snug text-text', mono && 'truncate font-mono')}
         title={title}
       >
         {children ?? value ?? EM_DASH}
@@ -44,7 +44,11 @@ export function Field({
 
 export function FieldGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <dl className={cn('grid gap-4 sm:grid-cols-2 xl:grid-cols-3', className)}>{children}</dl>
+    <dl
+      className={cn('grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3', className)}
+    >
+      {children}
+    </dl>
   )
 }
 

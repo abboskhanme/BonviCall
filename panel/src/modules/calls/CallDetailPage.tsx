@@ -239,63 +239,69 @@ function CallCard({ call }: { call: Call }) {
 
       <AudioSection call={call} />
 
-      <Section title={t('callDetail.sectionTiming')}>
-        <Field
-          label={t('callDetail.startedAt')}
-          value={formatDateTimeOrDash(call.started_at)}
-          title={formatInstantTitle(call.started_at)}
-        />
-        <Field
-          label={t('callDetail.answeredAt')}
-          value={call.answered_at ? formatDateTimeOrDash(call.answered_at) : null}
-          title={call.answered_at ? formatInstantTitle(call.answered_at) : undefined}
-        />
-        <Field
-          label={t('callDetail.endedAt')}
-          value={call.ended_at ? formatDateTimeOrDash(call.ended_at) : null}
-          title={call.ended_at ? formatInstantTitle(call.ended_at) : undefined}
-        />
-        <Field
-          label={t('callDetail.receivedAt')}
-          value={formatDateTimeOrDash(call.received_at)}
-          title={formatInstantTitle(call.received_at)}
-        />
-        <Field label={t('callDetail.duration')} value={formatDuration(call.duration_sec)} />
-        <Field
-          label={t('callDetail.ringSec')}
-          value={call.ring_sec === null ? null : formatDuration(call.ring_sec)}
-        />
-        <Field label={t('callDetail.deviceTimezone')} value={call.device_timezone} />
-        <Field
-          label={t('callDetail.clockSkew')}
-          value={t('callDetail.clockSkewValue', { seconds: call.clock_skew_sec })}
-        />
-      </Section>
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <Section title={t('callDetail.sectionTiming')}>
+          <FieldGrid className="xl:grid-cols-2">
+            <Field
+              label={t('callDetail.startedAt')}
+              value={formatDateTimeOrDash(call.started_at)}
+              title={formatInstantTitle(call.started_at)}
+            />
+            <Field
+              label={t('callDetail.answeredAt')}
+              value={call.answered_at ? formatDateTimeOrDash(call.answered_at) : null}
+              title={call.answered_at ? formatInstantTitle(call.answered_at) : undefined}
+            />
+            <Field
+              label={t('callDetail.endedAt')}
+              value={call.ended_at ? formatDateTimeOrDash(call.ended_at) : null}
+              title={call.ended_at ? formatInstantTitle(call.ended_at) : undefined}
+            />
+            <Field
+              label={t('callDetail.receivedAt')}
+              value={formatDateTimeOrDash(call.received_at)}
+              title={formatInstantTitle(call.received_at)}
+            />
+            <Field label={t('callDetail.duration')} value={formatDuration(call.duration_sec)} />
+            <Field
+              label={t('callDetail.ringSec')}
+              value={call.ring_sec === null ? null : formatDuration(call.ring_sec)}
+            />
+            <Field label={t('callDetail.deviceTimezone')} value={call.device_timezone} />
+            <Field
+              label={t('callDetail.clockSkew')}
+              value={t('callDetail.clockSkewValue', { seconds: call.clock_skew_sec })}
+            />
+          </FieldGrid>
+        </Section>
 
-      <Section title={t('callDetail.sectionOrigin')}>
-        {/* Resolved server-side; `sales` receives its own agent object too —
-            the panel hides the COLUMN on the list, the API special-cases
-            nobody. */}
-        <Field label={t('callDetail.agent')} value={call.agent_name} />
-        <Field label={t('callDetail.numberE164')} value={formatPhone(call.number_e164)} />
-        <Field label={t('callDetail.deviceModel')} value={call.device_model ?? null} />
-        <Field label={t('callDetail.source')} value={t(SOURCE_LABEL[call.source])} />
-        <Field
-          label={t('callDetail.reconciled')}
-          value={boolText(call.reconciled_with_call_log)}
-        />
-        <Field
-          label={t('callDetail.appVersion')}
-          value={`${call.app_version} · ${call.app_variant}`}
-        />
-        <Field
-          label={t('callDetail.installation')}
-          value={call.installation_id}
-          title={call.installation_id}
-          mono
-        />
-        <Field label={t('callDetail.seq')} value={String(call.seq)} mono />
-      </Section>
+        <Section title={t('callDetail.sectionOrigin')}>
+          <FieldGrid className="xl:grid-cols-2">
+            {/* Resolved server-side; `sales` receives its own agent object too —
+                the panel hides the COLUMN on the list, the API special-cases
+                nobody. */}
+            <Field label={t('callDetail.agent')} value={call.agent_name} />
+            <Field label={t('callDetail.numberE164')} value={formatPhone(call.number_e164)} />
+            <Field label={t('callDetail.deviceModel')} value={call.device_model ?? null} />
+            <Field label={t('callDetail.source')} value={t(SOURCE_LABEL[call.source])} />
+            <Field
+              label={t('callDetail.reconciled')}
+              value={boolText(call.reconciled_with_call_log)}
+            />
+            <Field
+              label={t('callDetail.appVersion')}
+              value={`${call.app_version} · ${call.app_variant}`}
+            />
+            <Field
+              label={t('callDetail.installation')}
+              value={call.installation_id}
+              title={call.installation_id}
+              mono
+            />
+            <Field label={t('callDetail.seq')} value={String(call.seq)} mono />
+          </FieldGrid>
+        </Section>
+      </div>
 
       <NoteSection call={call} />
     </div>
