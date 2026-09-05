@@ -28,6 +28,19 @@
     <string name="home_title">Bosh sahifa</string>
     <string name="calls_title">Qo\'ng\'iroqlar</string>
     <string name="diagnostics_title">Ilova holati</string>
+    <!-- The server address leads: the first real handset reported "no internet"
+         while its browser reached the server fine, and nothing on the device
+         could say which address the app was even using. -->
+    <string name="diagnostics_server">Server manzili</string>
+    <string name="diagnostics_test">Aloqani tekshirish</string>
+    <string name="diagnostics_reach_checking">Tekshirilmoqda…</string>
+    <string name="diagnostics_reach_ok">Server javob berdi. Aloqa bor.</string>
+    <string name="diagnostics_reach_failed">Serverga ulanib bo\'lmadi.</string>
+    <string name="diagnostics_version">Ilova versiyasi</string>
+    <string name="diagnostics_enrolled">Ro\'yxatdan o\'tgan</string>
+    <string name="diagnostics_enrolled_yes">Ha</string>
+    <string name="diagnostics_enrolled_no">Yo\'q — kod kiritilmagan</string>
+    <string name="diagnostics_number">Yozib olinadigan raqam</string>
 
 
     <!-- ══ N41 ══════════════════════════════════════════════════════════════
