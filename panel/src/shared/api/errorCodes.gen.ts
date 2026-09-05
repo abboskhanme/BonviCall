@@ -11,6 +11,7 @@
 /** Every error code the server can emit (server/src/core/errors.py::ErrorCode). */
 export const ERROR_CODES = [
   'agent_has_open_assignment',
+  'apk_rejected',
   'app_error',
   'app_version_unsupported',
   'assignment_overlap',
@@ -49,6 +50,7 @@ export const ERROR_CODES = [
   'refresh_reused',
   'retention_confirmation_required',
   'sales_user_requires_agent',
+  'stranded_count_mismatch',
   'unauthorized',
   'upload_expired',
   'validation_error',

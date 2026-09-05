@@ -129,6 +129,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/download/{version_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Version
+         * @description The APK itself. **Public** (SPEC §4.1 rule 5), rate-limited.
+         *
+         *     The install landing page sends a salesperson's browser here and that
+         *     browser has no session. The binary is a client and holds no secret; the
+         *     enrolment code is the secret, and it guards the page that links here.
+         */
+        get: operations["download_version_api_v1_app_download__version_code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/min-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Min Version
+         * @description Raise or lower the floor, having stated what it costs.
+         *
+         *     409 ``stranded_count_mismatch`` when the number moved since the impact was
+         *     read. That is not pedantry — it is the case where the admin is deciding
+         *     against a picture that is no longer true.
+         */
+        put: operations["set_min_version_api_v1_app_min_version_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/min-version/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Min Version Impact
+         * @description Who a proposed minimum would strand — read this before changing it.
+         *
+         *     Deliberately a ``GET`` with the candidate in the query string, so it can be
+         *     called repeatedly while an admin tries numbers, and so the panel can show
+         *     the cost live beside the input rather than after the fact.
+         */
+        get: operations["min_version_impact_api_v1_app_min_version_impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Versions
+         * @description Every build, newest first. Both variants — they ship in lockstep.
+         */
+        get: operations["list_versions_api_v1_app_versions_get"];
+        put?: never;
+        /**
+         * Upload Version
+         * @description Store a build. **Uploaded is not published** — this reaches nobody yet.
+         *
+         *     ``multipart/form-data`` rather than the JSON everything else uses, because
+         *     the payload is a binary the admin picked in a file dialog. It is the only
+         *     such endpoint in the product.
+         */
+        post: operations["upload_version_api_v1_app_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard Version
+         * @description Take back a build that reached nobody.
+         *
+         *     Unpublished only. A published build stays: it is the distribution record,
+         *     and a phone may be downloading it right now. This exists because an upload
+         *     with a mistyped version code would otherwise hold that code for ever — the
+         *     unique constraint refuses the corrected re-upload.
+         */
+        delete: operations["discard_version_api_v1_app_versions__version_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Version
+         * @description Make it current for its variant. Every phone is offered it from now on.
+         */
+        post: operations["publish_version_api_v1_app_versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assignments": {
         parameters: {
             query?: never;
@@ -1121,6 +1266,64 @@ export interface components {
          * @enum {string}
          */
         AppVariant: "legacy28" | "modern34";
+        /** AppVersionListResponse */
+        AppVersionListResponse: {
+            /** Items */
+            items: components["schemas"]["AppVersionResponse"][];
+            /**
+             * Signing Sha256 Configured
+             * @description Whether a signing fingerprint is configured. False means uploads are accepted without the key check — see docs/APK-SIGNING.md.
+             */
+            signing_sha256_configured: boolean;
+            /** Total */
+            total: number;
+        };
+        /**
+         * AppVersionResponse
+         * @description One build in the distribution record.
+         */
+        AppVersionResponse: {
+            /**
+             * Apk Sha256
+             * @description Computed server-side, never accepted.
+             */
+            apk_sha256: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Current */
+            is_current: boolean;
+            /** Is Mandatory */
+            is_mandatory: boolean;
+            /** Min Api Level */
+            min_api_level: number;
+            /**
+             * Published At
+             * @description NULL means uploaded but not published — reaches nobody.
+             */
+            published_at: string | null;
+            /** Release Notes Uz */
+            release_notes_uz: string | null;
+            /**
+             * Size Bytes
+             * Format: int64
+             */
+            size_bytes: number;
+            variant: components["schemas"]["AppVariant"];
+            /** Version */
+            version: string;
+            /** Version Code */
+            version_code: number;
+        };
         /**
          * AssignmentListResponse
          * @description Full history for a number — this is the timeline the agent page renders.
@@ -1203,7 +1406,7 @@ export interface components {
          *     that "everything that happened" is answerable from one column.
          * @enum {string}
          */
-        AuditAction: "login_succeeded" | "login_failed" | "logout" | "password_changed" | "password_reset" | "user_created" | "user_updated" | "user_deactivated" | "agent_created" | "agent_updated" | "agent_archived" | "agents_imported" | "number_created" | "number_updated" | "assignment_created" | "assignment_closed" | "calls_reattributed" | "enrolment_code_issued" | "enrolment_code_revoked" | "installation_attested" | "installation_revoked" | "installation_rebound" | "command_issued" | "call_note_updated" | "calls_exported" | "audio_play" | "audio_download" | "audio_deleted" | "alert_acknowledged" | "setting_updated" | "retention_changed" | "line_directory_updated" | "supported_model_updated" | "app_version_published" | "service_token_created" | "service_token_revoked" | "export_read";
+        AuditAction: "login_succeeded" | "login_failed" | "logout" | "password_changed" | "password_reset" | "user_created" | "user_updated" | "user_deactivated" | "agent_created" | "agent_updated" | "agent_archived" | "agents_imported" | "number_created" | "number_updated" | "assignment_created" | "assignment_closed" | "calls_reattributed" | "enrolment_code_issued" | "enrolment_code_revoked" | "installation_attested" | "installation_revoked" | "installation_rebound" | "command_issued" | "call_note_updated" | "calls_exported" | "audio_play" | "audio_download" | "audio_deleted" | "alert_acknowledged" | "setting_updated" | "retention_changed" | "line_directory_updated" | "supported_model_updated" | "app_version_uploaded" | "app_version_published" | "service_token_created" | "service_token_revoked" | "export_read";
         /** AuditListResponse */
         AuditListResponse: {
             /** Items */
@@ -1245,6 +1448,32 @@ export interface components {
             object_type: string;
             /** User Agent */
             user_agent: string | null;
+        };
+        /** Body_upload_version_api_v1_app_versions_post */
+        Body_upload_version_api_v1_app_versions_post: {
+            /**
+             * Apk
+             * Format: binary
+             * @description The signed APK.
+             */
+            apk: string;
+            /**
+             * Is Mandatory
+             * @default false
+             */
+            is_mandatory: boolean;
+            /**
+             * Min Api Level
+             * @default 26
+             */
+            min_api_level: number;
+            /** Release Notes Uz */
+            release_notes_uz?: string | null;
+            variant: components["schemas"]["AppVariant"];
+            /** Version */
+            version: string;
+            /** Version Code */
+            version_code: number;
         };
         /**
          * CallAudioSummary
@@ -2579,6 +2808,30 @@ export interface components {
             status: components["schemas"]["InstallationStatus"];
         };
         /**
+         * SetMinimumVersionRequest
+         * @description ``PUT /api/v1/app/min-version``.
+         *
+         *     ``acknowledged_stranded`` must equal the count the impact endpoint returns
+         *     right now. Not ceremony: it fails exactly when the number moved between
+         *     looking and deciding, which is when the admin's picture is stale.
+         */
+        SetMinimumVersionRequest: {
+            /**
+             * Acknowledged Stranded
+             * @description The stranded count you just saw. Must still be true.
+             */
+            acknowledged_stranded: number;
+            /** Version Code */
+            version_code: number;
+        };
+        /** SetMinimumVersionResponse */
+        SetMinimumVersionResponse: {
+            /** Stranded Count */
+            stranded_count: number;
+            /** Version Code */
+            version_code: number;
+        };
+        /**
          * SetPasswordRequest
          * @description ``POST /api/v1/users/{id}/password`` — an admin resetting somebody else's.
          */
@@ -2666,6 +2919,28 @@ export interface components {
             projected_bytes_12m: number;
         };
         /**
+         * StrandedInstallationOut
+         * @description One phone a proposed minimum version would refuse.
+         */
+        StrandedInstallationOut: {
+            /** Agent Name */
+            agent_name: string;
+            /** App Version */
+            app_version: string | null;
+            /** App Version Code */
+            app_version_code: number | null;
+            /** Device */
+            device: string;
+            /**
+             * Installation Id
+             * Format: uuid
+             */
+            installation_id: string;
+            /** Last Heartbeat At */
+            last_heartbeat_at: string | null;
+            status: components["schemas"]["InstallationStatus"];
+        };
+        /**
          * UpdateAgentRequest
          * @description ``PATCH /api/v1/agents/{id}``. Absent fields are unchanged.
          */
@@ -2739,6 +3014,23 @@ export interface components {
             role?: components["schemas"]["UserRole"] | null;
         };
         /**
+         * UploadReleaseResponse
+         * @description What the upload found in the file, alongside the row it created.
+         */
+        UploadReleaseResponse: {
+            /**
+             * Signer Sha256
+             * @description SHA-256 of the signing certificate, read from the APK's v2/v3 signing block. Compare it against docs/APK-SIGNING.md by eye if no fingerprint is configured yet — a build signed by another key cannot be installed as an update, only as an uninstall that destroys the phone's unsent queue.
+             */
+            signer_sha256: string;
+            /**
+             * Signer Verified
+             * @description True when it was checked against the configured fingerprint.
+             */
+            signer_verified: boolean;
+            version: components["schemas"]["AppVersionResponse"];
+        };
+        /**
          * UserListResponse
          * @description A page of accounts. Small table, so no cursor: the panel shows them all.
          */
@@ -2806,6 +3098,33 @@ export interface components {
          * @enum {string}
          */
         VerificationMethod: "sim_msisdn" | "callback" | "admin_attested";
+        /**
+         * VersionGateImpactResponse
+         * @description What raising the floor would cost, **before** it is raised (N34, UC-28).
+         *
+         *     These are personally owned handsets. A stranded phone drains its queue,
+         *     is then refused, and stays refused until somebody physically reaches that
+         *     salesperson — so this is not a preview of a config change, it is the cost
+         *     of a decision, and the panel shows it before the button.
+         */
+        VersionGateImpactResponse: {
+            /** Current Min Version Code */
+            current_min_version_code: number;
+            /** Stranded */
+            stranded: components["schemas"]["StrandedInstallationOut"][];
+            /** Stranded Count */
+            stranded_count: number;
+            /**
+             * Unknown Version Count
+             * @description Active phones that have never reported a version code. The gate lets these through, so they are not counted as stranded — but each one might be below the floor and we cannot say.
+             */
+            unknown_version_count: number;
+            /**
+             * Version Code
+             * @description The minimum being considered.
+             */
+            version_code: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -3061,6 +3380,216 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_version_api_v1_app_download__version_code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_code: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_min_version_api_v1_app_min_version_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMinimumVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetMinimumVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    min_version_impact_api_v1_app_min_version_impact_get: {
+        parameters: {
+            query: {
+                version_code: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionGateImpactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_app_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppVersionListResponse"];
+                };
+            };
+        };
+    };
+    upload_version_api_v1_app_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_version_api_v1_app_versions_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadReleaseResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_version_api_v1_app_versions__version_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_version_api_v1_app_versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppVersionResponse"];
                 };
             };
             /** @description Validation Error */

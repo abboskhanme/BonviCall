@@ -54,6 +54,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, MessageKey> = {
   app_version_published: 'audit.app_version_published',
   service_token_created: 'audit.service_token_created',
   service_token_revoked: 'audit.service_token_revoked',
+  app_version_uploaded: 'audit.app_version_uploaded',
   export_read: 'audit.export_read',
 }
 

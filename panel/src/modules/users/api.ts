@@ -40,10 +40,13 @@ export type UserQuery = NonNullable<
  *  rule — a rule people cannot follow is a rule they write on a sticky note. */
 export const MIN_PASSWORD_LENGTH = 10
 
-export function useUsers(params: UserQuery): UseQueryResult<UserList> {
+export function useUsers(params: UserQuery, enabled = true): UseQueryResult<UserList> {
   return useQuery({
     queryKey: queryKey('users', 'list', params),
     queryFn: () => api.get<UserList>('/users', { ...params }),
+    // `users:read` is admin-only, so a page that merely wants a name for an
+    // id must be able to ask without provoking a 403 for a manager.
+    enabled,
   })
 }
 
