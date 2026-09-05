@@ -137,6 +137,27 @@ class EnrolmentViewModel @Inject constructor(
                 registeredNumber = display,
                 agentName = agent,
             )
+
+            // Resume where enrolment actually is, not at the beginning.
+            //
+            // An enrolment code is single-use. Restoring the number but not the
+            // step sent a half-enrolled phone back to E1 to re-enter a code the
+            // server had already consumed — an unrecoverable loop, and the
+            // first real handset sat in it. The installation id is the fact
+            // that matters: if one exists, redeem succeeded and this phone is
+            // past E1 whatever happened to the process.
+            //
+            // PERMISSIONS is the safe resume point rather than a remembered
+            // step: E2's checks are live and idempotent, so re-running them
+            // costs a second and re-reads the truth, and E5 reads verification
+            // state from the server rather than from anything held here.
+            if (session.installationId.first() != null &&
+                _state.value.step == EnrolmentStep.CODE
+            ) {
+                timer.finish(EnrolmentStep.CODE)
+                timer.start(EnrolmentStep.PERMISSIONS)
+                _state.value = _state.value.copy(step = EnrolmentStep.PERMISSIONS)
+            }
         }
     }
 
