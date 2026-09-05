@@ -11,11 +11,13 @@ import uz.bonvi.call.capture.transcode.AudioTranscoder
 import uz.bonvi.call.capture.transcode.MediaCodecAudioTranscoder
 import uz.bonvi.call.data.repository.AudioUpload
 import uz.bonvi.call.data.repository.AudioUploader
+import uz.bonvi.call.data.repository.PendingMyCallsGateway
 import uz.bonvi.call.data.repository.RoomCallSessionStore
 import uz.bonvi.call.data.repository.RoomPendingCallStore
+import uz.bonvi.call.domain.MyCallsGateway
 import uz.bonvi.call.domain.PrivacyBoundary
-import uz.bonvi.call.service.PendingCallStore
 import uz.bonvi.call.service.CallSessionStore
+import uz.bonvi.call.service.PendingCallStore
 import javax.inject.Singleton
 
 /**
@@ -47,6 +49,12 @@ abstract class CaptureBindingsModule {
     @Binds
     @Singleton
     abstract fun audioUpload(impl: AudioUploader): AudioUpload
+
+    /** TODO(device-read-api): swap for the Retrofit implementation once
+     *  `GET /api/device/v1/calls` lands — see docs/DEVICE-READ-API.md. */
+    @Binds
+    @Singleton
+    abstract fun myCallsGateway(impl: PendingMyCallsGateway): MyCallsGateway
 
     @Binds
     @Singleton

@@ -5,6 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
+import uz.bonvi.call.data.repository.ServerAddressRepository
 import uz.bonvi.call.domain.SimDirectory
 import uz.bonvi.call.ui.theme.BonviCallTheme
 import javax.inject.Inject
@@ -29,8 +32,11 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var sims: SimDirectory
 
+    @Inject lateinit var serverAddress: ServerAddressRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyDeepLinkServer(intent)
         setContent {
             BonviCallTheme {
                 BonviCallNavHost(
@@ -43,9 +49,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        applyDeepLinkServer(intent)
         // A second scan of the same link while the flow is open must not
         // restart it; the code field simply refills.
         setIntent(intent)
+    }
+
+    /**
+     * `bonvicall://enrol?code=…&server=https://…`
+     *
+     * **The deep link wins.** A code opened from the install link carries the
+     * server it belongs to, and that is the normal path; the field on the
+     * diagnostics screen is for when there is no link — a code read out over
+     * the phone, or a tunnel that moved after enrolment.
+     */
+    private fun applyDeepLinkServer(intent: Intent?) {
+        val server = intent?.data
+            ?.takeIf { it.scheme == DEEP_LINK_SCHEME }
+            ?.getQueryParameter("server")
+            ?: return
+        lifecycleScope.launch { serverAddress.saveFromDeepLink(server) }
     }
 
     private fun codeFrom(intent: Intent?): String? =

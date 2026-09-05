@@ -26,21 +26,10 @@
 
     <!-- Main destinations -->
     <string name="home_title">Bosh sahifa</string>
-    <string name="calls_title">Qo\'ng\'iroqlar</string>
     <string name="diagnostics_title">Ilova holati</string>
     <!-- The server address leads: the first real handset reported "no internet"
          while its browser reached the server fine, and nothing on the device
          could say which address the app was even using. -->
-    <string name="diagnostics_server">Server manzili</string>
-    <string name="diagnostics_test">Aloqani tekshirish</string>
-    <string name="diagnostics_reach_checking">Tekshirilmoqda…</string>
-    <string name="diagnostics_reach_ok">Server javob berdi. Aloqa bor.</string>
-    <string name="diagnostics_reach_failed">Serverga ulanib bo\'lmadi.</string>
-    <string name="diagnostics_version">Ilova versiyasi</string>
-    <string name="diagnostics_enrolled">Ro\'yxatdan o\'tgan</string>
-    <string name="diagnostics_enrolled_yes">Ha</string>
-    <string name="diagnostics_enrolled_no">Yo\'q — kod kiritilmagan</string>
-    <string name="diagnostics_number">Yozib olinadigan raqam</string>
 
 
     <!-- ══ N41 ══════════════════════════════════════════════════════════════
@@ -140,6 +129,62 @@
     <string name="enrol_done_attested">Raqamni administrator tasdiqlagan.</string>
     <string name="enrol_done_diagnostics">Ilova holatini ko\'rish</string>
     <string name="enrol_not_finished">Ro\'yxatdan o\'tish tugamagan — qo\'ng\'iroqlar hali yuborilmaydi.</string>
+
+
+    <!-- Ilova holati (diagnostics). What an admin asks an agent to read out
+         during an assisted install (UC-07), and where N41's transparency lives
+         day to day. -->
+    <string name="diag_capturing">Qo\'ng\'iroqlar qayd etilmoqda</string>
+    <string name="diag_not_capturing">Qayd etilmayapti</string>
+    <string name="diag_queue">Yuborilmagan qo\'ng\'iroqlar: %1$d</string>
+    <string name="diag_queue_parked">Yuborib bo\'lmagan: %1$d</string>
+    <string name="diag_service">Ilova fonda ishlayapti</string>
+    <string name="diag_service_off">Ilova fonda ishlamayapti</string>
+    <string name="diag_app_version">Ilova versiyasi: %1$s</string>
+
+    <!-- Debug builds only: the server address. Never shown in a release
+         build — a field that repoints a salesperson\'s phone is not something
+         that ships. -->
+    <string name="diag_server_title">Server manzili</string>
+    <string name="diag_server_hint">https://…</string>
+    <string name="diag_server_check">Tekshirish</string>
+    <string name="diag_server_save">Saqlash</string>
+    <string name="diag_server_ok">Server javob berdi.</string>
+    <string name="diag_server_unreachable">Bu manzilda server topilmadi. Manzilni tekshiring.</string>
+    <string name="diag_server_not_bonvicall">Bu manzilda boshqa narsa javob berdi (%1$d).</string>
+    <string name="diag_server_bad_url">Manzil noto\'g\'ri. https:// bilan boshlanishi kerak.</string>
+    <string name="diag_server_no_host">Manzilda server nomi yo\'q.</string>
+    <string name="diag_server_saved">Saqlandi.</string>
+
+
+    <!-- The employee's own calls (client request, N41). docs/QOLLANMA.md
+         promises transparency about what is recorded; this is that promise as
+         a screen. The vocabulary matters here more than anywhere: *qayd
+         etilgan* = the call is logged, *yozib olingan* = the audio exists. -->
+    <string name="calls_empty">Hozircha qo\'ng\'iroq yo\'q.</string>
+    <string name="calls_not_available">Bu bo\'lim hali tayyor emas. Qo\'ng\'iroqlaringiz qayd etilmoqda — ularni tez orada shu yerda ko\'rasiz.</string>
+    <string name="calls_offline">Internetga ulanib bo\'lmadi. Ro\'yxatni ko\'rish uchun aloqa kerak.</string>
+    <string name="calls_error">Ro\'yxatni yuklab bo\'lmadi.</string>
+    <string name="calls_incoming">Kiruvchi</string>
+    <string name="calls_outgoing">Chiquvchi</string>
+    <string name="calls_play">Tinglash</string>
+    <string name="calls_duration">%1$d:%2$02d</string>
+    <string name="calls_load_more">Yana ko\'rsatish</string>
+
+    <!-- Why a call has no recording. The call itself is always qayd etilgan;
+         these explain why it is not yozib olingan. Same ten values as the
+         server\'s closed enum (N5) — a call with no audio and no reason would
+         leave the employee to guess, which is the opposite of the point. -->
+    <string name="reason_pending_upload">Yozuv yuborilmoqda</string>
+    <string name="reason_not_expected">Suhbat bo\'lmagan — yozuv kutilmaydi</string>
+    <string name="reason_recording_route_unavailable">Bu telefonda yozib olish imkoni yo\'q</string>
+    <string name="reason_oem_recorder_off">Telefonning o\'z yozuv funksiyasi o\'chirilgan</string>
+    <string name="reason_no_permission">Mikrofon ruxsati berilmagan</string>
+    <string name="reason_capture_returned_silence">Yozuv bo\'sh chiqdi</string>
+    <string name="reason_app_not_running">Qo\'ng\'iroq paytida ilova ishlamayotgan edi</string>
+    <string name="reason_upload_expired">Yuborish muddati o\'tib ketdi</string>
+    <string name="reason_queue_space_exhausted">Telefon xotirasi to\'lgan edi</string>
+    <string name="reason_attribution_failed">Yozuv bu qo\'ng\'iroqqa mos kelmadi</string>
 
     <string name="common_not_ready">Bu ekran hali tayyor emas.</string>
 </resources>

@@ -8,7 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import uz.bonvi.call.enrolment.EnrolmentViewModel
-import uz.bonvi.call.ui.calls.CallsScreen
+import uz.bonvi.call.ui.calls.MyCallsScreen
 import uz.bonvi.call.ui.diagnostics.DiagnosticsScreen
 import uz.bonvi.call.ui.enrolment.EnrolCodeScreen
 import uz.bonvi.call.ui.enrolment.EnrolDoneScreen
@@ -129,7 +129,7 @@ fun BonviCallNavHost(
         }
 
         composable(Routes.HOME) { HomeScreen() }
-        composable(Routes.CALLS) { CallsScreen() }
+        composable(Routes.CALLS) { MyCallsScreen() }
         composable(Routes.DIAGNOSTICS) { DiagnosticsScreen() }
     }
 }

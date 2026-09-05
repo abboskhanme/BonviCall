@@ -2,116 +2,196 @@ package uz.bonvi.call.ui.diagnostics
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import uz.bonvi.call.diagnostics.DiagnosticsViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import uz.bonvi.call.R
+import uz.bonvi.call.data.repository.ServerAddressRepository
+import uz.bonvi.call.domain.ServerAddress
+import uz.bonvi.call.ui.enrolment.NumberBanner
+import uz.bonvi.call.ui.enrolment.collectAsStateWithLifecycleCompat
 
 /**
- * Queue depth, last contact, capability states, capture route — this is what an
- * admin asks the employee to read out during an assisted install (UC-07).
+ * "Ilova holati" (UC-07, N41).
  *
- * The **server address** leads, and it leads for a reason learned on the first
- * real handset: the app said "no internet" while the phone's browser reached
- * the server without trouble. Nothing on the device could answer "which server
- * are you even asking?", so a one-line configuration mistake looked like a
- * network fault. Any device that cannot state what it is talking to costs
- * somebody an afternoon.
+ * The screen an admin asks an agent to read out during an assisted install, and
+ * the one `docs/QOLLANMA.md` sends them to. It leads with the N41 banner —
+ * which number is recorded — because that is the question the employee has,
+ * and only then answers the one the admin has.
+ *
+ * The server-address section is **debug builds only**. It is not merely
+ * hidden: `SessionStore.saveBaseUrl` refuses a manual write in a release build,
+ * so a screen that somehow rendered it could still not repoint the phone.
+ * Hiding a control is not access control.
  */
 @Composable
 fun DiagnosticsScreen(viewModel: DiagnosticsViewModel = hiltViewModel()) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) { viewModel.refresh() }
+    val state by viewModel.state.collectAsStateWithLifecycleCompat()
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.diagnostics_title),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
-            Row(stringResource(R.string.diagnostics_server), state.baseUrl)
-
-            when (state.reach) {
-                DiagnosticsViewModel.Reach.OK ->
-                    Text(
-                        text = stringResource(R.string.diagnostics_reach_ok),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                DiagnosticsViewModel.Reach.FAILED ->
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = stringResource(R.string.diagnostics_reach_failed),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        // The raw exception, deliberately. "Connection failed"
-                        // sends nobody anywhere; the class name distinguishes a
-                        // cleartext policy from an unreachable host, and those
-                        // have different fixes.
-                        state.reachDetail?.let {
-                            Text(text = it, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                DiagnosticsViewModel.Reach.CHECKING ->
-                    Text(
-                        text = stringResource(R.string.diagnostics_reach_checking),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                DiagnosticsViewModel.Reach.UNKNOWN -> Unit
-            }
-
-            Button(
-                onClick = viewModel::testConnection,
-                enabled = state.reach != DiagnosticsViewModel.Reach.CHECKING,
-                modifier = Modifier.fillMaxWidth(),
+        Column(modifier = Modifier.fillMaxSize()) {
+            NumberBanner(state.registeredNumber)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.diagnostics_test))
-            }
+                Text(
+                    text = stringResource(R.string.diagnostics_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
 
-            HorizontalDivider()
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (state.capturing) R.string.diag_capturing
+                                else R.string.diag_not_capturing,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(
+                                if (state.serviceRunning) R.string.diag_service
+                                else R.string.diag_service_off,
+                            ),
+                        )
+                        // Records, not bytes: the person reading this out loud
+                        // needs a number they can say.
+                        Text(stringResource(R.string.diag_queue, state.pending))
+                        if (state.parked > 0) {
+                            Text(
+                                text = stringResource(R.string.diag_queue_parked, state.parked),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        Text(stringResource(R.string.diag_app_version, state.appVersion))
+                        Text(state.variant)
+                    }
+                }
 
-            Row(stringResource(R.string.diagnostics_version), "${state.appVersion} · ${state.variant}")
-            Row(
-                stringResource(R.string.diagnostics_enrolled),
-                stringResource(
-                    if (state.enrolled) R.string.diagnostics_enrolled_yes
-                    else R.string.diagnostics_enrolled_no,
-                ),
-            )
-            state.registeredNumber?.let {
-                Row(stringResource(R.string.diagnostics_number), it)
+                if (state.serverEditable) ServerAddressSection(state, viewModel)
             }
         }
     }
 }
 
+/**
+ * Debug only. A free tunnel gets a new hostname every restart, and baking the
+ * address into the APK turned a five-second problem into a rebuild, a file
+ * transfer and a reinstall.
+ *
+ * **Check before save**, and save is disabled until the check passes: an
+ * unreachable address saved is a phone pointed at nothing, and every failure
+ * after that reads as "no internet".
+ */
 @Composable
-private fun Row(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
-        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+private fun ServerAddressSection(
+    state: DiagnosticsViewModel.UiState,
+    viewModel: DiagnosticsViewModel,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.diag_server_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            OutlinedTextField(
+                value = state.serverAddress,
+                onValueChange = viewModel::onServerAddressChanged,
+                placeholder = { Text(stringResource(R.string.diag_server_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Done,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            state.serverCheck?.let { result ->
+                val (textRes, isError) = when (result) {
+                    is ServerAddressRepository.CheckResult.Reachable ->
+                        R.string.diag_server_ok to false
+
+                    is ServerAddressRepository.CheckResult.Unreachable ->
+                        R.string.diag_server_unreachable to true
+
+                    is ServerAddressRepository.CheckResult.NotBonviCall ->
+                        R.string.diag_server_not_bonvicall to true
+
+                    is ServerAddressRepository.CheckResult.Invalid -> when (result.reason) {
+                        ServerAddress.Validation.Reason.NO_HOST ->
+                            R.string.diag_server_no_host to true
+
+                        else -> R.string.diag_server_bad_url to true
+                    }
+                }
+                Text(
+                    text = if (result is ServerAddressRepository.CheckResult.NotBonviCall) {
+                        stringResource(textRes, result.status)
+                    } else {
+                        stringResource(textRes)
+                    },
+                    color = if (isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+
+            // The exception class, verbatim. A developer reading this over the
+            // phone needs the word the network used, not a paraphrase of it.
+            state.serverCheckDetail?.let {
+                Text(text = it, style = MaterialTheme.typography.bodySmall)
+            }
+
+            if (state.serverSaved) Text(stringResource(R.string.diag_server_saved))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.checking) {
+                    CircularProgressIndicator()
+                } else {
+                    Button(onClick = viewModel::onCheckServer) {
+                        Text(stringResource(R.string.diag_server_check))
+                    }
+                }
+                Button(
+                    onClick = viewModel::onSaveServer,
+                    // Save only after the address has actually answered.
+                    enabled = viewModel.canSave(),
+                ) {
+                    Text(stringResource(R.string.diag_server_save))
+                }
+            }
+        }
     }
 }

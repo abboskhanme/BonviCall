@@ -17,6 +17,7 @@ import uz.bonvi.call.data.remote.LocalDateAdapter
 import uz.bonvi.call.data.remote.UuidAdapter
 import uz.bonvi.call.data.remote.TokenAuthenticator
 import uz.bonvi.call.data.remote.api.AppUpdateApi
+import uz.bonvi.call.data.remote.api.ServerReachabilityApi
 import uz.bonvi.call.data.remote.api.DeviceAudioApi
 import uz.bonvi.call.data.remote.api.DeviceAuthApi
 import uz.bonvi.call.data.remote.api.DeviceCallsApi
@@ -107,6 +108,23 @@ object NetworkModule {
     @Provides
     @Singleton
     fun appUpdateApi(retrofit: Retrofit): AppUpdateApi = retrofit.create(AppUpdateApi::class.java)
+
+    /**
+     * Built on a BARE OkHttp client, not the shared one.
+     *
+     * The shared client carries the base-URL interceptor, which would rewrite
+     * the very address this is trying to test, and the auth interceptor, which
+     * would attach a token to a server that has no idea who we are. Testing an
+     * address has to reach exactly the address typed.
+     */
+    @Provides
+    @Singleton
+    fun reachabilityApi(moshi: Moshi): ServerReachabilityApi = Retrofit.Builder()
+        .baseUrl(SessionStore.DEFAULT_BASE_URL)
+        .client(OkHttpClient.Builder().build())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+        .create(ServerReachabilityApi::class.java)
 
     /** Path versioning, never a header (CONVENTIONS.md §4.1). */
     const val DEVICE_API_PREFIX = "/api/device/v1/"

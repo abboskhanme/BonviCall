@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
+import uz.bonvi.call.BuildConfig
+import uz.bonvi.call.domain.ServerAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -81,7 +84,36 @@ class SessionStore @Inject constructor(
         it[KEY_SUBSCRIPTION_ID] = subscriptionId
     }
 
-    suspend fun saveBaseUrl(url: String) = edit { it[KEY_BASE_URL] = url }
+    /**
+     * Point this installation at a server.
+     *
+     * ⚠️ **Refused in a release build.** The guard is here rather than only in
+     * the screen that offers it: hiding a control is not access control — the
+     * same mistake as a nav menu without a route gate — and what a repointed
+     * handset would send elsewhere is every call the employee makes.
+     *
+     * @return true when the address was written.
+     */
+    suspend fun saveBaseUrl(url: String, source: ServerAddress.Source): Boolean {
+        if (source == ServerAddress.Source.MANUAL && !BuildConfig.DEBUG) {
+            Timber.w("Refusing a manual server address in a release build")
+            return false
+        }
+        return when (val validation = ServerAddress.validate(url)) {
+            is ServerAddress.Validation.Invalid -> {
+                Timber.w("Refusing an invalid server address: %s", validation.reason)
+                false
+            }
+
+            is ServerAddress.Validation.Valid -> {
+                edit { it[KEY_BASE_URL] = validation.normalised }
+                true
+            }
+        }
+    }
+
+    /** Whether the address may be typed in on this build. Debug only. */
+    val serverAddressEditable: Boolean get() = BuildConfig.DEBUG
 
     /**
      * Why the device can or cannot send (T79/N25, T83/N34).
