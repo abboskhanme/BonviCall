@@ -4,7 +4,8 @@
 
 .PHONY: up down logs logs-backend logs-panel psql test test-server test-panel \
         lint migrate migrate-check migration contract types shell-backend build \
-        android-build android-test android-lint android-dto
+        android-build android-test android-lint android-dto \
+        android-install android-release
 
 up:                ## Bring the stack up with hot reload
 	docker compose up -d
@@ -28,6 +29,27 @@ logs-panel:
 
 logs-worker:
 	docker compose logs -f worker
+
+# T102. A throwaway database, created and dropped here, so verifying the head
+# never involves typing `downgrade` at the development one. `-x db_url` is the
+# ONLY way to point alembic somewhere else — POSTGRES_DB does not, because
+# DATABASE_URL is one whole string, and that misreading emptied the dev
+# database once already (migrations/env.py now refuses it).
+migrate-head-check: ## Verify a clean database reaches head, on a scratch copy
+	@set -e; \
+	url=$$(grep '^DATABASE_URL=' .env | cut -d= -f2- | sed 's#/[^/]*$$#/bonvicall_headcheck#'); \
+	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} -d postgres -q \
+		-c "DROP DATABASE IF EXISTS bonvicall_headcheck;" \
+		-c "CREATE DATABASE bonvicall_headcheck;"; \
+	docker compose run --rm backend alembic -x db_url="$$url" upgrade head; \
+	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} \
+		-d bonvicall_headcheck -qtA \
+		-c "SELECT 'tables: '||count(*) FROM information_schema.tables WHERE table_schema='public';" \
+		-c "SELECT 'settings: '||count(*) FROM app_settings;"; \
+	docker compose run --rm backend alembic -x db_url="$$url" downgrade base; \
+	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} -d postgres -q \
+		-c "DROP DATABASE bonvicall_headcheck;"; \
+	echo "head reached from empty, downgrade clean, scratch database removed"
 
 job:               ## make job n=silence_detection — run one job once, now
 	docker compose run --rm backend python -m src.worker --once $(n)
@@ -95,6 +117,16 @@ android-test:
 android-lint:
 	cd android && ./gradlew lint
 
+# Install the debug APK on a connected handset. Set bonvicall.devHost in
+# android/local.properties first — see docs/ON-DEVICE-TESTING.md.
+android-install:
+	cd android && ./gradlew installLegacy28Debug
+
+# A signed release. Needs android/keystore.properties; without it the same
+# command produces -unsigned.apk rather than failing (docs/APK-SIGNING.md).
+android-release:
+	cd android && ./gradlew assembleLegacy28Release assembleModern34Release
+
 # Kotlin DTOs are GENERATED from the device contract, never hand-written
 # (CONVENTIONS.md §1, CONVENTIONS-CLIENT.md §5). A renamed field must be a
 # compile error on 15 phones we cannot force-update, not a runtime null.
@@ -108,10 +140,6 @@ android-dto:
 	  -g kotlin -o /out \
 	  --global-property models,modelDocs=false,modelTests=false \
 	  --additional-properties=packageName=uz.bonvi.call.data.remote.dto,modelPackage=uz.bonvi.call.data.remote.dto,serializationLibrary=moshi,enumPropertyNaming=UPPERCASE,sourceFolder=.
-	@# Stopgap: the contract declares 64-bit fields as formatless integers,
-	@# which generate as 32-bit kotlin.Int. See the script's docstring; it
-	@# deletes itself once the server emits format: int64.
-	python3 android/scripts/widen_int64.py
 
 shell-backend:
 	docker compose exec backend bash

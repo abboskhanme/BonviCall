@@ -24,6 +24,7 @@ from src.core.enums import (
     CallType,
     CaptureRoute,
 )
+from src.core.wire import Int64
 
 #: Ours -> BonviZvonki's vocabulary, mapped in exactly one place (SPEC §3.1).
 BONVIZVONKI_DIRECTION = {
@@ -41,7 +42,7 @@ class ExportCallOut(BaseModel):
     """One call, in the shape release 2 consumes."""
 
     id: uuid.UUID
-    seq: int = Field(description="The cursor. Monotonic, server-assigned.")
+    seq: Int64 = Field(description="The cursor. Monotonic, server-assigned.")
     agent: ExportAgentOut
     agent_number_e164: str
     agent_number_key: str = Field(description="Last 9 digits — their join key too (N37).")
@@ -74,7 +75,7 @@ class ExportCallsResponse(BaseModel):
     """``seq ASC`` with a settling window, so two full passes agree (UC-29)."""
 
     items: list[ExportCallOut]
-    next_since: int
+    next_since: Int64
     count: int
 
 

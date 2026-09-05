@@ -16,6 +16,7 @@ from src.core.enums import (
     VerificationMethod,
     VerificationState,
 )
+from src.core.wire import Int64
 
 
 class IssueCodeRequest(BaseModel):
@@ -97,7 +98,7 @@ class DeviceRedeemIn(BaseModel):
     device: DeviceInfoIn
     app: AppInfoIn
     device_fingerprint: str = Field(min_length=64, max_length=64)
-    device_epoch_ms: int
+    device_epoch_ms: Int64
     device_timezone: str = Field(max_length=64)
     sim_subscription_id: int | None = None
     sim_slot: int | None = Field(default=None, ge=0, le=8)
@@ -248,7 +249,7 @@ class CallbackEventIn(BaseModel):
         default=False,
         description="False means the operator suppressed the number — that is R19.",
     )
-    receiver_epoch_ms: int | None = None
+    receiver_epoch_ms: Int64 | None = None
     heartbeat: bool = Field(default=False, description="True for a keepalive with no call.")
 
 

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TEMPLATE. `__DEV_HOST__` is replaced at build time by the value of
+  `bonvicall.devHost` (see app/build.gradle.kts). This file is what is tracked;
+  the substituted copy lands in build/ and is never committed, so nobody's home
+  IP address ends up in the repository and nobody has to edit a tracked file to
+  test on their own network.
+
+  DEBUG BUILDS ONLY. `src/debug/` is not part of any release artefact —
+  `assembleRelease` never sees it.
+
+  N22 and CONVENTIONS-CLIENT.md §9 say cleartext is disabled and certificate
+  errors are never bypassed. This narrows that rule rather than lifting it:
+
+    • the BASE config still refuses cleartext, so an accidental http:// call to
+      anything not named below still fails;
+    • cleartext is permitted to NAMED HOSTS ONLY — the emulator's loopback and
+      one LAN address a developer sets locally;
+    • no <trust-anchors> entry for user-installed certificates in ANY build
+      type. That is the part that actually matters: a handset with a corporate
+      or malware root must not be able to read the audio of every call the fleet
+      makes, and a debug build that trusts user CAs is how a developer's proxy
+      becomes a habit.
+
+  `cleartextTrafficPermitted="true"` on <base-config> is forbidden, and
+  ManifestPermissionsTest fails the build if it appears here.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- The host machine as seen from the Android emulator. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <!-- The developer's LAN address, substituted at build time. -->
+        <domain includeSubdomains="false">__DEV_HOST__</domain>
+    </domain-config>
+</network-security-config>

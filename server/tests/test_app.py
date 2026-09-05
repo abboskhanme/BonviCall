@@ -253,3 +253,40 @@ def test_the_phone_vector_file_is_shared_with_the_android_suite() -> None:
     path = Path(CONTRACT_DIR) / "phone-vectors.json"
     vectors = json.loads(path.read_text(encoding="utf-8"))
     assert vectors["phone_key_digits"] == 9
+
+
+def test_every_router_module_is_registered() -> None:
+    """T101: a router file that nobody includes is an endpoint that does not exist.
+
+    The harness above can only check routes that are *registered*, so it is
+    blind by construction to a module someone wrote and forgot to wire — which
+    is not hypothetical: ``api/device/ws.py`` sat finished and unreachable while
+    its own tests passed, because they mounted it themselves.
+
+    Walks the filesystem rather than a list, so adding a router and forgetting
+    the ``include_router`` line fails here instead of in a demo.
+    """
+    import importlib
+
+    api_dir = Path(__file__).resolve().parents[1] / "src" / "api"
+    app = create_app()
+    registered = {route.path for route in _protected_routes(app)}
+
+    missing: list[str] = []
+    for surface in ("device", "panel", "service"):
+        for path in sorted((api_dir / surface).glob("*.py")):
+            if path.stem in ("__init__", "deps"):
+                continue
+            module = importlib.import_module(f"src.api.{surface}.{path.stem}")
+            router = getattr(module, "router", None)
+            if router is None:
+                continue
+            for route in router.routes:
+                # The module's own path, before the surface prefix is applied.
+                if not any(known.endswith(route.path) for known in registered):
+                    missing.append(f"src/api/{surface}/{path.stem}.py:{route.path}")
+
+    assert missing == [], (
+        f"these routers exist but nothing includes them: {missing}. Add the "
+        f"include_router line to src/api/<surface>/__init__.py."
+    )

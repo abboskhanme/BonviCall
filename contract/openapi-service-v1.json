@@ -87,6 +87,7 @@
           "receiver_epoch_ms": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -363,6 +364,7 @@
           },
           "seq": {
             "description": "The cursor. Monotonic, server-assigned.",
+            "format": "int64",
             "title": "Seq",
             "type": "integer"
           },
@@ -416,6 +418,7 @@
             "type": "array"
           },
           "next_since": {
+            "format": "int64",
             "title": "Next Since",
             "type": "integer"
           }

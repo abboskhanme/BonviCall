@@ -16,7 +16,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from src.api import DEVICE_API_PREFIX
-from src.api.device import audio, auth, calls, commands, enrolment, telemetry
+from src.api.device import audio, auth, calls, commands, enrolment, telemetry, ws
 
 router = APIRouter(prefix=DEVICE_API_PREFIX)
 router.include_router(enrolment.router)
@@ -25,3 +25,8 @@ router.include_router(calls.router)
 router.include_router(telemetry.router)
 router.include_router(audio.router)
 router.include_router(commands.router)
+# The realtime socket (SPEC §4.6). No prefix of its own: it is one path,
+# and ``/ws`` under a ``/commands`` prefix would say it carries only
+# commands, which is already untrue — it carries presence and the ping
+# clock too.
+router.include_router(ws.router)

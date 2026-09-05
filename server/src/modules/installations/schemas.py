@@ -13,6 +13,7 @@ from src.core.enums import (
     InstallationStatus,
     VerificationMethod,
 )
+from src.core.wire import Int64
 
 
 class InstallationResponse(BaseModel):
@@ -33,7 +34,7 @@ class InstallationResponse(BaseModel):
     revoked_at: datetime | None
     revoke_confirmed_at: datetime | None
     revoke_pending_records: int | None
-    revoke_pending_bytes: int | None
+    revoke_pending_bytes: Int64 | None
     app_version: str | None
     app_variant: AppVariant | None
     sim_subscription_id: int | None
@@ -77,5 +78,5 @@ class RevokeResponse(BaseModel):
     status: InstallationStatus
     revoked_at: datetime
     pending_records: int | None
-    pending_bytes: int | None
+    pending_bytes: Int64 | None
     confirmed: bool

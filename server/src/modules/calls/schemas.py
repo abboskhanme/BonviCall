@@ -25,6 +25,7 @@ from src.core.enums import (
     CallType,
     CaptureRoute,
 )
+from src.core.wire import Int64
 from src.modules.calls.rules import is_valid_combination
 
 #: SPEC §4.0: a call batch is 50 items or 256 KiB, whichever comes first.
@@ -82,7 +83,7 @@ class DeviceCallIn(BaseModel):
     command_id: uuid.UUID | None = Field(
         default=None, description="Set when this call answered a click-to-call command."
     )
-    device_epoch_ms: int = Field(
+    device_epoch_ms: Int64 = Field(
         description="System.currentTimeMillis() at call start — raw evidence for skew."
     )
     device_timezone: str = Field(max_length=64, description="IANA name.")
@@ -200,7 +201,7 @@ class CallResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    seq: int
+    seq: Int64
     agent_id: uuid.UUID
     number_id: uuid.UUID
     installation_id: uuid.UUID

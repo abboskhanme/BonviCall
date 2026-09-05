@@ -989,6 +989,7 @@
             "title": "Ring Sec"
           },
           "seq": {
+            "format": "int64",
             "title": "Seq",
             "type": "integer"
           },
@@ -1694,6 +1695,7 @@
       "DataUsageResponse": {
         "properties": {
           "cap_bytes_month": {
+            "format": "int64",
             "title": "Cap Bytes Month",
             "type": "integer"
           },
@@ -1725,10 +1727,12 @@
             "type": "string"
           },
           "cap_bytes_month": {
+            "format": "int64",
             "title": "Cap Bytes Month",
             "type": "integer"
           },
           "cellular_bytes_month": {
+            "format": "int64",
             "title": "Cellular Bytes Month",
             "type": "integer"
           },
@@ -1747,6 +1751,7 @@
             "type": "integer"
           },
           "wifi_bytes_month": {
+            "format": "int64",
             "title": "Wifi Bytes Month",
             "type": "integer"
           }
@@ -1875,6 +1880,7 @@
           "cellular_bytes_month": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -1908,6 +1914,7 @@
           "free_storage_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -2020,6 +2027,7 @@
           "queue_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -2264,6 +2272,7 @@
           "cellular_bytes_month": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -2297,6 +2306,7 @@
           "free_storage_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -2409,6 +2419,7 @@
           "queue_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -3378,6 +3389,7 @@
           "revoke_pending_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -3872,6 +3884,7 @@
           "pending_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "type": "integer"
               },
               {
@@ -4004,6 +4017,7 @@
         "description": "One day of the growth curve.",
         "properties": {
           "audio_bytes_total": {
+            "format": "int64",
             "title": "Audio Bytes Total",
             "type": "integer"
           },
@@ -4012,10 +4026,12 @@
             "type": "integer"
           },
           "bytes_added": {
+            "format": "int64",
             "title": "Bytes Added",
             "type": "integer"
           },
           "bytes_deleted": {
+            "format": "int64",
             "title": "Bytes Deleted",
             "type": "integer"
           },
@@ -4039,6 +4055,7 @@
         "description": "N18: current usage, 30-day growth, and the projection it implies.",
         "properties": {
           "audio_bytes_total": {
+            "format": "int64",
             "title": "Audio Bytes Total",
             "type": "integer"
           },
@@ -4047,6 +4064,7 @@
             "type": "integer"
           },
           "bytes_added_30d": {
+            "format": "int64",
             "title": "Bytes Added 30D",
             "type": "integer"
           },
@@ -4059,6 +4077,7 @@
           },
           "projected_bytes_12m": {
             "description": "Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.",
+            "format": "int64",
             "title": "Projected Bytes 12M",
             "type": "integer"
           }

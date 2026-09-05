@@ -1,9 +1,89 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.hilt)
 }
+
+/**
+ * The LAN address of a developer's machine, for testing on a real handset.
+ *
+ * Set it in `local.properties` (gitignored) as
+ * `bonvicall.devHost=192.168.1.23`, or pass `-Pbonvicall.devHost=…`. It is
+ * substituted into the DEBUG network security config only; a release build
+ * never sees it. Unset, it falls back to the emulator loopback, so the default
+ * behaviour is unchanged and nobody's home IP is ever committed.
+ */
+val devHost: String? = (project.findProperty("bonvicall.devHost") as String?)
+    ?: runCatching {
+        Properties().apply {
+            rootProject.file("local.properties").inputStream().use(::load)
+        }.getProperty("bonvicall.devHost")
+    }.getOrNull()
+
+/**
+ * Substitutes `__DEV_HOST__` into the debug network security config.
+ *
+ * The TEMPLATE lives outside `res/` on purpose — a tracked copy inside `res/`
+ * plus a generated one would be a duplicate-resource error. A developer testing
+ * on a real phone changes one line in `local.properties` instead of editing a
+ * tracked file, which is how somebody else's IP gets committed and how a
+ * "temporary" wildcard gets added.
+ */
+val generateDebugNetworkConfig by tasks.registering {
+    val template = layout.projectDirectory.file("src/debug/network_security_config.template.xml")
+    val output = layout.buildDirectory.file("generated/res/devhost/xml/network_security_config.xml")
+    inputs.file(template)
+    inputs.property("devHost", devHost ?: "")
+    outputs.file(output)
+
+    doLast {
+        // Already covered by the static entries. Emitting the placeholder line
+        // anyway would produce a duplicate <domain>, which lint rejects as
+        // fatal — correctly, since a duplicated host is a config nobody has
+        // read.
+        val alreadyListed = setOf("10.0.2.2", "127.0.0.1", "localhost")
+        val host = devHost?.trim()?.takeIf { it.isNotEmpty() && it !in alreadyListed }
+
+        val rendered = template.asFile.readLines()
+            .mapNotNull { line ->
+                when {
+                    !line.contains("__DEV_HOST__") -> line
+                    host != null -> line.replace("__DEV_HOST__", host)
+                    // No LAN host configured: drop the line entirely rather
+                    // than shipping a placeholder as a domain name.
+                    else -> null
+                }
+            }
+            .joinToString("\n", postfix = "\n")
+
+        output.get().asFile.apply { parentFile.mkdirs() }.writeText(rendered)
+    }
+}
+
+/**
+ * The release signing keystore.
+ *
+ * ⚠️ **Losing this key means no device can ever be updated again.** Android
+ * refuses to install an update signed by a different key, and with no Play
+ * Store to re-publish through (N33) the only remedy is uninstall-and-reinstall
+ * on every handset in the fleet — which destroys the local queue on each one.
+ * `docs/APK-SIGNING.md` is the backup procedure and it is part of T81, not an
+ * afterthought.
+ *
+ * Credentials come from `keystore.properties` (gitignored) or the environment,
+ * never from this file. An unsigned release still builds, so CI and a
+ * developer without the key are not blocked — `signingConfig` is simply absent
+ * and `assembleRelease` produces `-unsigned.apk`.
+ */
+val keystoreProperties: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.isFile }
+    ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
+
+fun secret(key: String, env: String): String? =
+    keystoreProperties?.getProperty(key) ?: System.getenv(env)
 
 android {
     namespace = "uz.bonvi.call"
@@ -53,8 +133,40 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("debug") {
+            res.srcDir(layout.buildDirectory.dir("generated/res/devhost"))
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val storePath = secret("storeFile", "BONVICALL_KEYSTORE")
+            if (storePath != null) {
+                storeFile = rootProject.file(storePath)
+                storePassword = secret("storePassword", "BONVICALL_KEYSTORE_PASSWORD")
+                keyAlias = secret("keyAlias", "BONVICALL_KEY_ALIAS") ?: "bonvicall"
+                keyPassword = secret("keyPassword", "BONVICALL_KEY_PASSWORD")
+
+                // v2 and v3 as well as v1. The APK is side-loaded onto API
+                // 26–34; v1 alone is rejected from API 30, and v2+ is what
+                // makes the install fast enough not to look broken during
+                // N40's fifteen minutes.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Absent when there is no keystore, which yields -unsigned.apk
+            // rather than a build failure: CI and a developer without the key
+            // must still be able to prove the release variant compiles.
+            signingConfig = signingConfigs.getByName("release")
+                .takeIf { it.storeFile != null }
+
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -112,6 +224,12 @@ android {
         lintConfig = file("lint.xml")
     }
 }
+
+// The substituted file has to exist before ANY task that scans the debug
+// resource directories — AGP has several (mapSourceSetPaths, mergeResources,
+// packageResources) and naming them individually is a list that goes stale.
+// preBuild runs before all of them.
+tasks.named("preBuild") { dependsOn(generateDebugNetworkConfig) }
 
 kapt {
     correctErrorTypes = true

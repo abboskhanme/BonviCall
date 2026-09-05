@@ -83,6 +83,26 @@ class SessionStore @Inject constructor(
 
     suspend fun saveBaseUrl(url: String) = edit { it[KEY_BASE_URL] = url }
 
+    /**
+     * Why the device can or cannot send (T79/N25, T83/N34).
+     *
+     * Writing this NEVER touches the queue. There is no state in which the
+     * client throws captured calls away — that is the whole point of N25, and
+     * the reason the state and the queue live in different stores.
+     */
+    suspend fun saveAuthState(state: String) = edit { it[KEY_AUTH_STATE] = state }
+
+    fun authStateSnapshot(): uz.bonvi.call.domain.DeviceAuthState =
+        uz.bonvi.call.domain.DeviceAuthState.entries
+            .firstOrNull { it.wire == snapshot.authState }
+            ?: uz.bonvi.call.domain.DeviceAuthState.ACTIVE
+
+    val authState: Flow<uz.bonvi.call.domain.DeviceAuthState> = store.data.map { prefs ->
+        uz.bonvi.call.domain.DeviceAuthState.entries
+            .firstOrNull { it.wire == prefs[KEY_AUTH_STATE] }
+            ?: uz.bonvi.call.domain.DeviceAuthState.ACTIVE
+    }
+
     /** UC-08. Revocation leaves nothing behind that could re-bind. */
     suspend fun clear() = edit { it.clear() }
 
@@ -112,6 +132,10 @@ class SessionStore @Inject constructor(
         val simSubscriptionId: Int? = null,
         val registeredNumberDisplay: String? = null,
         val registeredNumberE164: String? = null,
+        val refreshToken: String? = null,
+        /** [uz.bonvi.call.domain.DeviceAuthState]'s wire value. Read
+         *  synchronously by the OkHttp authenticator and by the heartbeat. */
+        val authState: String = "active",
     )
 
     init {
@@ -128,6 +152,8 @@ class SessionStore @Inject constructor(
                         simSubscriptionId = prefs[KEY_SUBSCRIPTION_ID],
                         registeredNumberDisplay = prefs[KEY_NUMBER_DISPLAY],
                         registeredNumberE164 = prefs[KEY_NUMBER_E164],
+                        refreshToken = prefs[KEY_REFRESH_TOKEN],
+                        authState = prefs[KEY_AUTH_STATE] ?: "active",
                     )
                 }
                 .collect()
@@ -149,5 +175,6 @@ class SessionStore @Inject constructor(
         private val KEY_VERIFICATION_METHOD = stringPreferencesKey("verification_method")
         private val KEY_BASE_URL = stringPreferencesKey("base_url")
         private val KEY_SUBSCRIPTION_ID = intPreferencesKey("sim_subscription_id")
+        private val KEY_AUTH_STATE = stringPreferencesKey("auth_state")
     }
 }

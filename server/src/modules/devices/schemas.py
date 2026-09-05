@@ -16,6 +16,7 @@ from src.core.enums import (
     InstallationStatus,
     NetworkType,
 )
+from src.core.wire import Int64
 
 
 class DeviceHealthResponse(BaseModel):
@@ -64,15 +65,15 @@ class DeviceHealthResponse(BaseModel):
     battery_charging: bool | None
     battery_optimisation_exempt: bool | None
     power_save_mode: bool | None
-    free_storage_bytes: int | None
+    free_storage_bytes: Int64 | None
     queue_records: int | None
-    queue_bytes: int | None
+    queue_bytes: Int64 | None
     queue_oldest_at: datetime | None
     parked_records: int | None
     clock_skew_sec: int | None
     device_timezone: str | None
     network_type: NetworkType | None
-    cellular_bytes_month: int | None
+    cellular_bytes_month: Int64 | None
     service_running: bool | None
     capture_enabled: bool | None
     recording_route: CaptureRoute | None
@@ -120,7 +121,7 @@ class DeviceDetailResponse(DeviceHealthResponse):
 class DeviceHeartbeatIn(BaseModel):
     """``POST /api/device/v1/heartbeat`` — every 120 s while the service lives."""
 
-    device_epoch_ms: int = Field(description="Raw device clock; the skew evidence (N36).")
+    device_epoch_ms: Int64 = Field(description="Raw device clock; the skew evidence (N36).")
     device_timezone: str = Field(max_length=64)
     device_rtt_ms: int | None = Field(default=None, ge=0)
     app_version: str | None = Field(default=None, max_length=20)
@@ -133,17 +134,17 @@ class DeviceHeartbeatIn(BaseModel):
         description="isIgnoringBatteryOptimizations(). False is the usual cause of a dead service.",
     )
     power_save_mode: bool | None = None
-    free_storage_bytes: int | None = Field(default=None, ge=0)
+    free_storage_bytes: Int64 | None = Field(default=None, ge=0)
     queue_records: int | None = Field(
         default=None,
         ge=0,
         description="Zero is what the stale-version gate waits for (SPEC §4.3).",
     )
-    queue_bytes: int | None = Field(default=None, ge=0)
+    queue_bytes: Int64 | None = Field(default=None, ge=0)
     queue_oldest_at: datetime | None = None
     parked_records: int | None = Field(default=None, ge=0)
     network_type: NetworkType | None = None
-    cellular_bytes_month: int | None = Field(default=None, ge=0)
+    cellular_bytes_month: Int64 | None = Field(default=None, ge=0)
     service_running: bool | None = None
     capture_enabled: bool | None = None
     recording_route: CaptureRoute | None = None
@@ -258,8 +259,8 @@ class DeviceEventDetailIn(BaseModel):
 
     # queue_full, storage_low (N8, N10)
     queue_records: int | None = Field(default=None, ge=0)
-    queue_bytes: int | None = Field(default=None, ge=0)
-    free_storage_bytes: int | None = Field(default=None, ge=0)
+    queue_bytes: Int64 | None = Field(default=None, ge=0)
+    free_storage_bytes: Int64 | None = Field(default=None, ge=0)
 
     # poisoned_record (N9)
     client_call_id: uuid.UUID | None = Field(
@@ -282,7 +283,7 @@ class DeviceEventDetailIn(BaseModel):
         default=None, description="Whether the employee did it, or the OS did."
     )
     deleted_records: int | None = Field(default=None, ge=0)
-    deleted_bytes: int | None = Field(default=None, ge=0)
+    deleted_bytes: Int64 | None = Field(default=None, ge=0)
 
 
 class DeviceEventIn(BaseModel):

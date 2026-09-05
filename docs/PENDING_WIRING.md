@@ -10,39 +10,18 @@ wiring is mechanical.
 
 ---
 
-## 1. Device realtime socket — `/api/device/v1/ws` (T55)
+## 1. ~~Device realtime socket~~ — wired 2026-09-05
 
-**Built:** `server/src/api/device/ws.py`, `server/src/core/realtime.py`,
-`server/src/core/push.py`, `CommandService.deliver()`,
-`DeviceService.set_ws_connected()`,
-`server/src/modules/commands/tests/test_command_channel.py` (17 tests).
+`router.include_router(ws.router)` is in `src/api/device/__init__.py`.
+`test_every_registered_route_is_protected_or_declared_public` now covers
+`WEBSOCKET /api/device/v1/ws` (verified by removing the guard and watching it
+fail), and `test_command_channel.py` no longer mounts the router itself.
 
-**To wire — one line**, in `server/src/api/device/__init__.py`:
-
-```python
-from src.api.device import audio, auth, calls, commands, enrolment, telemetry, ws
-...
-router.include_router(ws.router)
-```
-
-**Nothing else.** Specifically:
-
-- **No permission entry.** A device principal holds no permissions (see
-  `api/device/deps.py`); the socket is protected by `WsInstallationDep`, which
-  is the same `require_device` → `require_installation` chain every other
-  device route uses. It is not public and must not be added to `PUBLIC_ROUTES`.
-- **No migration.** It writes only `device_health.ws_connected` and
-  `device_health.queue_records`, both of which already exist.
-- **No contract regeneration.** `contract/device-ws-frames.json` is already
-  committed and `make contract` is idempotent with the route unregistered,
-  because OpenAPI does not describe WebSocket routes either way.
-
-**What changes the moment it is registered:**
-`test_every_registered_route_is_protected_or_declared_public` starts covering
-it — `tests/test_app.py` was made `APIWebSocketRoute`-aware in the same pass, so
-the harness picks the socket up with no further edit. Until then
-`test_command_channel.py` mounts the router on its own app, which is why the
-endpoint is under test today rather than after the wiring.
+No permission entry, no migration and no OpenAPI change were needed, for the
+reasons recorded when it was built: a device principal holds no permissions,
+the socket writes only columns that already exist, and OpenAPI does not
+describe WebSocket routes — `contract/device-ws-frames.json` carries the frames
+instead.
 
 ---
 

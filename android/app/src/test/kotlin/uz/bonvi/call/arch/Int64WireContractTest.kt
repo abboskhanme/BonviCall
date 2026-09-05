@@ -36,18 +36,16 @@ class Int64WireContractTest {
     /**
      * Fields whose real range exceeds 32 bits and whose contract type does not
      * say so. ⚠️ This list only SHRINKS.
+     *
+     * **It is empty, and it emptied itself.** On 2026-09-05 it held nine
+     * fields and `android/scripts/widen_int64.py` patched the generated DTOs
+     * to `kotlin.Long`. `build-backend` annotated them `format: int64`, the
+     * first test below went red on the next run — which is exactly what it was
+     * built to do — and the script was deleted rather than left to rot.
+     *
+     * The rest of this class stays: its value now is catching the NEXT one.
      */
-    private val awaitingInt64Format = setOf(
-        "DeviceRedeemIn.device_epoch_ms",
-        "DeviceCallIn.device_epoch_ms",
-        "DeviceHeartbeatIn.device_epoch_ms",
-        "DeviceHeartbeatIn.free_storage_bytes",
-        "DeviceHeartbeatIn.queue_bytes",
-        "DeviceHeartbeatIn.cellular_bytes_month",
-        "DeviceEventDetailIn.free_storage_bytes",
-        "DeviceEventDetailIn.queue_bytes",
-        "DeviceEventDetailIn.deleted_bytes",
-    )
+    private val awaitingInt64Format = emptySet<String>()
 
     /**
      * Formatless `*_bytes` fields that genuinely FIT in 32 bits, with the

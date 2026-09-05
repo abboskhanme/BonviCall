@@ -13,6 +13,8 @@ import uz.bonvi.call.data.remote.BaseUrlInterceptor
 import uz.bonvi.call.data.remote.BearerAuthInterceptor
 import uz.bonvi.call.data.remote.DeviceHeadersInterceptor
 import uz.bonvi.call.data.remote.OffsetDateTimeAdapter
+import uz.bonvi.call.data.remote.TokenAuthenticator
+import uz.bonvi.call.data.remote.api.DeviceAuthApi
 import uz.bonvi.call.data.remote.api.DeviceCallsApi
 import uz.bonvi.call.data.remote.api.DeviceEnrolmentApi
 import uz.bonvi.call.data.session.SessionStore
@@ -45,7 +47,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun okHttp(session: SessionStore): OkHttpClient = OkHttpClient.Builder()
+    fun okHttp(
+        session: SessionStore,
+        authenticator: TokenAuthenticator,
+    ): OkHttpClient = OkHttpClient.Builder()
+        // T79/N25: a 401 refreshes once and replays. A REFUSED refresh writes
+        // auth_expired and holds the queue — it never discards.
+        .authenticator(authenticator)
         .addInterceptor(BaseUrlInterceptor { session.snapshot.baseUrl })
         .addInterceptor(DeviceHeadersInterceptor { session.snapshot.installationId })
         .addInterceptor(BearerAuthInterceptor { session.snapshot.accessToken })
@@ -78,6 +86,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun callsApi(retrofit: Retrofit): DeviceCallsApi = retrofit.create(DeviceCallsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun authApi(retrofit: Retrofit): DeviceAuthApi = retrofit.create(DeviceAuthApi::class.java)
 
     /** Path versioning, never a header (CONVENTIONS.md §4.1). */
     const val DEVICE_API_PREFIX = "/api/device/v1/"

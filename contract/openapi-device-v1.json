@@ -430,6 +430,7 @@
           },
           "device_epoch_ms": {
             "description": "System.currentTimeMillis() at call start — raw evidence for skew.",
+            "format": "int64",
             "title": "Device Epoch Ms",
             "type": "integer"
           },
@@ -988,6 +989,7 @@
           "deleted_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1024,6 +1026,7 @@
           "free_storage_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1048,6 +1051,7 @@
           "queue_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1213,6 +1217,7 @@
           "cellular_bytes_month": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1224,6 +1229,7 @@
           },
           "device_epoch_ms": {
             "description": "Raw device clock; the skew evidence (N36).",
+            "format": "int64",
             "title": "Device Epoch Ms",
             "type": "integer"
           },
@@ -1247,6 +1253,7 @@
           "free_storage_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1304,6 +1311,7 @@
           "queue_bytes": {
             "anyOf": [
               {
+                "format": "int64",
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1556,6 +1564,7 @@
             "$ref": "#/components/schemas/DeviceInfoIn"
           },
           "device_epoch_ms": {
+            "format": "int64",
             "title": "Device Epoch Ms",
             "type": "integer"
           },

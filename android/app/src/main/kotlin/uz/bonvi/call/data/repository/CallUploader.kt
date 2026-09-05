@@ -8,7 +8,10 @@ import uz.bonvi.call.data.remote.api.DeviceCallsApi
 import uz.bonvi.call.data.remote.dto.DeviceCallBatchIn
 import uz.bonvi.call.data.remote.dto.DeviceCallIn
 import uz.bonvi.call.data.remote.toFailure
+import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.di.IoDispatcher
+import uz.bonvi.call.domain.AuthStateRule
+import uz.bonvi.call.domain.DeviceAuthState
 import uz.bonvi.call.domain.UploadPolicy
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +32,7 @@ import javax.inject.Singleton
 class CallUploader @Inject constructor(
     private val api: DeviceCallsApi,
     private val queue: CallQueueRepository,
+    private val session: SessionStore,
     private val moshi: Moshi,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) {
@@ -36,6 +40,19 @@ class CallUploader @Inject constructor(
     data class Outcome(val sent: Int, val confirmed: Int, val parked: Int, val retryLater: Boolean)
 
     suspend fun drainOnce(): Outcome = withContext(io) {
+        // T79/N25 and T83/N34, in one check.
+        //
+        // `UPDATE_REQUIRED` deliberately still sends: the server accepts a
+        // stale client's queued records and refuses it only once the backlog is
+        // empty, so a client that stopped sending would strand exactly the data
+        // the gate was designed to protect. `AUTH_EXPIRED` and `REVOKED` stop
+        // sending and **hold** the queue — nothing is ever discarded here.
+        val authState = session.authStateSnapshot()
+        if (!authState.canSend) {
+            Timber.i("Not sending: device is %s. The queue is held.", authState.wire)
+            return@withContext Outcome(0, 0, 0, retryLater = false)
+        }
+
         val batch = queue.nextBatch()
         if (batch.isEmpty()) return@withContext Outcome(0, 0, 0, retryLater = false)
 
@@ -68,6 +85,10 @@ class CallUploader @Inject constructor(
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             val failure = response.toFailure(moshi)
+            // N34's refusal, or a revoke. Recorded so the UI can say why; the
+            // queue is untouched either way.
+            val nextState = AuthStateRule.next(authState, failure.status, failure.code)
+            if (nextState != authState) session.saveAuthState(nextState.wire)
             var parked = 0
             batch.forEach { row ->
                 val outcome = queue.recordFailure(row, failure.status, failure.code)

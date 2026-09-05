@@ -220,7 +220,11 @@ class ManifestPermissionsTest {
         // a recurring tax across Phase 4 and the risk is essentially zero —
         // src/debug/ resources are not in a release artefact. What must stay
         // true is that the hole is a LIST OF HOSTS and never a blanket switch.
-        val debug = File(TestPaths.appDir, "src/debug/res/xml/network_security_config.xml")
+        // The TEMPLATE, which is what is tracked. The substituted copy (with
+        // the developer's LAN address from `bonvicall.devHost`) lands in build/
+        // and is never committed — so nobody's home IP reaches the repository
+        // and nobody edits a tracked file to test on their own network.
+        val debug = File(TestPaths.appDir, "src/debug/network_security_config.template.xml")
         if (!debug.exists()) return
         val text = debug.readText()
 
@@ -238,6 +242,8 @@ class ManifestPermissionsTest {
             .toList()
         assertThat(domains).isNotEmpty()
         assertThat(domains.any { it == "*" || it.startsWith("*.") }).isFalse()
+        // The LAN host is a placeholder in the tracked file, not an address.
+        assertThat(domains).contains("__DEV_HOST__")
 
         // No build type trusts user-installed certificates. This is the part
         // that matters: a handset with a corporate or malware root must never
@@ -265,5 +271,30 @@ class ManifestPermissionsTest {
         // N24: a token restored onto a different handset is exactly the
         // installation_mismatch the server refuses.
         assertThat(manifest("main").readText()).contains("android:allowBackup=\"false\"")
+    }
+
+    @Test
+    fun `the signing key is never committed`() {
+        // T81. Losing the key means no device can ever be updated again
+        // (docs/APK-SIGNING.md); committing it is the other half of the same
+        // incident. The example file exists so nobody has to guess the shape.
+        val android = TestPaths.appDir.parentFile
+        assertThat(File(android, "keystore.properties.example").isFile).isTrue()
+        assertThat(File(android, "keystore.properties").exists()).isFalse()
+
+        val ignored = File(android, ".gitignore").readText()
+        for (pattern in listOf("keystore.properties", "*.jks", "*.keystore")) {
+            assertThat(ignored).contains(pattern)
+        }
+    }
+
+    @Test
+    fun `the release build is signed only when a keystore is configured`() {
+        // Without it `assembleRelease` must still succeed and produce
+        // -unsigned.apk: CI and a developer without the key have to be able to
+        // prove the release variant compiles.
+        val build = File(TestPaths.appDir, "build.gradle.kts").readText()
+        assertThat(build).contains("takeIf { it.storeFile != null }")
+        assertThat(build).contains("enableV2Signing = true")
     }
 }

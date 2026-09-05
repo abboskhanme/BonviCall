@@ -1,7 +1,7 @@
 """The device realtime socket and the FCM seam (T55, SPEC §4.6).
 
-Driven through the ASGI interface directly rather than through
-``TestClient.websocket_connect``. ``TestClient`` runs the app in its own thread
+Driven against the **registered** route through the ASGI interface directly,
+rather than through ``TestClient.websocket_connect``. ``TestClient`` runs the app in its own thread
 and event loop, and the ``db`` fixture is an asyncpg connection bound to *this*
 loop inside an open savepoint — the two cannot see each other, and a test that
 appears to pass across that boundary is testing a different database than the
@@ -73,18 +73,6 @@ class Socket:
                 raise AssertionError(f"socket ended: {message}")
 
 
-def _app_with_socket(base_app: FastAPI) -> FastAPI:
-    """The device socket mounted on a test app.
-
-    ``src/api/device/__init__.py`` is a shared file and Phase 6 owns it, so the
-    route is not registered in ``create_app()`` yet. Mounting it here means the
-    endpoint is under test now instead of after the wiring
-    (``docs/PENDING_WIRING.md``).
-    """
-    base_app.include_router(ws_module.router, prefix=DEVICE_API_PREFIX)
-    return base_app
-
-
 async def _open(app: FastAPI, headers: dict[str, str], socket: Socket) -> asyncio.Task:
     scope = {
         "type": "websocket",
@@ -130,7 +118,7 @@ async def _connected(
     """A verified installation with a live socket, ready to be talked to."""
     installation = await installation_factory()
     client = await device_client_factory(installation)
-    app = _app_with_socket(client._transport.app)  # noqa: SLF001 — the test's own app
+    app = client._transport.app  # noqa: SLF001 — the test's own app
     socket = Socket()
     task = await _open(app, dict(client.headers), socket)
     await _settle(lambda: realtime.get_hub().is_connected(installation.id))
@@ -218,7 +206,7 @@ async def test_a_displaced_socket_cannot_evict_its_replacement() -> None:
 async def test_the_socket_refuses_an_unauthenticated_handshake(app) -> None:
     """No token, no socket — and the ordinary error envelope, not a bare close."""
     socket = Socket()
-    task = await _open(_app_with_socket(app), {"x-app-version": "1.0.0"}, socket)
+    task = await _open(app, {"x-app-version": "1.0.0"}, socket)
     await asyncio.wait_for(task, timeout=2)
     assert socket.denied == 401
 
@@ -235,7 +223,7 @@ async def test_the_socket_needs_the_same_headers_as_every_other_device_call(
         if key.lower() != "x-installation-id"
     }
     socket = Socket()
-    task = await _open(_app_with_socket(client._transport.app), headers, socket)  # noqa: SLF001
+    task = await _open(client._transport.app, headers, socket)  # noqa: SLF001
     await asyncio.wait_for(task, timeout=2)
     assert socket.denied == 400
 
@@ -250,7 +238,7 @@ async def test_an_unverified_installation_gets_no_socket(
     client = await device_client_factory(installation)
     installation.status = InstallationStatus.PENDING
     socket = Socket()
-    task = await _open(_app_with_socket(client._transport.app), dict(client.headers), socket)  # noqa: SLF001
+    task = await _open(client._transport.app, dict(client.headers), socket)  # noqa: SLF001
     await asyncio.wait_for(task, timeout=2)
     assert socket.denied == 403
 
@@ -436,7 +424,7 @@ async def test_the_device_page_learns_the_socket_is_up_and_then_down(
     client = await device_client_factory(installation)
     socket = Socket()
     task = await _open(
-        _app_with_socket(client._transport.app),  # noqa: SLF001
+        client._transport.app,  # noqa: SLF001
         dict(client.headers),
         socket,
     )
@@ -508,7 +496,7 @@ async def test_a_second_socket_replaces_the_first_and_says_why(
     """One installation is one phone. Two live sockets would ack a dial twice."""
     installation = await installation_factory()
     client = await device_client_factory(installation)
-    app = _app_with_socket(client._transport.app)  # noqa: SLF001
+    app = client._transport.app  # noqa: SLF001
     headers = dict(client.headers)
 
     first, second = Socket(), Socket()
