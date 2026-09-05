@@ -122,6 +122,17 @@ class DeviceHeartbeatIn(BaseModel):
     """``POST /api/device/v1/heartbeat`` — every 120 s while the service lives."""
 
     device_epoch_ms: Int64 = Field(description="Raw device clock; the skew evidence (N36).")
+    app_version_code: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "The integer the version gate compares (N34). Reported at "
+            "enrolment in `AppInfoIn.version_code` and refreshed here, because "
+            "the code changes when the app updates and nothing else on the "
+            "wire carries it afterwards. Omitting it leaves the stored value "
+            "alone."
+        ),
+    )
     push_token: str | None = Field(
         default=None,
         max_length=512,

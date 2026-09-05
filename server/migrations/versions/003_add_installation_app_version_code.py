@@ -1,10 +1,17 @@
 """Add ``installations.app_version_code`` — the number the gate compares (N34).
 
-``AppInfoIn.version_code`` arrives on every enrolment and was thrown away, and
-the app sends ``X-App-Version-Code`` on every request. With nowhere to keep it,
+``AppInfoIn.version_code`` arrives on every enrolment — the client sends
+``BuildConfig.VERSION_CODE`` — and was thrown away. With nowhere to keep it,
 ``installations._version_code`` reconstructed a code from the human version
 string by concatenating its digits: ``"1.0.0"`` became ``100``, which looks
 plausible, and ``"1.4.0"`` became ``140`` when the real code might be ``14``.
+
+The older docstring claimed the app "sends ``X-App-Version-Code`` on every
+request and stores the code on enrolment". Neither half was true: no client
+sends that header, and there was no column to store anything in. It is
+refreshed on the **heartbeat** instead, as a named field
+(``DeviceHeartbeatIn.app_version_code``) so the Kotlin DTO is generated with it
+rather than depending on somebody remembering to add an interceptor.
 
 That is not only a gap in a report. The version gate (N34) compares this number
 against ``app.min_supported_version_code``, so raising the minimum was deciding

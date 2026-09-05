@@ -390,3 +390,26 @@ async def test_a_published_build_cannot_be_deleted(admin) -> None:
     response = await admin.delete(f"/api/v1/app/versions/{version['id']}")
     assert response.status_code == 409
     assert response.json()["error"]["detail"]["reason"] == "published"
+
+
+async def test_the_uploader_comes_back_as_a_name(admin) -> None:
+    """A manager cannot read `GET /users`, so an id alone renders as a uuid."""
+    uploaded = (await _upload(admin)).json()["version"]
+    assert uploaded["created_by_name"], "upload response carries the name"
+
+    listed = (await admin.get("/api/v1/app/versions")).json()["items"][0]
+    assert listed["created_by_name"] == uploaded["created_by_name"]
+    assert listed["created_by"] == uploaded["created_by"]
+
+
+async def test_a_manager_sees_the_uploader_name_without_users_read(
+    admin, manager
+) -> None:
+    """The reason this is denormalised at all — checked from the role that has
+    the problem, not from admin."""
+    await _upload(admin)
+    assert (await manager.get("/api/v1/users")).status_code == 403
+
+    listed = (await manager.get("/api/v1/app/versions")).json()["items"][0]
+    assert listed["created_by_name"]
+    assert listed["created_by_name"] != listed["created_by"]

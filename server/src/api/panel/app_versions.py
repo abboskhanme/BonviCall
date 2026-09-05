@@ -77,9 +77,9 @@ def _client_ip(request: Request) -> str | None:
 )
 async def list_versions(session: SessionDep) -> AppVersionListResponse:
     """Every build, newest first. Both variants — they ship in lockstep."""
-    rows, total = await ReleaseService(session).list_versions()
+    items, total = await ReleaseService(session).list_versions()
     return AppVersionListResponse(
-        items=[AppVersionResponse.model_validate(row) for row in rows],
+        items=items,
         total=total,
         signing_sha256_configured=bool(
             normalise_fingerprint(get_settings().apk_signing_sha256)
@@ -125,11 +125,12 @@ async def upload_version(
         release_notes_uz=release_notes_uz,
         is_mandatory=is_mandatory,
     )
-    row, inspection = await ReleaseService(session).upload(
+    service = ReleaseService(session)
+    row, inspection = await service.upload(
         payload, meta, principal.id, _client_ip(request)
     )
     return UploadReleaseResponse(
-        version=AppVersionResponse.model_validate(row),
+        version=(await service.with_uploader([row]))[0],
         signer_sha256=inspection.signer_sha256,
         signer_verified=bool(normalise_fingerprint(get_settings().apk_signing_sha256)),
     )
@@ -147,10 +148,9 @@ async def publish_version(
     request: Request,
 ) -> AppVersionResponse:
     """Make it current for its variant. Every phone is offered it from now on."""
-    row = await ReleaseService(session).publish(
-        version_id, principal.id, _client_ip(request)
-    )
-    return AppVersionResponse.model_validate(row)
+    service = ReleaseService(session)
+    row = await service.publish(version_id, principal.id, _client_ip(request))
+    return (await service.with_uploader([row]))[0]
 
 
 @router.delete(

@@ -55,15 +55,19 @@ async def storage_report(session: SessionDep) -> StorageReportResponse:
     """Current GB and 30-day growth, without a ``du`` over 200 GB (N18)."""
     service = AudioService(session)
     history = await service.storage_history()
-    latest = history[-1] if history else None
+    # Today's figures come from the rows, not from the last snapshot: the job
+    # runs nightly and the answer must be true on a server where it has not run
+    # yet. The snapshots are the growth curve, which only they can give.
+    total, files = await service.current_storage()
     added = sum(point.bytes_added for point in history)
-    total = latest.audio_bytes_total if latest else 0
     return StorageReportResponse(
         audio_bytes_total=total,
-        audio_files=latest.audio_files if latest else 0,
+        audio_files=files,
         bytes_added_30d=added,
         # A year at the last 30 days' rate. Deliberately linear: a smarter
-        # model would imply a confidence the data does not support.
+        # model would imply a confidence the data does not support. With no
+        # history there is no rate, so the projection is today's total — an
+        # honest "we cannot say yet" rather than a flat line drawn from one point.
         projected_bytes_12m=total + added * 12,
         history=[StoragePointOut.model_validate(point, from_attributes=True) for point in history],
     )

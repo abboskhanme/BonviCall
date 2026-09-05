@@ -17,7 +17,28 @@ Phase 6's server-side wiring is complete as of 2026-09-05. What was here:
 | Item | Landed | Note |
 |---|---|---|
 | Device realtime socket `/api/device/v1/ws` | 2026-09-05 | `include_router(ws.router)`. The RBAC harness covers `WEBSOCKET /api/device/v1/ws`, verified by removing the guard and watching it fail. `test_every_router_module_is_registered` now walks `src/api/*/` so an unwired router cannot pass again — which is how this one sat finished and unreachable while its own tests passed. |
+| App versions module | 2026-09-05 | `/api/v1/app/*` — list, upload, publish, discard, the public download, and the min-version impact + change. Migrations 003 (`installations.app_version_code`) and 004 (`app_version_uploaded` audit action). |
 | FCM registration token | 2026-09-05 | `installations.push_token` (migration **002**), `DeviceHeartbeatIn.push_token`, and `CommandService.deliver()` sends it. A separate revision rather than an edit to 001: adding a *column* there would leave every database already at head 001 silently without it, because `upgrade head` is a no-op for them. |
+
+## Waiting on another unit
+
+**`app_version_code` on the heartbeat (Android).** The field is in the contract
+(`DeviceHeartbeatIn.app_version_code`) and the server stores it, so the Kotlin
+DTO gains it on the next generation — but something has to *populate* it with
+`BuildConfig.VERSION_CODE`, the same value `EnrolmentRepository.appInfo()`
+already sends at redeem.
+
+Until then the gate works from the enrolment-time code and goes stale the
+moment a handset updates: the phone would report a new `app_version` string and
+an old code, and raising the minimum would strand a phone that had already
+updated. Enrolment is correct today, so this is not urgent — but it is the
+half that decides who stops reporting.
+
+**`APK_SIGNING_SHA256` (ops).** Blank until the release key is generated
+(`docs/APK-SIGNING.md`). While blank the server extracts each upload's signer
+and returns it, but cannot refuse a wrong one.
+
+---
 
 **Still deliberately absent — not pending:**
 

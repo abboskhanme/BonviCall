@@ -28,7 +28,8 @@ from src.modules.catalog.rules import (
     inspect_apk,
     normalise_fingerprint,
 )
-from src.modules.catalog.schemas import UploadReleaseRequest
+from src.modules.catalog.schemas import AppVersionResponse, UploadReleaseRequest
+from src.modules.users.models import UserModel
 
 log = get_logger(__name__)
 
@@ -175,7 +176,7 @@ class ReleaseService:
         self.audit = AuditService(session)
         self.store = LocalFsReleaseStore(get_settings().release_storage_path)
 
-    async def list_versions(self) -> tuple[list[AppVersionModel], int]:
+    async def list_versions(self) -> tuple[list[AppVersionResponse], int]:
         """Newest build first, both variants. Small table, no pagination."""
         rows = list(
             (
@@ -187,7 +188,30 @@ class ReleaseService:
                 )
             ).all()
         )
-        return rows, len(rows)
+        return await self.with_uploader(rows), len(rows)
+
+    async def with_uploader(
+        self, rows: list[AppVersionModel]
+    ) -> list[AppVersionResponse]:
+        """Attach the uploader's name — one query for the whole page, not one
+        per row. ``app_versions.created_by`` is a foreign key into ``users``,
+        which is what makes reading that table from here allowed (§2)."""
+        names = await self._uploader_names([row.created_by for row in rows])
+        return [
+            AppVersionResponse.model_validate(row).model_copy(
+                update={"created_by_name": names.get(row.created_by, "")}
+            )
+            for row in rows
+        ]
+
+    async def _uploader_names(self, ids) -> dict[uuid.UUID, str]:
+        wanted = {value for value in ids if value is not None}
+        if not wanted:
+            return {}
+        result = await self.session.execute(
+            select(UserModel.id, UserModel.full_name).where(UserModel.id.in_(wanted))
+        )
+        return {row.id: row.full_name for row in result.all()}
 
     async def get(self, version_id: uuid.UUID) -> AppVersionModel:
         row = await self.session.get(AppVersionModel, version_id)

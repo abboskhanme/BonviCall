@@ -286,9 +286,7 @@ class DeviceService:
             health.queue_records = queue_records
         await self.session.commit()
 
-    async def ingest_heartbeat(
-        self, installation, payload, reported_version_code: int | None = None
-    ):
+    async def ingest_heartbeat(self, installation, payload):
         """One heartbeat request, end to end: state, alerts, update block.
 
         The router calls this and nothing else — orchestration and the commit
@@ -298,8 +296,11 @@ class DeviceService:
         """
         from src.modules.installations.service import InstallationService
 
-        if reported_version_code is not None:
-            installation.app_version_code = reported_version_code
+        if payload.app_version_code is not None:
+            # The gate's number, refreshed. It changes when the app updates and
+            # the heartbeat is the only thing that carries it afterwards; an
+            # omitted field leaves the enrolment-time value alone.
+            installation.app_version_code = payload.app_version_code
         _, skew = await self.record_heartbeat(installation, payload)
         update = await InstallationService(self.session).update_block(installation)
         await self.session.commit()

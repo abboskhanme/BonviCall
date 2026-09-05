@@ -470,6 +470,30 @@ class AudioService:
         await self.session.refresh(row)
         return row
 
+    async def current_storage(self) -> tuple[int, int]:
+        """``(bytes, files)`` held **right now**, from the rows not the rollup.
+
+        The nightly snapshot gives the growth *curve*; it cannot give today's
+        total, because on a server whose job has not run yet there is no row —
+        and the report then answered "0 bytes of audio" while the recordings
+        were sitting on disk. "No history yet" is a true statement; "you are
+        using no storage" is a false one, and it is false in the direction that
+        says the volume is fine.
+
+        The concern behind reading the rollup was never the aggregate — it was
+        not running a ``du`` over 200 GB per page view. This is a ``SUM`` over a
+        small indexed table, which is what the job itself runs.
+        """
+        totals = (
+            await self.session.execute(
+                select(
+                    func.coalesce(func.sum(CallAudioModel.bytes), 0),
+                    func.count(),
+                ).where(CallAudioModel.deleted_at.is_(None))
+            )
+        ).one()
+        return int(totals[0]), int(totals[1])
+
     async def storage_history(self, days: int = 30) -> list[StorageUsageDailyModel]:
         """The last ``days`` rows, oldest first — the growth curve N18 wants."""
         cutoff = clock.now().astimezone(TASHKENT).date() - timedelta(days=days)

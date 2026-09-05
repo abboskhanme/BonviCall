@@ -89,6 +89,14 @@ class AppVersionResponse(BaseModel):
     )
     created_at: datetime
     created_by: uuid.UUID | None
+    created_by_name: str = Field(
+        default="",
+        description=(
+            "Who uploaded it, resolved server-side. The id alone would make "
+            "every page re-solve it through `GET /users`, which a manager "
+            "cannot read — so a manager would see a bare uuid."
+        ),
+    )
 
     @property
     def download_path(self) -> str:

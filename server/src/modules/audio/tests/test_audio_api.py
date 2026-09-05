@@ -441,6 +441,7 @@ async def test_retention_keeps_the_row_and_the_call(db, audio_factory) -> None:
     audio = await audio_factory(payload=PAYLOAD)
     audio.recorded_at = datetime.now(UTC) - timedelta(days=800)
     await db.flush()
+
     await AudioService(db).apply_retention()
     await db.refresh(audio)
     assert audio.deleted_at is not None
@@ -539,3 +540,49 @@ async def test_a_download_always_writes_its_own_row(db, manager, audio_factory) 
         .where(AuditLogModel.action == AuditAction.AUDIO_DOWNLOAD)
     )
     assert rows == 1
+
+
+async def test_the_storage_report_is_true_before_the_nightly_job_has_run(
+    db, admin, call_factory, installation_factory, device_client_factory
+) -> None:
+    """It answered "0 bytes" on a server holding recordings, which is worse
+    than empty: it is false in the direction that says the volume is fine.
+
+    The daily snapshots are the growth curve and only they can give it. Today's
+    total is a ``SUM`` over the rows, which is what the nightly job runs anyway.
+    """
+    call, client = await _call_and_device(
+        call_factory, installation_factory, device_client_factory
+    )
+    opened = await _upload(client, call)
+    await client.post(f"/api/device/v1/audio/{opened['upload_id']}/commit")
+
+    body = (await admin.get("/api/v1/reports/storage")).json()
+    assert body["audio_files"] == 1
+    assert body["audio_bytes_total"] == len(PAYLOAD)
+    # No snapshot has been written, so there is no growth rate to project from.
+    assert body["history"] == []
+    assert body["projected_bytes_12m"] == len(PAYLOAD)
+
+
+async def test_retention_deleted_audio_stops_counting_against_the_volume(
+    db, admin, call_factory, installation_factory, device_client_factory
+) -> None:
+    """Those bytes are off the disk; counting them would overstate usage and
+    make the 250 GB provision look tighter than it is."""
+    call, client = await _call_and_device(
+        call_factory, installation_factory, device_client_factory
+    )
+    opened = await _upload(client, call)
+    await client.post(f"/api/device/v1/audio/{opened['upload_id']}/commit")
+
+    audio = await db.scalar(sa.select(CallAudioModel))
+    audio.recorded_at = datetime.now(UTC) - timedelta(days=800)
+    await db.flush()
+    from src.modules.audio.service import AudioService
+
+    await AudioService(db).apply_retention()
+
+    body = (await admin.get("/api/v1/reports/storage")).json()
+    assert body["audio_files"] == 0
+    assert body["audio_bytes_total"] == 0

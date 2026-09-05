@@ -154,6 +154,28 @@ CAPABILITY_DRIFT: dict[str, dict[str, tuple[str, str | None]]] = {
     },
 }
 
+# Not every phone updates the day a build ships — that is the whole reason the
+# version gate exists, and a fleet where everyone is current cannot demonstrate
+# the one screen it is for: the list of people about to stop reporting.
+#
+# The numbers are the app's **real** ones (`android/app/build.gradle.kts`:
+# versionCode 1, versionName 1.0.0) and the next build after it. Inventing a
+# scheme like 140/130/120 made the demo internally consistent and wrong against
+# everything else: a real handset walking docs/ON-DEVICE-TESTING.md enrols
+# reporting code 1 and would have landed below every fictional phone in the
+# fleet, and below any build in the catalogue.
+CURRENT_VERSION = ("1.1.0", 2)
+BEHIND_VERSION = ("1.0.0", 1)
+APP_VERSIONS: dict[str, tuple[str, int]] = {
+    "SM-A546E": CURRENT_VERSION,
+    "SM-A245F": CURRENT_VERSION,
+    "V2111": CURRENT_VERSION,
+    # Two handsets have not taken the update — which is the ordinary state of a
+    # fleet of personal phones, and the state `min-version/impact` is for.
+    "Redmi Note 12": BEHIND_VERSION,
+    "Redmi 10C": BEHIND_VERSION,
+}
+
 CONTACTS = [
     ("Oybek aka", "+998901234567"),
     ("Nodira opa", "+998977654321"),
@@ -235,6 +257,7 @@ def make_call(
     disposition: str,
     duration: int,
     variant: str,
+    app_version: str,
     route: str,
     missing: str | None,
 ) -> dict:
@@ -256,7 +279,7 @@ def make_call(
         "device_epoch_ms": int(started.timestamp() * 1000),
         "device_timezone": "Asia/Tashkent",
         "app_variant": variant,
-        "app_version": "1.0.0",
+        "app_version": app_version,
         "sim_slot": 0,
         "sim_subscription_id": 1,
     }
@@ -474,7 +497,14 @@ def main() -> int:
                     "device_fingerprint": sha256(f"fp-{model}-{number['e164']}"),
                     "device_epoch_ms": int(now.timestamp() * 1000),
                     "device_timezone": "Asia/Tashkent",
-                    "app": {"variant": variant, "version": "1.0.0", "version_code": 1},
+                    "app": {
+                        "variant": variant,
+                        "version": APP_VERSIONS[model][0],
+                        # BuildConfig.VERSION_CODE on a real handset. This is
+                        # the number the gate compares (N34) — not the version
+                        # string, which only looks like one.
+                        "version_code": APP_VERSIONS[model][1],
+                    },
                     "device": {
                         "manufacturer": manufacturer,
                         "model": model,
@@ -580,6 +610,7 @@ def main() -> int:
                     disposition=disposition,
                     duration=duration,
                     variant=variant,
+                    app_version=APP_VERSIONS[model][0],
                     route=route,
                     missing=missing,
                 )
@@ -599,6 +630,7 @@ def main() -> int:
                     disposition="answered",
                     duration=95,
                     variant=variant,
+                    app_version=APP_VERSIONS[model][0],
                     route=route,
                     missing=None,
                 )
@@ -611,6 +643,7 @@ def main() -> int:
                     disposition="answered",
                     duration=180,
                     variant=variant,
+                    app_version=APP_VERSIONS[model][0],
                     route=route,
                     missing=None,
                 )
@@ -703,7 +736,10 @@ def main() -> int:
                     "parked_records": 0,
                     "free_storage_bytes": random.randint(2, 40) * 1024**3,
                     "app_variant": variant,
-                    "app_version": "1.0.0",
+                    "app_version": APP_VERSIONS[model][0],
+                    # Refreshed on every heartbeat because it changes when the
+                    # app updates and nothing else on the wire carries it.
+                    "app_version_code": APP_VERSIONS[model][1],
                     "api_level": 34 if variant == "modern34" else 31,
                     # The app sends this on the first heartbeat after
                     # `onNewToken`, not on every one. It is how a phone whose

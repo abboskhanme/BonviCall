@@ -158,6 +158,10 @@ demo:              ## Seed a demo fleet: 5 agents, 5 devices, ~45 calls, real au
 # retention.audio_months. Running the real job — not an UPDATE — is what turns
 # it into the panel's "expired" state, and proves the job works while it is at it.
 	$(MAKE) job n=audio_retention
+# One storage snapshot, so the report has a point on its growth curve. The
+# current totals are read live, so the page is right either way — this makes
+# the *history* non-empty, which is the half only the nightly job can give.
+	$(MAKE) job n=storage_usage
 
 demo-reset:        ## Wipe operational data and re-seed the demo
 	docker compose exec -T postgres psql -U $${POSTGRES_USER:-bonvicall} \
