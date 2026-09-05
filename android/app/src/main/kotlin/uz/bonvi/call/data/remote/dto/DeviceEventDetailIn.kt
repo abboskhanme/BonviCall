@@ -15,8 +15,19 @@
 
 package uz.bonvi.call.data.remote.dto
 
-import uz.bonvi.call.data.remote.dto.AudioMissingReason
-import uz.bonvi.call.data.remote.dto.CaptureRoute
+import uz.bonvi.call.data.remote.dto.Attempts
+import uz.bonvi.call.data.remote.dto.ByUser
+import uz.bonvi.call.data.remote.dto.ClientCallId
+import uz.bonvi.call.data.remote.dto.DeletedBytes
+import uz.bonvi.call.data.remote.dto.DeletedRecords
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInAudioMissingReason
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInCaptureRoute
+import uz.bonvi.call.data.remote.dto.DiscardedCount
+import uz.bonvi.call.data.remote.dto.FreeStorageBytes
+import uz.bonvi.call.data.remote.dto.FromVersion
+import uz.bonvi.call.data.remote.dto.QueueBytes
+import uz.bonvi.call.data.remote.dto.QueueRecords
+import uz.bonvi.call.data.remote.dto.ToVersion
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -43,45 +54,45 @@ import com.squareup.moshi.JsonClass
 data class DeviceEventDetailIn (
 
     @Json(name = "attempts")
-    val attempts: kotlin.Int? = null,
+    val attempts: Attempts? = null,
 
     @Json(name = "audio_missing_reason")
-    val audioMissingReason: AudioMissingReason? = null,
+    val audioMissingReason: DeviceEventDetailInAudioMissingReason? = null,
 
     @Json(name = "by_user")
-    val byUser: kotlin.Boolean? = null,
+    val byUser: ByUser? = null,
 
     @Json(name = "capture_route")
-    val captureRoute: CaptureRoute? = null,
+    val captureRoute: DeviceEventDetailInCaptureRoute? = null,
 
     @Json(name = "client_call_id")
-    val clientCallId: java.util.UUID? = null,
+    val clientCallId: ClientCallId? = null,
 
     @Json(name = "deleted_bytes")
-    val deletedBytes: kotlin.Long? = null,
+    val deletedBytes: DeletedBytes? = null,
 
     @Json(name = "deleted_records")
-    val deletedRecords: kotlin.Int? = null,
+    val deletedRecords: DeletedRecords? = null,
 
     @Json(name = "discarded_count")
-    val discardedCount: kotlin.Int? = null,
+    val discardedCount: DiscardedCount? = null,
 
     @Json(name = "free_storage_bytes")
-    val freeStorageBytes: kotlin.Long? = null,
+    val freeStorageBytes: FreeStorageBytes? = null,
 
     @Json(name = "from_version")
-    val fromVersion: kotlin.String? = null,
+    val fromVersion: FromVersion? = null,
 
     @Json(name = "queue_bytes")
-    val queueBytes: kotlin.Long? = null,
+    val queueBytes: QueueBytes? = null,
 
     @Json(name = "queue_records")
-    val queueRecords: kotlin.Int? = null,
+    val queueRecords: QueueRecords? = null,
 
     @Json(name = "to_version")
-    val toVersion: kotlin.String? = null
+    val toVersion: ToVersion? = null
 
-) {
+) : kotlin.collections.HashMap<String, kotlin.Any>() {
 
 
 }

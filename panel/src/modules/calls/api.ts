@@ -101,3 +101,40 @@ export function useUpdateCallNote(
     },
   })
 }
+
+/**
+ * The CSV export, streamed with the SAME filters the list is showing.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UC-22: the row count must equal the `total` on screen, and it does because
+ * the server re-runs the same filter builder rather than a parallel one. So
+ * the panel's job is only to send the filters it is already displaying — and
+ * to say what is about to be exported BEFORE the file arrives, because a
+ * download is the one action with no undo and no preview.
+ *
+ * It goes through `fetch` in `audio.ts`'s sibling role rather than `api.get`:
+ * the response is a stream with a `Content-Disposition` to read, not JSON.
+ * The filename comes from the server for the reason SPEC §4.8 gives — two
+ * naming rules in two places drift.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function callsExportUrl(params: CallListQuery): string {
+  // Reuse the list's own query serialisation so a filter cannot be spelled one
+  // way for the table and another for the file.
+  const query = toQuery(params)
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value)) {
+      for (const item of value) search.append(key, String(item))
+    } else {
+      search.set(key, String(value))
+    }
+  }
+  // `limit`, `cursor` and `with_total` are paging concerns and the export has
+  // no pages; sending them would be noise at best.
+  search.delete('limit')
+  search.delete('cursor')
+  search.delete('with_total')
+  return `/api/v1/calls/export?${search.toString()}`
+}

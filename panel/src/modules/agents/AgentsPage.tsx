@@ -14,7 +14,7 @@
  */
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Archive, Pencil, Plus } from 'lucide-react'
+import { Archive, Pencil, Plus, Upload } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
@@ -30,6 +30,8 @@ import { useNumbers } from '@/modules/numbers/api'
 
 import { AgentModal } from './AgentModal'
 import { CreateAgentModal } from './CreateAgentModal'
+import { ImportAgentsModal } from './ImportAgentsModal'
+import { LineDirectorySection } from '@/modules/lineDirectory/LineDirectorySection'
 import { ArchiveAgentModal } from './ArchiveAgentModal'
 import { useAgentLines, useAgents, type Agent } from './api'
 
@@ -47,6 +49,7 @@ export function AgentsPage() {
 
   const [editing, setEditing] = useState<Agent | null>(null)
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [archiving, setArchiving] = useState<Agent | null>(null)
 
   const agentsQuery = useAgents({ q: search, includeArchived })
@@ -74,10 +77,16 @@ export function AgentsPage() {
         description={t('agents.subtitle')}
         actions={
           mayWrite ? (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="size-4" aria-hidden />
-              {t('agents.create')}
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" onClick={() => setImporting(true)}>
+                <Upload className="size-4" aria-hidden />
+                {t('import.action')}
+              </Button>
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="size-4" aria-hidden />
+                {t('agents.create')}
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -212,11 +221,14 @@ export function AgentsPage() {
         )}
       </QueryBoundary>
 
+      <LineDirectorySection />
+
       {mayWrite ? (
         <>
           {/* Create is a FLOW, not a form: agent, number and enrolment code
               in one dialog that ends on the code. Edit stays a plain form. */}
           <CreateAgentModal open={creating} onOpenChange={setCreating} />
+          <ImportAgentsModal open={importing} onOpenChange={setImporting} />
           <AgentModal
             open={editing !== null}
             onOpenChange={(open) => !open && setEditing(null)}

@@ -110,10 +110,22 @@ id belonging to another agent returns **404, never 403** (SPEC §4.1 rule 2;
 
 ---
 
-## Client state
+## Client state — LANDED 2026-09-05
 
-Built and waiting: `domain/MyCall.kt`, `MyCallsGateway`, `MyCallsViewModel`,
-`ui/calls/MyCallsScreen.kt`. The Retrofit implementation is a stub that returns
-an empty page and is marked `TODO(device-read-api)`; when the contract lands,
-`make android-dto` generates the DTOs and the stub is replaced by one Retrofit
-interface. Nothing above it changes.
+Wired: `DeviceCallReadApi`, `RetrofitMyCallsGateway`, `MyCallsViewModel`,
+`ui/calls/MyCallsScreen.kt`, and `data/player/Media3AudioPlayback` streaming
+through the app's own OkHttp client so ExoPlayer issues real `Range` requests
+and seek is native.
+
+**Two corrections `build-backend` made to this spec, both right:**
+
+- `audio_missing_reason` beside a recording that exists would make the enum's
+  name a lie. The derived, never-null **`audio_state`** is the better answer:
+  one field to switch on, one Uzbek sentence out, and `audio_missing_reason`
+  stays honest and nullable. The client **copies it and never re-derives it** —
+  it needs `call_audio.deleted_at`, which the call row does not carry, so a
+  client computing it from `has_audio` would offer a play button for a recording
+  retention has removed.
+- The "installation with no agent" guard is gone. `installations.agent_id` is
+  `NOT NULL`, and code defending an unrepresentable state reads as if the state
+  were possible.

@@ -409,12 +409,6 @@ class EnrolmentService:
         await self.session.commit()
         return verification, tokens
 
-    async def reissue_tokens(self, installation: InstallationModel) -> DeviceTokenPair:
-        """A fresh pair for a phone that still holds a valid access token."""
-        tokens = await self.installations.issue_device_pair(installation)
-        await self.session.commit()
-        return tokens
-
     async def report_callback_event(
         self,
         receiver: CallbackReceiverModel,

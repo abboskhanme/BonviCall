@@ -53,7 +53,7 @@ async def test_revoking_kills_every_issued_token(
     """UC-08: token_version moves, so tokens already on the phone are dead."""
     installation = await installation_factory()
     client = await device_client_factory(installation)
-    assert (await client.get("/api/device/v1/enrolment/token")).status_code == 200
+    assert (await client.get("/api/device/v1/calls")).status_code == 200
 
     response = await admin.post(f"/api/v1/installations/{installation.id}/revoke", json={})
     assert response.status_code == 200
@@ -61,7 +61,9 @@ async def test_revoking_kills_every_issued_token(
         "Bonvi does not own the handset; claiming a completed wipe would be a lie"
     )
 
-    refused = await client.get("/api/device/v1/enrolment/token")
+    # Any device route: revocation moves ``token_version``, so the token dies
+    # in the principal resolver rather than per route.
+    refused = await client.get("/api/device/v1/calls")
     assert refused.status_code == 401
 
 
@@ -171,3 +173,52 @@ async def test_a_device_refresh_token_rotates_and_a_replay_kills_the_pair(
     )
     assert replay.status_code == 401
     assert replay.json()["error"]["code"] == "refresh_reused"
+
+
+async def test_the_set_of_routes_that_hand_out_device_tokens_is_closed() -> None:
+    """N34 has exactly **one** refusal point, and that is the whole design.
+
+    A stale client drains its queue on 200s and is refused only at
+    ``POST /auth/refresh``, once it has told us the queue is empty. Any *other*
+    route that issues a token pair lets a refused phone keep going for ever.
+
+    ``GET /api/device/v1/enrolment/token`` was exactly that: no caller, no
+    version check, and it turned a 30-minute access token into a 90-day refresh
+    token with none of the rotation that makes ``credential_replay``
+    detectable. Deleted 2026-09-05. This is what stops the next one.
+
+    Adding a route here is a decision about the version gate. Make it
+    deliberately: put it in the list and say why.
+    """
+    from src.main import create_app
+
+    #: Route -> why it may hand out credentials.
+    ALLOWED_ISSUERS = {
+        "/api/device/v1/auth/refresh": "the gate itself; refuses under-version once drained",
+        "/api/device/v1/enrolment/redeem": "provisional token only; cannot upload a call",
+        "/api/device/v1/enrolment/verify/msisdn": "the real pair, after the number is proved",
+        "/api/device/v1/enrolment/verify/callback/status": "the same pair, callback route",
+    }
+    token_schemas = {"DeviceTokenPairOut", "IssuedTokensOut", "DeviceRedeemOut"}
+
+    issuers = set()
+    for route in create_app().routes:
+        path = getattr(route, "path", "")
+        model = getattr(route, "response_model", None)
+        if path.startswith("/api/device/v1") and getattr(model, "__name__", "") in token_schemas:
+            issuers.add(path)
+        # A route can also nest one, as the verification responses do.
+        elif path.startswith("/api/device/v1") and model is not None:
+            nested = getattr(model, "model_fields", {})
+            if any(
+                getattr(field.annotation, "__name__", "") in token_schemas
+                for field in nested.values()
+            ):
+                issuers.add(path)
+
+    assert issuers <= set(ALLOWED_ISSUERS), (
+        f"a new device route hands out credentials: {sorted(issuers - set(ALLOWED_ISSUERS))}. "
+        "The version gate lives on refresh and only on refresh — adding an "
+        "issuer is a decision about N34, so record it in ALLOWED_ISSUERS."
+    )
+    assert "/api/device/v1/enrolment/token" not in issuers

@@ -3070,28 +3070,6 @@
         ]
       }
     },
-    "/api/device/v1/enrolment/token": {
-      "get": {
-        "description": "Re-issue the pair for an installation that already holds a valid token.\n\nUsed by the app after an update, when it has a live access token but lost\nits stored refresh token. Cheap, and it saves an agent re-enrolling.",
-        "operationId": "current_token_api_device_v1_enrolment_token_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceTokenPairOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Current Token",
-        "tags": [
-          "Device enrolment"
-        ]
-      }
-    },
     "/api/device/v1/enrolment/verify/callback/start": {
       "post": {
         "description": "Route 2 — the load-bearing one, since SMS is out of scope.\n\n409 ``callback_receiver_down`` when no receiver has checked in recently:\nraising a challenge the agent cannot possibly satisfy is worse than saying\nso, and the Uzbek message tells them to contact the admin.",

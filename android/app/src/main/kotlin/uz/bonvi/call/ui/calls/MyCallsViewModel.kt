@@ -32,6 +32,7 @@ import javax.inject.Inject
 class MyCallsViewModel @Inject constructor(
     private val gateway: MyCallsGateway,
     private val session: SessionStore,
+    private val player: uz.bonvi.call.domain.AudioPlayback,
 ) : ViewModel() {
 
     data class UiState(
@@ -41,14 +42,17 @@ class MyCallsViewModel @Inject constructor(
         val nextCursor: String? = null,
         val hasMore: Boolean = false,
         val message: Message? = null,
+        /** Which row is sounding, so the screen can show a stop control on it
+         *  and only on it. */
+        val playingId: String? = null,
     ) {
         val isEmpty: Boolean get() = !loading && calls.isEmpty() && message == null
     }
 
-    /** Each of these says something different and TRUE. "Not deployed yet" is
-     *  not "something went wrong", and conflating them makes the honest
-     *  messages elsewhere less believable. */
-    enum class Message { NOT_AVAILABLE, OFFLINE, FAILED }
+    /** Each says something different and TRUE. "No connection" is not
+     *  "something went wrong", and conflating them makes the honest messages
+     *  elsewhere less believable. */
+    enum class Message { OFFLINE, FAILED }
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -86,9 +90,6 @@ class MyCallsViewModel @Inject constructor(
                 )
             }
 
-            is MyCallsGateway.Result.NotAvailable ->
-                _state.value = _state.value.copy(loading = false, message = Message.NOT_AVAILABLE)
-
             is MyCallsGateway.Result.Offline ->
                 _state.value = _state.value.copy(loading = false, message = Message.OFFLINE)
 
@@ -97,7 +98,32 @@ class MyCallsViewModel @Inject constructor(
         }
     }
 
-    /** The stream URL, or null when the server holds no audio for this call. */
-    suspend fun audioUrl(call: MyCall): String? =
-        if (call.playable) gateway.audioUrl(call.id) else null
+    /**
+     * Start playing.
+     *
+     * Guarded on [MyCall.playable] rather than trusting the caller: a play
+     * request for a call whose audio retention has deleted would answer 410,
+     * and a 410 mid-playback reads to an employee as a broken app rather than
+     * as the retention policy working.
+     */
+    fun play(call: MyCall) {
+        if (!call.playable) return
+        viewModelScope.launch {
+            val url = gateway.audioUrl(call.id) ?: return@launch
+            _state.value = _state.value.copy(playingId = call.id)
+            player.play(url)
+        }
+    }
+
+    fun stop() {
+        player.pause()
+        _state.value = _state.value.copy(playingId = null)
+    }
+
+    override fun onCleared() {
+        // A leaked player keeps a codec and, worse, keeps playing a
+        // colleague's conversation out loud.
+        player.release()
+        super.onCleared()
+    }
 }

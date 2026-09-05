@@ -299,6 +299,9 @@ dependencies {
 
     implementation(libs.navigation.compose)
 
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.datasource.okhttp)
+
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)

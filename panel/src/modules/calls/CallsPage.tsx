@@ -17,7 +17,7 @@
  */
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, PhoneIncoming, PhoneOutgoing } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, PhoneIncoming, PhoneOutgoing } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
@@ -32,6 +32,7 @@ import {
   formatPhone,
 } from '@/shared/lib/format'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
+import { ExportCallsModal } from './ExportCallsModal'
 import { EnumFilter, FilterField, SELECT_CLASS, TextFilter } from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
@@ -256,6 +257,7 @@ export function CallsPage() {
    * than lying about where the reader came from.
    */
   const [trail, setTrail] = useState<string[]>([])
+  const [exporting, setExporting] = useState(false)
 
   const query: CallListQuery = {
     limit,
@@ -304,11 +306,61 @@ export function CallsPage() {
 
   const total = callsQuery.data?.total
 
+  /**
+   * The filters in force, in Uzbek, for the export dialog to read back.
+   *
+   * Built from the SAME values the query object carries, so what the dialog
+   * promises and what the server receives cannot disagree.
+   */
+  const filterSummary: string[] = [
+    agentId
+      ? t('calls.exportFilterAgent', {
+          name:
+            (agentsQuery.data?.items ?? []).find((agent) => agent.id === agentId)?.full_name ??
+            agentId,
+        })
+      : null,
+    direction ? t('calls.exportFilterOne', {
+      field: t('calls.filterDirection'),
+      value: t(DIRECTION_LABEL[direction]),
+    }) : null,
+    disposition ? t('calls.exportFilterOne', {
+      field: t('calls.filterDisposition'),
+      value: t(DISPOSITION_LABEL[disposition]),
+    }) : null,
+    callType ? t('calls.exportFilterOne', {
+      field: t('calls.filterCallType'),
+      value: t(CALL_TYPE_LABEL[callType]),
+    }) : null,
+    hasAudio === undefined
+      ? null
+      : t('calls.exportFilterOne', {
+          field: t('calls.filterAudio'),
+          value: t(hasAudio ? 'calls.filterAudioWith' : 'calls.filterAudioWithout'),
+        }),
+    dateFrom ? t('calls.exportFilterOne', { field: t('calls.filterDateFrom'), value: dateFrom }) : null,
+    dateTo ? t('calls.exportFilterOne', { field: t('calls.filterDateTo'), value: dateTo }) : null,
+    remoteNumber
+      ? t('calls.exportFilterOne', { field: t('calls.filterRemoteNumber'), value: remoteNumber })
+      : null,
+    nameQuery
+      ? t('calls.exportFilterOne', { field: t('calls.filterContact'), value: nameQuery })
+      : null,
+  ].filter((line): line is string => line !== null)
+
   return (
     <Page>
       <PageHeader
         title={t('page.calls')}
         description={showAgent ? undefined : t('calls.ownScopeNote')}
+        actions={
+          can(Perm.REPORTS_EXPORT) ? (
+            <Button variant="secondary" size="sm" onClick={() => setExporting(true)}>
+              <Download className="size-4" aria-hidden />
+              {t('calls.export')}
+            </Button>
+          ) : undefined
+        }
       />
 
       <Card className="flex flex-wrap items-end gap-3 p-3">
@@ -480,6 +532,19 @@ export function CallsPage() {
           </>
         )}
       </QueryBoundary>
+
+      {can(Perm.REPORTS_EXPORT) ? (
+        <ExportCallsModal
+          open={exporting}
+          onOpenChange={setExporting}
+          query={query}
+          // The list's own total — the number UC-22 requires the file's row
+          // count to equal. Computing a second one here is how that guarantee
+          // starts looking broken.
+          total={typeof total === 'number' ? total : null}
+          filterSummary={filterSummary}
+        />
+      ) : null}
     </Page>
   )
 }

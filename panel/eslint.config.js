@@ -96,9 +96,11 @@ export default tseslint.config(
      * has to be read off the response. None of that is what the JSON client
      * models, and routing it through `api.get` would mean teaching that
      * client about blobs and byte ranges to satisfy a rule about JSON.
+     * `export.ts` is the same exception for the same reason: a streamed CSV
+     * with a `Content-Disposition` to read off the response.
      * `public/audio-sw.js` is plain JS outside `src/` and is not linted here.
      */
-    files: ['src/modules/calls/audio.ts'],
+    files: ['src/modules/calls/audio.ts', 'src/modules/calls/export.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

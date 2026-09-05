@@ -162,12 +162,19 @@
          a screen. The vocabulary matters here more than anywhere: *qayd
          etilgan* = the call is logged, *yozib olingan* = the audio exists. -->
     <string name="calls_empty">Hozircha qo\'ng\'iroq yo\'q.</string>
-    <string name="calls_not_available">Bu bo\'lim hali tayyor emas. Qo\'ng\'iroqlaringiz qayd etilmoqda — ularni tez orada shu yerda ko\'rasiz.</string>
+    <!-- audio_state, one sentence each. `expired` is NOT a failure: the
+         recording existed and retention removed it, which is the system
+         working. Saying so plainly is the difference between an employee
+         trusting the list and doubting it. -->
+    <string name="audio_expired">Yozuv saqlash muddati tugagani uchun o\'chirilgan</string>
+    <string name="audio_queued">Yozuv yuborilmoqda</string>
+    <string name="audio_not_expected">Suhbat bo\'lmagan — yozuv kutilmaydi</string>
     <string name="calls_offline">Internetga ulanib bo\'lmadi. Ro\'yxatni ko\'rish uchun aloqa kerak.</string>
     <string name="calls_error">Ro\'yxatni yuklab bo\'lmadi.</string>
     <string name="calls_incoming">Kiruvchi</string>
     <string name="calls_outgoing">Chiquvchi</string>
     <string name="calls_play">Tinglash</string>
+    <string name="calls_stop">To\'xtatish</string>
     <string name="calls_duration">%1$d:%2$02d</string>
     <string name="calls_load_more">Yana ko\'rsatish</string>
 

@@ -227,7 +227,12 @@ class EnrolmentRepository @Inject constructor(
      * one-off, it is the first sample.
      */
     suspend fun reportStepTiming(step: String, durationMs: Long, attempts: Int? = null) {
-        postEvent("step_timing", DeviceEventDetailIn(attempts = attempts), step, durationMs)
+        // ⚠️ `detail` is null, not because we have nothing to say but because
+        // every field on `DeviceEventDetailIn` currently generates as an empty
+        // Kotlin class — see `GeneratedDtoShapeTest`. `kind` and `at` still
+        // carry the measurement N40 needs; the attempt count is lost until the
+        // contract stops minting a named type per field.
+        postEvent("step_timing", detail = null, step = step, durationMs = durationMs)
     }
 
     /**
@@ -237,12 +242,14 @@ class EnrolmentRepository @Inject constructor(
      * stalled rollout looks exactly like a working one until go-live.
      */
     suspend fun reportStuck(step: String) {
-        postEvent("enrolment_stuck", DeviceEventDetailIn(byUser = true), step, null)
+        // Same reason as above. `kind` is what moves the agent to
+        // needs_assisted_install, so the signal itself is intact.
+        postEvent("enrolment_stuck", detail = null, step = step, durationMs = null)
     }
 
     private suspend fun postEvent(
         kind: String,
-        detail: DeviceEventDetailIn,
+        detail: DeviceEventDetailIn?,
         step: String,
         durationMs: Long?,
     ) {

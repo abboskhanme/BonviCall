@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uz.bonvi.call.R
 import uz.bonvi.call.domain.AudioMissingReason
+import uz.bonvi.call.domain.AudioState
 import uz.bonvi.call.domain.CallDirection
 import uz.bonvi.call.domain.MyCall
 import uz.bonvi.call.ui.enrolment.NumberBanner
@@ -63,8 +64,6 @@ fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
                     Text(
                         text = stringResource(
                             when (state.message) {
-                                MyCallsViewModel.Message.NOT_AVAILABLE ->
-                                    R.string.calls_not_available
                                 MyCallsViewModel.Message.OFFLINE -> R.string.calls_offline
                                 else -> R.string.calls_error
                             },
@@ -79,7 +78,14 @@ fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.calls, key = { it.id }) { CallRow(it) }
+                    items(state.calls, key = { it.id }) { call ->
+                        CallRow(
+                            call = call,
+                            playing = state.playingId == call.id,
+                            onPlay = viewModel::play,
+                            onStop = viewModel::stop,
+                        )
+                    }
                     if (state.hasMore) {
                         item {
                             TextButton(
@@ -97,7 +103,12 @@ fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun CallRow(call: MyCall) {
+private fun CallRow(
+    call: MyCall,
+    playing: Boolean,
+    onPlay: (MyCall) -> Unit,
+    onStop: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -129,18 +140,7 @@ private fun CallRow(call: MyCall) {
                 )
             }
 
-            // Audio, or the honest reason. Never a dead play button.
-            if (call.playable) {
-                TextButton(onClick = { /* T-audio-playback */ }) {
-                    Text(stringResource(R.string.calls_play))
-                }
-            } else {
-                Text(
-                    text = stringResource(call.audioMissingReason.labelRes()),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            AudioRow(call, playing, onPlay, onStop)
         }
     }
 }
@@ -152,6 +152,60 @@ private fun Centre(content: @Composable () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
     ) { content() }
+}
+
+/**
+ * What the employee sees where the audio is, or is not.
+ *
+ * ═══ `audio_state` decides, and every arm has its sentence ═════════════════
+ * **`EXPIRED` is not a failure and must not read like one**: the recording
+ * existed and retention removed it, which is the system working as designed.
+ * `QUEUED` says it is on the way. `NOT_EXPECTED` says there was no
+ * conversation. Only `MISSING` carries a reason, and that is where the
+ * ten-value enum earns its place.
+ *
+ * A play control appears **only** for `RECORDED`. A button that answers 410
+ * teaches somebody the app is broken when it is behaving exactly as designed.
+ */
+@Composable
+private fun AudioRow(
+    call: MyCall,
+    playing: Boolean,
+    onPlay: (MyCall) -> Unit,
+    onStop: () -> Unit,
+) {
+    when (call.audioState) {
+        AudioState.RECORDED -> TextButton(
+            onClick = { if (playing) onStop() else onPlay(call) },
+        ) {
+            Text(
+                stringResource(if (playing) R.string.calls_stop else R.string.calls_play),
+            )
+        }
+
+        AudioState.EXPIRED -> Muted(stringResource(R.string.audio_expired))
+        AudioState.QUEUED -> Muted(stringResource(R.string.audio_queued))
+        AudioState.NOT_EXPECTED -> Muted(stringResource(R.string.audio_not_expected))
+
+        AudioState.MISSING -> Muted(
+            // The reason is guaranteed present for MISSING, and the fallback is
+            // the honest one rather than a blank line if the server ever sends
+            // MISSING without one.
+            stringResource(
+                call.audioMissingReason?.labelRes()
+                    ?: R.string.reason_recording_route_unavailable,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun Muted(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**

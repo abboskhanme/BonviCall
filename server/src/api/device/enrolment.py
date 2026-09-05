@@ -28,7 +28,6 @@ from src.modules.enrolment.schemas import (
     DeviceMsisdnVerifyIn,
     DeviceRedeemIn,
     DeviceRedeemOut,
-    DeviceTokenPairOut,
     DeviceVerificationStatusOut,
     IssuedTokensOut,
     RedeemAgentOut,
@@ -139,25 +138,4 @@ async def callback_status(
             refresh_token=tokens.refresh_token,
             expires_in=tokens.expires_in,
         ),
-    )
-
-
-@router.get("/token", response_model=DeviceTokenPairOut)
-async def current_token(
-    installation: InstallationDep, session: SessionDep
-) -> DeviceTokenPairOut:
-    """Re-issue the pair for an installation that already holds a valid token.
-
-    Used by the app after an update, when it has a live access token but lost
-    its stored refresh token. Cheap, and it saves an agent re-enrolling.
-    """
-    tokens = await EnrolmentService(session).reissue_tokens(installation)
-    return DeviceTokenPairOut(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        expires_in=tokens.expires_in,
-        installation_id=installation.id,
-        status=installation.status,
-        verification_method=installation.verification_method,
-        server_time=clock.now(),
     )

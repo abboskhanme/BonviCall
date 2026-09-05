@@ -27,6 +27,7 @@ navigationCompose = "2.7.7"
 timber = "5.0.1"
 coroutines = "1.8.1"
 lifecycle = "2.8.2"
+media3 = "1.3.1"
 coreKtx = "1.13.1"
 activityCompose = "1.9.0"
 junit = "4.13.2"
@@ -48,6 +49,10 @@ compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+# Media3 — audio playback with real Range requests (N43)
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
 
 # Navigation
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
