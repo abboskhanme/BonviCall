@@ -99,17 +99,22 @@ export function AudioPlayer({ callId, url }: { callId: string; url: string | nul
 
   return (
     <div className="space-y-2" data-testid="audio-ready">
-      {/* An ordinary src. The Service Worker adds the header in flight, so the
-          player issues its own Range requests and seek is native. */}
-      <audio controls preload="metadata" src={state.url} className="w-full">
-        {t('callDetail.playerNoSupport')}
-      </audio>
+      {/* Player and download on ONE row. `<audio controls>` is greedy — left
+          to itself it takes the full width and pushes the button onto a
+          second line — so it gets `min-w-0 flex-1` and the button is told not
+          to shrink. */}
+      <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+        {/* An ordinary src. The Service Worker adds the header in flight, so
+            the player issues its own Range requests and seek is native. */}
+        <audio controls preload="metadata" src={state.url} className="h-10 min-w-0 flex-1">
+          {t('callDetail.playerNoSupport')}
+        </audio>
 
-      <div className="flex flex-wrap items-center gap-3">
         {mayDownload ? (
           <Button
             variant="secondary"
             size="sm"
+            className="shrink-0"
             onClick={() => {
               setDownloadError(null)
               void downloadCallAudio(callId, url).catch((error: unknown) => {
@@ -123,14 +128,14 @@ export function AudioPlayer({ callId, url }: { callId: string; url: string | nul
             {t('callDetail.download')}
           </Button>
         ) : null}
-
-        {/* Said out loud, because it changes what the listener experiences:
-            on the fallback the whole file downloads before playback starts,
-            and a twenty-minute recording takes a moment. */}
-        {state.mode === 'blob' ? (
-          <span className="text-2xs text-muted">{t('callDetail.playerFallback')}</span>
-        ) : null}
       </div>
+
+      {/* Said out loud, because it changes what the listener experiences: on
+          the fallback the whole file downloads before playback starts, and a
+          twenty-minute recording takes a moment. */}
+      {state.mode === 'blob' ? (
+        <p className="text-2xs text-muted">{t('callDetail.playerFallback')}</p>
+      ) : null}
 
       {downloadError ? <p className="text-xs text-bad">{downloadError}</p> : null}
     </div>

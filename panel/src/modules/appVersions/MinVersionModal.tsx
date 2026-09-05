@@ -36,7 +36,7 @@ import { relativeText } from '@/shared/lib/relativeText'
 import { Modal, ModalField, ModalFields } from '@/shared/ui/Modal'
 import { Input } from '@/shared/ui/primitives'
 
-import { useSetMinimumVersion, useVersionGateImpact } from './appVersions'
+import { useSetMinimumVersion, useVersionGateImpact } from './api'
 
 export function MinVersionModal({
   open,

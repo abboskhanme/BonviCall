@@ -119,6 +119,22 @@ describe('route gate', () => {
     expect(heading(t('page.devices'))).not.toBeNull()
   })
 
+  it('does not register the routes the client asked us to remove', () => {
+    // `/monitor`, `/numbers` and `/enrolment` went on 2026-09-05; `/settings`
+    // followed, because recording is continuous and unconditional and a page
+    // of thresholds was not something they wanted to reach. A deleted route is
+    // easy to reintroduce by copying a neighbouring one, so it is asserted
+    // rather than remembered.
+    const paths = ROUTES.map((route) => route.path)
+    expect(paths).not.toContain('/settings')
+    expect(paths).not.toContain('/monitor')
+    expect(paths).not.toContain('/numbers')
+    expect(paths).not.toContain('/enrolment')
+    // The APK surface stays: it is distribution, not configuration, and
+    // without it a fleet of personal phones cannot be updated (N33).
+    expect(paths).toContain('/settings/app-versions')
+  })
+
   it('does not register /i/:code — the server renders the install page', () => {
     // SPEC §8.1 is answered by the server as plain HTML: it is the first thing
     // a salesperson touches on their own phone inside N40's 15 unaided
@@ -133,7 +149,14 @@ describe('route gate', () => {
     // render a page whose every request will fail.
     signIn([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.DEVICES_READ_OWN])
 
-    for (const path of ['/alerts', '/reports/gap', '/audit', '/agents', '/users', '/settings']) {
+    for (const path of [
+      '/alerts',
+      '/reports/gap',
+      '/audit',
+      '/agents',
+      '/users',
+      '/settings/app-versions',
+    ]) {
       const view = renderAt(path)
       expect(heading(t('page.dashboard'))).not.toBeNull()
       view.unmount()

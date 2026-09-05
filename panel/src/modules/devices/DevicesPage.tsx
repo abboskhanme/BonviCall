@@ -42,7 +42,14 @@ import { EnumFilter } from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
-import { buildFleet, useDevices, useInstallations, type FleetRow, type FleetState } from './api'
+import {
+  buildFleet,
+  useDevices,
+  useInstallations,
+  type FleetProblem,
+  type FleetRow,
+  type FleetState,
+} from './api'
 import {
   CAPTURE_ROUTE_LABEL,
   FLEET_PROBLEM_LABEL,
@@ -57,9 +64,41 @@ function parseState(raw: string | null): FleetState | undefined {
   return raw !== null && raw in FLEET_STATE_LABEL ? (raw as FleetState) : undefined
 }
 
+/**
+ * Everything already said by the state badge, removed from the problems list.
+ *
+ * `Holati` and `Muammolar` used to print the same word twice on most rows —
+ * "Aloqada emas" as a status and again as a problem — which is a column
+ * carrying no information and a row that takes twice the height to say one
+ * thing. The state badge answers "how is it"; this answers "and what else",
+ * which is only worth a column when there IS something else.
+ */
+function extraProblems(row: FleetRow): FleetProblem[] {
+  const saidByState: Partial<Record<FleetState, FleetProblem>> = {
+    never_reported: 'never_reported',
+    install_disappeared: 'install_disappeared',
+    offline: 'offline',
+    revoked: 'revoked',
+  }
+  const covered = saidByState[row.state]
+  return row.problems.filter((problem) => problem !== covered)
+}
+
+/** The queue cell: a count, a size when one is known, and never a dash
+ *  standing in for a number the device simply did not send. */
+function queueText(health: FleetRow['health']): string {
+  if (health.never_reported) return EM_DASH
+  const records = health.queue_records ?? 0
+  if (records === 0) return t('devices.queueEmpty')
+  const bytes = health.queue_bytes
+  if (bytes === null || bytes === undefined) return t('devices.queueCountOnly', { n: records })
+  return t('devices.queueValue', { n: records, size: formatBytes(bytes) })
+}
+
 function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) => string | null }) {
-  const { health, state, problems } = row
+  const { health, state } = row
   const name = agentName(health.agent_id)
+  const extra = extraProblems(row)
 
   return (
     <TR>
@@ -83,15 +122,17 @@ function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) 
           <span className="font-mono text-xs text-muted">{shortId(health.agent_id)}</span>
         )}
       </TD>
-      <TD>
+      <TD className="whitespace-nowrap">
+        {/* `whitespace-nowrap` on the cell: the badge wrapped onto two lines
+            and took the whole row with it. */}
         <Badge tone={FLEET_STATE_TONE[state]}>{t(FLEET_STATE_LABEL[state])}</Badge>
       </TD>
       <TD
         className="whitespace-nowrap text-muted"
         title={health.last_heartbeat_at ? formatInstantTitle(health.last_heartbeat_at) : undefined}
       >
-        {/* Never-reported has no timestamp, and a dash here would say
-            "unknown" when the truth is "never". */}
+        {/* Never-reported has no timestamp, and a dash would say "unknown"
+            when the truth is "never". */}
         {health.last_heartbeat_at ? relativeText(health.last_heartbeat_at) : t('devices.never')}
       </TD>
       <TD className="whitespace-nowrap">
@@ -103,20 +144,30 @@ function DeviceRow({ row, agentName }: { row: FleetRow; agentName: (id: string) 
           EM_DASH
         )}
       </TD>
-      <TD className="whitespace-nowrap text-end font-mono tabular-nums text-muted">
-        {health.never_reported
-          ? EM_DASH
-          : `${health.queue_records ?? 0} · ${formatBytes(health.queue_bytes)}`}
+      <TD
+        className="whitespace-nowrap text-end font-mono tabular-nums text-muted"
+        title={health.never_reported ? undefined : t('devices.colQueueHint')}
+      >
+        {/* Was `0 · —`, which said nothing twice. An empty queue is the
+            normal, good case and reads as one; a queue with records names its
+            size ONLY when a size is known — the device does not always report
+            `queue_bytes`, and `1 ta · —` is the same non-answer in a
+            different place. */}
+        {queueText(health)}
       </TD>
       <TD className="whitespace-nowrap text-muted">{health.app_version ?? EM_DASH}</TD>
       <TD>
-        <ul className="flex flex-wrap gap-1">
-          {problems.map((problem) => (
-            <li key={problem}>
-              <Badge tone="warn">{t(FLEET_PROBLEM_LABEL[problem])}</Badge>
-            </li>
-          ))}
-        </ul>
+        {extra.length === 0 ? (
+          <span className="text-xs text-muted">{EM_DASH}</span>
+        ) : (
+          <ul className="flex flex-wrap gap-1">
+            {extra.map((problem) => (
+              <li key={problem}>
+                <Badge tone="warn">{t(FLEET_PROBLEM_LABEL[problem])}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
       </TD>
     </TR>
   )
@@ -150,21 +201,35 @@ export function DevicesPage() {
   const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation)
   const visible = stateFilter ? fleet.filter((row) => row.state === stateFilter) : fleet
   const needAttention = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
+  // `buildFleet` already sorts worst first, so the head of that list IS the
+  // worst thing in the fleet.
+  const worst = needAttention[0] ?? null
 
   return (
     <Page>
       <PageHeader title={t('page.devices')} description={t('devices.subtitle')} />
 
-      {needAttention.length > 0 ? (
+      {worst ? (
+        /* "5 of 5 need attention" tells nobody anything — when everything is
+           flagged the sentence is noise. Name the single worst thing instead,
+           and say nothing at all when there is nothing to say. */
         <Card className="flex items-start gap-3 border-warn/40 bg-warn/5 p-3">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
           <p className="text-sm text-text">
-            {t('devices.attention', { n: needAttention.length, total: fleet.length })}
+            {t('devices.attentionWorst', {
+              state: t(FLEET_STATE_LABEL[worst.state]),
+              device:
+                `${worst.health.manufacturer ?? ''} ${worst.health.model ?? ''}`.trim() ||
+                t('devices.unknownModel'),
+              agent: agentName(worst.health.agent_id) ?? '',
+              more: needAttention.length - 1,
+            })}
           </p>
         </Card>
       ) : null}
 
-      <Card className="flex flex-wrap items-end gap-3 p-3">
+      {/* One control does not need a card around it. */}
+      <div className="flex flex-wrap items-end gap-3">
         <EnumFilter
           label={t('devices.filterState')}
           allLabel={t('calls.filterAny')}
@@ -172,7 +237,10 @@ export function DevicesPage() {
           value={stateFilter}
           onChange={applyFilter}
         />
-      </Card>
+        <span className="pb-2 text-xs text-muted">
+          {t('devices.total', { count: visible.length })}
+        </span>
+      </div>
 
       <QueryBoundary
         query={devicesQuery}
@@ -204,7 +272,6 @@ export function DevicesPage() {
                 </TBody>
               </Table>
             </TableWrap>
-            <p className="text-xs text-muted">{t('devices.total', { count: visible.length })}</p>
           </>
         )}
       </QueryBoundary>

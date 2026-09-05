@@ -26,7 +26,7 @@ import { Modal, ModalField, ModalFields } from '@/shared/ui/Modal'
 import { Input } from '@/shared/ui/primitives'
 import { SELECT_CLASS } from '@/shared/ui/filters'
 
-import { useUploadVersion, type AppVariant, type UploadRelease } from './appVersions'
+import { useUploadVersion, type AppVariant, type UploadRelease } from './api'
 
 const VARIANTS: readonly AppVariant[] = ['legacy28', 'modern34']
 

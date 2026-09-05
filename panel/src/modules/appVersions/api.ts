@@ -26,6 +26,40 @@ import { api } from '@/shared/api/client'
 import { moduleKey, queryKey } from '@/shared/api/queryKeys'
 import type { components } from '@/shared/api/types.gen'
 
+export type Setting = components['schemas']['SettingResponse']
+export type SettingList = components['schemas']['SettingListResponse']
+
+/** The minimum supported version code lives in `app_settings` (SPEC §3.8). */
+export const MIN_VERSION_KEY = 'app.min_supported_version_code'
+
+/**
+ * The settings list, read for exactly one key.
+ *
+ * `/settings` the PAGE was removed on 2026-09-05 at the client's request, but
+ * the minimum supported version is a distribution fact and belongs here. This
+ * is the only remaining caller of `GET /api/v1/settings` in the panel — the
+ * endpoint stays because the twenty-eight thresholds are still read by the
+ * services that need them, and an RBAC-protected call is a better escape
+ * hatch for changing retention than editing a row in production by hand.
+ */
+export function useSettings(): UseQueryResult<SettingList> {
+  return useQuery({
+    queryKey: queryKey('settings', 'list'),
+    queryFn: () => api.get<SettingList>('/settings'),
+  })
+}
+
+export function findSetting(list: Setting[] | undefined, key: string): Setting | undefined {
+  return (list ?? []).find((setting) => setting.key === key)
+}
+
+/** `SettingResponse.value` is untyped on the wire — the column holds JSON —
+ *  so the narrowing happens here, against the row's own `value_type`. */
+export function settingNumber(setting: Setting | undefined): number | null {
+  if (!setting || typeof setting.value !== 'number') return null
+  return setting.value
+}
+
 export type AppVersion = components['schemas']['AppVersionResponse']
 export type AppVersionList = components['schemas']['AppVersionListResponse']
 export type VersionGateImpact = components['schemas']['VersionGateImpactResponse']

@@ -39,8 +39,7 @@ import { DeviceDetailPage } from '@/modules/devices/DeviceDetailPage'
 import { DevicesPage } from '@/modules/devices/DevicesPage'
 import { GapReportPage } from '@/modules/reports/GapReportPage'
 import { StorageReportPage } from '@/modules/reports/StorageReportPage'
-import { AppVersionsPage } from '@/modules/settings/AppVersionsPage'
-import { SettingsPage } from '@/modules/settings/SettingsPage'
+import { AppVersionsPage } from '@/modules/appVersions/AppVersionsPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { landingPath } from '@/shared/auth/landing'
 import { Perm, type Permission } from '@/shared/auth/permissions'
@@ -111,13 +110,27 @@ export const ROUTES: readonly RouteSpec[] = [
 
   // ── Administration ────────────────────────────────────────────────────
   { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },
-  { path: '/audit', element: <AuditPage />, anyOf: [Perm.AUDIT_READ] },
-  { path: '/settings', element: <SettingsPage />, anyOf: [Perm.SETTINGS_READ] },
+  //
+  // Removed 2026-09-05 at the client's request: `/settings`. Recording is
+  // continuous and unconditional — no setting has ever gated it — so a page of
+  // thresholds was not something they wanted to be able to reach. The
+  // `working_hours.*` values it exposed are still read by `modules/devices`
+  // server-side, and only to decide when a silent phone is asleep rather than
+  // broken; that is about when to raise an alert, never about when to record.
+  //
+  // `GET/PUT /api/v1/settings` deliberately keeps no caller but this page's
+  // one read: retention behind an RBAC-protected API call is a better place
+  // for it than a button, and better than editing a row in production by hand.
+  //
+  // The APK surface stays, because it is distribution and not configuration:
+  // without it nobody can publish a build or raise the minimum version, and a
+  // fleet of personal phones cannot be updated at all (N33).
   {
     path: '/settings/app-versions',
     element: <AppVersionsPage />,
     anyOf: [Perm.APPVERSIONS_READ],
   },
+  { path: '/audit', element: <AuditPage />, anyOf: [Perm.AUDIT_READ] },
 ]
 
 function FullPageLoader() {

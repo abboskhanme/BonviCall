@@ -33,7 +33,6 @@ import {
   Package,
   Phone,
   ScrollText,
-  Settings,
   Smartphone,
   SunMedium,
   UserCog,
@@ -157,13 +156,10 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupAdmin',
   },
   {
-    to: '/settings',
-    labelKey: 'nav.settings',
-    icon: Settings,
-    anyOf: [Perm.SETTINGS_READ],
-    group: 'nav.groupAdmin',
-  },
-  {
+    // Distribution, not configuration. `/settings` is gone; this is what
+    // publishes an APK and raises the minimum version, and without it a fleet
+    // of personal phones cannot be updated at all (N33). The path keeps its
+    // old shape so existing links still work.
     to: '/settings/app-versions',
     labelKey: 'nav.appVersions',
     icon: Package,
@@ -243,7 +239,7 @@ function NavList({
             ) : null}
             <NavLink
               to={item.to}
-              end={item.to === '/' || item.to === '/settings'}
+              end={item.to === '/'}
               onClick={onNavigate}
               title={collapsed ? t(item.labelKey) : undefined}
               className={({ isActive }) =>

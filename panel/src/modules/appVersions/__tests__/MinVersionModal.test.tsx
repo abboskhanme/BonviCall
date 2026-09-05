@@ -24,8 +24,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { MinVersionModal } from '@/modules/settings/MinVersionModal'
-import type { VersionGateImpact } from '@/modules/settings/appVersions'
+import { MinVersionModal } from '@/modules/appVersions/MinVersionModal'
+import type { VersionGateImpact } from '@/modules/appVersions/api'
 import { tokenStore } from '@/shared/api/client'
 import { t } from '@/shared/i18n'
 

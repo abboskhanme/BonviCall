@@ -197,10 +197,30 @@ describe('the two guards', () => {
     const rows = await screen.findAllByRole('row')
     const mine = rows.find((row) => row.textContent?.includes('Administrator'))
     expect(mine).toBeDefined()
-    // Locked twice over here — it is both my own account and the last admin —
-    // and the row names both reasons rather than only the first.
-    expect(mine?.textContent).toContain(t('users.lastAdminLocked'))
-    expect(mine?.textContent).toContain(t('users.selfLocked'))
+    // Marked inline beside the name, which costs the row no height.
+    expect(mine?.textContent).toContain(t('users.lastAdminShort'))
+
+    // Locked twice over here — my own account AND the last admin — and both
+    // reasons travel on the control's `title` rather than as a caption that
+    // wrapped the row onto four lines.
+    const edit = within(mine as HTMLElement).getByRole('button', { name: t('users.edit') })
+    expect(edit).toHaveAttribute('title', expect.stringContaining(t('users.lastAdminLocked')))
+    expect(edit).toHaveAttribute('title', expect.stringContaining(t('users.selfLocked')))
+  })
+
+  it('keeps every row the same height', async () => {
+    world([admin, makeUser(), sales])
+    renderPage()
+
+    await screen.findByText('Sales Salesov')
+    const rows = screen.getAllByRole('row').slice(1)
+    // The Administrator row carried a four-line caption under its buttons and
+    // was roughly three times the height of its neighbours; the table stopped
+    // looking like a table. Nothing in a cell may wrap onto a second line.
+    for (const row of rows) {
+      expect(row.textContent).not.toContain(t('users.selfLocked'))
+      expect(row.textContent).not.toContain(t('users.lastAdminLocked'))
+    }
   })
 
   it('marks the last admin even when it is somebody else', async () => {
@@ -212,8 +232,10 @@ describe('the two guards', () => {
     const rows = await screen.findAllByRole('row')
     const theirs = rows.find((row) => row.textContent?.includes('Other Admin'))
     expect(theirs).toBeDefined()
-    expect(theirs?.textContent).toContain(t('users.lastAdminLocked'))
-    expect(theirs?.textContent).not.toContain(t('users.selfLocked'))
+    expect(theirs?.textContent).toContain(t('users.lastAdminShort'))
+
+    const edit = within(theirs as HTMLElement).getByRole('button', { name: t('users.edit') })
+    expect(edit).toHaveAttribute('title', t('users.lastAdminLocked'))
   })
 
   it('stops marking one once a second admin exists', async () => {

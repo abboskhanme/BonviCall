@@ -20,15 +20,17 @@ import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
-import { formatDate } from '@/shared/lib/format'
+import { EM_DASH, formatDate, formatInstantTitle, formatPhone } from '@/shared/lib/format'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { FilterField, SELECT_CLASS, TextFilter } from '@/shared/ui/filters'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
+import { useNumbers } from '@/modules/numbers/api'
+
 import { AgentModal } from './AgentModal'
 import { ArchiveAgentModal } from './ArchiveAgentModal'
-import { useAgents, type Agent } from './api'
+import { useAgentLines, useAgents, type Agent } from './api'
 
 const PARAM_Q = 'q'
 const PARAM_ARCHIVED = 'archived'
@@ -47,6 +49,13 @@ export function AgentsPage() {
   const [archiving, setArchiving] = useState<Agent | null>(null)
 
   const agentsQuery = useAgents({ q: search, includeArchived })
+  const numbersQuery = useNumbers()
+  // The number and the date it was attached: see `useAgentLines` for why this
+  // costs one request per agent and what would remove it.
+  const { lines, isError: linesFailed } = useAgentLines(
+    agentsQuery.data?.items,
+    numbersQuery.data?.items,
+  )
 
   function applyFilter(key: string, value: string | null) {
     const next = new URLSearchParams(searchParams)
@@ -108,7 +117,10 @@ export function AgentsPage() {
                   <tr>
                     <TH>{t('agents.colName')}</TH>
                     <TH>{t('agents.colCode')}</TH>
-                    <TH>{t('agents.colHired')}</TH>
+                    <TH>{t('agents.colNumber')}</TH>
+                    {/* The date the NUMBER was attached — the assignment's
+                        `valid_from`, not the employment date. */}
+                    <TH>{t('agents.colAttached')}</TH>
                     <TH>{t('agents.colStatus')}</TH>
                     <TH>{t('agents.colNote')}</TH>
                     {mayWrite || mayArchive ? <TH className="w-0" /> : null}
@@ -126,10 +138,26 @@ export function AgentsPage() {
                         </Link>
                       </TD>
                       <TD className="font-mono text-xs text-muted">
-                        {agent.employee_code ?? '—'}
+                        {agent.employee_code ?? EM_DASH}
                       </TD>
-                      <TD className="whitespace-nowrap text-muted">
-                        {agent.hired_at ? formatDate(agent.hired_at) : '—'}
+                      <TD className="whitespace-nowrap font-mono">
+                        {(() => {
+                          const line = lines.get(agent.id)
+                          if (!line) return <span className="text-muted">{EM_DASH}</span>
+                          return formatPhone(line.e164) ?? line.e164
+                        })()}
+                      </TD>
+                      <TD
+                        className="whitespace-nowrap text-muted"
+                        title={(() => {
+                          const line = lines.get(agent.id)
+                          return line ? formatInstantTitle(line.since) : undefined
+                        })()}
+                      >
+                        {(() => {
+                          const line = lines.get(agent.id)
+                          return line ? formatDate(line.since) : EM_DASH
+                        })()}
                       </TD>
                       <TD>
                         {agent.archived_at ? (
@@ -175,6 +203,10 @@ export function AgentsPage() {
               </Table>
             </TableWrap>
             <p className="text-xs text-muted">{t('agents.total', { count: data.total })}</p>
+            {linesFailed ? (
+              // Never let a failed lookup read as "this agent has no number".
+              <p className="text-xs text-warn">{t('agents.linesPartial')}</p>
+            ) : null}
           </>
         )}
       </QueryBoundary>

@@ -28,15 +28,17 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 import { MinVersionModal } from './MinVersionModal'
 import { UploadVersionModal } from './UploadVersionModal'
 import {
+  MIN_VERSION_KEY,
   downloadUrl,
+  findSetting,
+  settingNumber,
   useAppVersions,
   useDiscardVersion,
   usePublishVersion,
+  useSettings,
   type AppVersion,
-} from './appVersions'
-import { findSetting, settingNumber, useSettings } from './api'
+} from './api'
 
-const MIN_VERSION_KEY = 'app.min_supported_version_code'
 
 /**
  * The server answers a discard of a published build with a generic `conflict`

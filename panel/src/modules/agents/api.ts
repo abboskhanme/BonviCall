@@ -10,7 +10,7 @@
  * a name, and four copies of that lookup is four things to fix when the roster
  * endpoint grows a cursor.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query'
 
 import { api } from '@/shared/api/client'
@@ -112,4 +112,66 @@ export function useArchiveAgent(agentId: string): UseMutationResult<Agent, unkno
       void client.invalidateQueries({ queryKey: moduleKey('numbers') })
     },
   })
+}
+
+/** One agent's current line, as the roster shows it. */
+export interface AgentLine {
+  e164: string
+  /** When this agent was given the number — the assignment's `valid_from`,
+   *  which is NOT the same fact as `hired_at`. */
+  since: string
+}
+
+/**
+ * Which work number each agent holds right now, and since when.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠️ **This fans out: one request per agent.**
+ *
+ * `AgentResponse` carries neither the number nor the assignment date, so the
+ * only way to put them on the roster is to read every agent's assignments and
+ * join them against `/numbers`. At fifteen agents that is fifteen small cached
+ * requests and it works; at three hundred it does not.
+ *
+ * The fix is the denormalisation `CallResponse` already has — `agent_name`
+ * arrives with the row rather than being looked up per row — and the same
+ * shape here would be `current_number_e164` and `number_since` on
+ * `AgentResponse`. **TODO(server): add them and delete this hook.**
+ *
+ * `since` comes from the assignment and never from `hired_at`. They are
+ * different facts: one is when this person was given this line, the other is
+ * when they were employed, and labelling the second as the first would put a
+ * false caption on real data.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function useAgentLines(
+  agents: Agent[] | undefined,
+  numbers: { id: string; e164: string }[] | undefined,
+): { lines: Map<string, AgentLine>; isError: boolean } {
+  const results = useQueries({
+    queries: (agents ?? []).map((agent) => ({
+      queryKey: queryKey('numbers', 'agentAssignments', { agentId: agent.id }),
+      queryFn: () =>
+        api.get<{ items: AssignmentRow[] }>('/assignments', { agent_id: agent.id }),
+      staleTime: 60_000,
+    })),
+  })
+
+  const e164ById = new Map((numbers ?? []).map((number) => [number.id, number.e164]))
+  const lines = new Map<string, AgentLine>()
+  ;(agents ?? []).forEach((agent, index) => {
+    // The OPEN assignment only: a closed one is history, and the roster is
+    // asking what they hold today. The card shows the full timeline.
+    const open = results[index]?.data?.items.find((row) => row.valid_to === null)
+    const e164 = open ? e164ById.get(open.number_id) : undefined
+    if (open && e164) lines.set(agent.id, { e164, since: open.valid_from })
+  })
+
+  return { lines, isError: results.some((result) => result.status === 'error') }
+}
+
+interface AssignmentRow {
+  number_id: string
+  valid_from: string
+  valid_to: string | null
 }

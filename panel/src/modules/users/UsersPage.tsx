@@ -114,15 +114,37 @@ export function UsersPage() {
                 {data.items.map((user) => {
                   const isSelf = user.id === currentUser?.id
                   const lastAdmin = isLastActiveAdmin(data.items, user)
-                  // Locked for a reason the row can name; the server refuses
-                  // it too, which is the check that decides anything.
-                  const locked = isSelf || lastAdmin
+                  // Both guards can apply at once — an admin editing their own
+                  // account while being the last one is blocked twice over —
+                  // so both reasons travel, joined, in one `title`. The server
+                  // refuses either way; this only explains the refusal.
+                  const editReason =
+                    [
+                      isSelf ? t('users.selfLocked') : null,
+                      lastAdmin ? t('users.lastAdminLocked') : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || null
                   return (
                     <TR key={user.id}>
-                      <TD className="font-medium text-text">
+                      <TD className="whitespace-nowrap font-medium text-text">
                         {user.full_name}
                         {isSelf ? (
                           <span className="ms-2 text-2xs text-muted">{t('users.you')}</span>
+                        ) : null}
+                        {lastAdmin ? (
+                          /* Was a bare icon on its own line above the buttons.
+                             Inline and captioned, it costs no height. */
+                          <span
+                            className="ms-2 inline-flex items-center gap-1 text-2xs text-warn"
+                            title={t('errors.last_admin')}
+                          >
+                            <ShieldAlert className="size-3" aria-hidden />
+                            {t('users.lastAdminShort')}
+                          </span>
+                        ) : null}
+                        {user.must_change_password ? (
+                          <span className="ms-2 text-2xs text-warn">{t('users.mustChange')}</span>
                         ) : null}
                       </TD>
                       <TD className="font-mono text-xs text-muted">{user.email}</TD>
@@ -143,17 +165,16 @@ export function UsersPage() {
                           EM_DASH
                         )}
                       </TD>
-                      <TD>
-                        <div className="flex flex-wrap items-center gap-1">
-                          {user.is_active ? (
-                            <Badge tone="good">{t('users.statusActive')}</Badge>
-                          ) : (
-                            <Badge tone="neutral">{t('users.statusInactive')}</Badge>
-                          )}
-                          {user.must_change_password ? (
-                            <Badge tone="warn">{t('users.mustChange')}</Badge>
-                          ) : null}
-                        </div>
+                      <TD className="whitespace-nowrap">
+                        {/* One badge. `must_change_password` is a pending
+                            action, not a second status, and showing them as
+                            two equal badges read as two states. It moves
+                            beside the name as a quiet note. */}
+                        {user.is_active ? (
+                          <Badge tone="good">{t('users.statusActive')}</Badge>
+                        ) : (
+                          <Badge tone="neutral">{t('users.statusInactive')}</Badge>
+                        )}
                       </TD>
                       <TD
                         className="whitespace-nowrap text-muted"
@@ -165,19 +186,29 @@ export function UsersPage() {
                       </TD>
                       {mayWrite ? (
                         <TD>
+                          {/* ═══════════════════════════════════════════════
+                              One line, always.
+
+                              The reasons used to sit under the buttons as a
+                              caption, which wrapped across four lines in a
+                              narrow column and made this row three times the
+                              height of its neighbours — the table stopped
+                              looking like a table.
+
+                              They are not dropped, though: a disabled button
+                              with no explanation is its own small cruelty.
+                              Somebody clicks, nothing happens, and they never
+                              find out why. The reason moves onto the control
+                              as a `title`, where it is available on hover and
+                              read out by a screen reader, and the row stays
+                              one line high.
+                              ═══════════════════════════════════════════════ */}
                           <div className="flex items-center justify-end gap-1">
-                            {lastAdmin ? (
-                              <span
-                                className="text-2xs text-warn"
-                                title={t('errors.last_admin')}
-                              >
-                                <ShieldAlert className="size-3.5" aria-hidden />
-                              </span>
-                            ) : null}
                             <Button
                               variant="ghost"
                               size="sm"
                               aria-label={t('users.edit')}
+                              title={editReason ?? t('users.edit')}
                               onClick={() => setEditing(user)}
                             >
                               <Pencil className="size-3.5" aria-hidden />
@@ -186,30 +217,16 @@ export function UsersPage() {
                               variant="ghost"
                               size="sm"
                               aria-label={t('users.reset')}
-                              // Resetting your own password here would sign you
-                              // out mid-session; `/auth/password` is the route
-                              // for that and it asks for the current one.
+                              // Resetting your own password here would sign
+                              // you out mid-session; `/auth/password` is the
+                              // route for that and it asks for the current one.
+                              title={isSelf ? t('users.selfLocked') : t('users.reset')}
                               disabled={isSelf}
                               onClick={() => setResetting(user)}
                             >
                               <KeyRound className="size-3.5" aria-hidden />
                             </Button>
                           </div>
-                          {/* Both reasons, when both apply: an admin editing
-                              their own account while being the last one is
-                              blocked twice over, and naming only the first
-                              would make the second look like a bug when it
-                              still refuses after they add a colleague. */}
-                          {locked ? (
-                            <p className="text-end text-2xs text-muted">
-                              {[
-                                isSelf ? t('users.selfLocked') : null,
-                                lastAdmin ? t('users.lastAdminLocked') : null,
-                              ]
-                                .filter(Boolean)
-                                .join(' · ')}
-                            </p>
-                          ) : null}
                         </TD>
                       ) : null}
                     </TR>

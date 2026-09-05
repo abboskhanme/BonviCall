@@ -15,12 +15,13 @@
  */
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Pencil } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
 import { messageForError } from '@/shared/api/errors'
 import { t } from '@/shared/i18n'
+import { cn } from '@/shared/lib/cn'
 import { Page, PageHeader } from '@/shared/layout/Page'
 import {
   formatDateTime,
@@ -215,27 +216,102 @@ function NoteSection({ call }: { call: Call }) {
   )
 }
 
-function CallCard({ call }: { call: Call }) {
-  const phone = formatPhone(call.remote_number)
+/**
+ * One side of the call: a person and the number they were on.
+ *
+ * Both sides share a shape so the eye can compare them, and the client side
+ * survives a withheld number — that is a real and common case (SPEC §4.0
+ * stores an unparseable or absent number rather than rejecting the call), and
+ * an empty half would read as a rendering fault rather than as a fact about
+ * the call.
+ */
+function Party({
+  role,
+  name,
+  number,
+  align = 'start',
+}: {
+  role: string
+  name: string | null
+  number: string | null
+  align?: 'start' | 'end'
+}) {
+  const alignment = align === 'end' ? 'items-end text-end' : 'items-start text-start'
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-0.5', alignment)}>
+      <span className="text-2xs font-medium uppercase tracking-wide text-muted">{role}</span>
+      <span className="truncate font-mono text-lg font-semibold text-text">
+        {number ?? t('calls.numberWithheld')}
+      </span>
+      {name ? <span className="truncate text-sm text-muted">{name}</span> : null}
+    </div>
+  )
+}
+
+/**
+ * The header: a call **between two people**, not a row of facts.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * The employee is on the left, the client on the right, and the direction is
+ * an arrow between them — pointing right when the employee called out,
+ * pointing left when the client called in. Direction is the first thing
+ * anybody wants from a call record and it should not require reading a badge
+ * to get.
+ *
+ * The arrow is decorative to a screen reader (`aria-hidden`); the direction
+ * word travels in the `<figcaption>`-style label beside the duration, so the
+ * information is never carried by shape alone.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function CallHeader({ call }: { call: Call }) {
+  const outgoing = call.direction === 'outgoing'
+  const Arrow = outgoing ? ArrowRight : ArrowLeft
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-wrap items-center gap-3 p-4">
-        <span className="font-mono text-lg font-semibold text-text">
-          {phone ?? t('calls.numberWithheld')}
-        </span>
-        {call.contact_name ? (
-          <span className="text-sm text-muted">{call.contact_name}</span>
-        ) : null}
-        <Badge tone="accent">{t(DIRECTION_LABEL[call.direction])}</Badge>
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+        <Party
+          role={t('callDetail.employeeSide')}
+          name={call.agent_name}
+          number={formatPhone(call.number_e164)}
+        />
+
+        {/* The visual middle: which way the call went, and how long it ran. */}
+        <div className="flex shrink-0 flex-col items-center gap-1 px-2">
+          <Arrow
+            className={cn('size-6', outgoing ? 'text-accent' : 'text-good')}
+            aria-hidden
+          />
+          <span className="whitespace-nowrap text-2xs font-medium uppercase tracking-wide text-muted">
+            {t(DIRECTION_LABEL[call.direction])}
+          </span>
+          <span className="font-mono text-base tabular-nums text-text">
+            {formatDuration(call.duration_sec)}
+          </span>
+        </div>
+
+        <Party
+          role={t('callDetail.clientSide')}
+          name={call.contact_name}
+          number={formatPhone(call.remote_number)}
+          align="end"
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <Badge tone={DISPOSITION_TONE[call.disposition]}>
           {t(DISPOSITION_LABEL[call.disposition])}
         </Badge>
         <Badge>{t(CALL_TYPE_LABEL[call.call_type])}</Badge>
-        <span className="ms-auto font-mono text-lg tabular-nums text-text">
-          {formatDuration(call.duration_sec)}
-        </span>
-      </Card>
+      </div>
+    </Card>
+  )
+}
+
+function CallCard({ call }: { call: Call }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <CallHeader call={call} />
 
       <AudioSection call={call} />
 
@@ -277,11 +353,10 @@ function CallCard({ call }: { call: Call }) {
 
         <Section title={t('callDetail.sectionOrigin')}>
           <FieldGrid className="xl:grid-cols-2">
-            {/* Resolved server-side; `sales` receives its own agent object too —
-                the panel hides the COLUMN on the list, the API special-cases
-                nobody. */}
-            <Field label={t('callDetail.agent')} value={call.agent_name} />
-            <Field label={t('callDetail.numberE164')} value={formatPhone(call.number_e164)} />
+            {/* The agent and the work number are NOT repeated here: the
+                header above already names both, on the side of the card that
+                belongs to the employee. Printing them twice is what made this
+                section long enough to need its own row per field. */}
             <Field label={t('callDetail.deviceModel')} value={call.device_model ?? null} />
             <Field label={t('callDetail.source')} value={t(SOURCE_LABEL[call.source])} />
             <Field
