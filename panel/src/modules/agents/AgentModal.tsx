@@ -1,5 +1,10 @@
 /**
- * Create and edit an agent (CONVENTIONS-CLIENT.md §3 — never an inline form).
+ * Edit an agent (CONVENTIONS-CLIENT.md §3 — never an inline form).
+ *
+ * Creating one is `CreateAgentModal`, which is a flow rather than a form: it
+ * also registers the work number and issues the enrolment code, because
+ * enrolling somebody used to take three separate places and the third was
+ * invisible.
  *
  * An agent is a salesperson, not a login. This modal deliberately carries no
  * password, role or email field: `POST /agents` never creates a user, and a

@@ -42,6 +42,7 @@ import { relativeText } from '@/shared/lib/relativeText'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { Section } from '@/shared/ui/detail'
 
+import { installUrl } from '@/modules/numbers/installUrl'
 import {
   isCodeLive,
   useEnrolmentAttempts,
@@ -110,14 +111,10 @@ function CodeRow({ code, mayWrite }: { code: EnrolmentCode; mayWrite: boolean })
   const [copied, setCopied] = useState(false)
   const live = isCodeLive(code)
 
-  // The install URL is built here because the server does not return one:
-  // `EnrolmentCodeResponse` carries the code only. Same-origin by
-  // construction, which is also what `/i/{code}` is served from.
-  const installUrl = `${window.location.origin}/i/${code.code}`
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(t('enrol.smsTemplate', { url: installUrl }))
+      await navigator.clipboard.writeText(t('enrol.smsTemplate', { url: installUrl(code.code) }))
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {

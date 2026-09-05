@@ -29,6 +29,7 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 import { useNumbers } from '@/modules/numbers/api'
 
 import { AgentModal } from './AgentModal'
+import { CreateAgentModal } from './CreateAgentModal'
 import { ArchiveAgentModal } from './ArchiveAgentModal'
 import { useAgentLines, useAgents, type Agent } from './api'
 
@@ -213,7 +214,9 @@ export function AgentsPage() {
 
       {mayWrite ? (
         <>
-          <AgentModal open={creating} onOpenChange={setCreating} agent={null} />
+          {/* Create is a FLOW, not a form: agent, number and enrolment code
+              in one dialog that ends on the code. Edit stays a plain form. */}
+          <CreateAgentModal open={creating} onOpenChange={setCreating} />
           <AgentModal
             open={editing !== null}
             onOpenChange={(open) => !open && setEditing(null)}
