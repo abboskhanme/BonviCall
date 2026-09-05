@@ -27,12 +27,14 @@ down_revision: str | None = "003"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-NEW_VALUE = "app_version_uploaded"
-
-
 def upgrade() -> None:
+    # Written out literally rather than interpolated: the value belongs in the
+    # diff a reviewer reads, and ``test_migration_enum_table_matches_core_enums``
+    # reads these statements to know what the database's enums hold.
     with op.get_context().autocommit_block():
-        op.execute(f"ALTER TYPE audit_action ADD VALUE IF NOT EXISTS '{NEW_VALUE}'")
+        op.execute(
+            "ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'app_version_uploaded'"
+        )
 
 
 def downgrade() -> None:

@@ -359,6 +359,134 @@
         "title": "AppVariant",
         "type": "string"
       },
+      "AppVersionListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppVersionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "signing_sha256_configured": {
+            "description": "Whether a signing fingerprint is configured. False means uploads are accepted without the key check — see docs/APK-SIGNING.md.",
+            "title": "Signing Sha256 Configured",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "signing_sha256_configured"
+        ],
+        "title": "AppVersionListResponse",
+        "type": "object"
+      },
+      "AppVersionResponse": {
+        "description": "One build in the distribution record.",
+        "properties": {
+          "apk_sha256": {
+            "description": "Computed server-side, never accepted.",
+            "title": "Apk Sha256",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "is_mandatory": {
+            "title": "Is Mandatory",
+            "type": "boolean"
+          },
+          "min_api_level": {
+            "title": "Min Api Level",
+            "type": "integer"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL means uploaded but not published — reaches nobody.",
+            "title": "Published At"
+          },
+          "release_notes_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Notes Uz"
+          },
+          "size_bytes": {
+            "format": "int64",
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "version_code": {
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "version_code",
+          "variant",
+          "apk_sha256",
+          "size_bytes",
+          "min_api_level",
+          "release_notes_uz",
+          "is_mandatory",
+          "is_current",
+          "published_at",
+          "created_at",
+          "created_by"
+        ],
+        "title": "AppVersionResponse",
+        "type": "object"
+      },
       "AssignmentListResponse": {
         "description": "Full history for a number — this is the timeline the agent page renders.",
         "properties": {
@@ -513,6 +641,7 @@
           "retention_changed",
           "line_directory_updated",
           "supported_model_updated",
+          "app_version_uploaded",
           "app_version_published",
           "service_token_created",
           "service_token_revoked",
@@ -649,6 +778,56 @@
           "user_agent"
         ],
         "title": "AuditResponse",
+        "type": "object"
+      },
+      "Body_upload_version_api_v1_app_versions_post": {
+        "properties": {
+          "apk": {
+            "description": "The signed APK.",
+            "format": "binary",
+            "title": "Apk",
+            "type": "string"
+          },
+          "is_mandatory": {
+            "default": false,
+            "title": "Is Mandatory",
+            "type": "boolean"
+          },
+          "min_api_level": {
+            "default": 26,
+            "title": "Min Api Level",
+            "type": "integer"
+          },
+          "release_notes_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Notes Uz"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "version_code": {
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "apk",
+          "version",
+          "version_code",
+          "variant"
+        ],
+        "title": "Body_upload_version_api_v1_app_versions_post",
         "type": "object"
       },
       "CallAudioSummary": {
@@ -3926,6 +4105,46 @@
         "title": "RevokeResponse",
         "type": "object"
       },
+      "SetMinimumVersionRequest": {
+        "description": "``PUT /api/v1/app/min-version``.\n\n``acknowledged_stranded`` must equal the count the impact endpoint returns\nright now. Not ceremony: it fails exactly when the number moved between\nlooking and deciding, which is when the admin's picture is stale.",
+        "properties": {
+          "acknowledged_stranded": {
+            "description": "The stranded count you just saw. Must still be true.",
+            "minimum": 0.0,
+            "title": "Acknowledged Stranded",
+            "type": "integer"
+          },
+          "version_code": {
+            "minimum": 1.0,
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_code",
+          "acknowledged_stranded"
+        ],
+        "title": "SetMinimumVersionRequest",
+        "type": "object"
+      },
+      "SetMinimumVersionResponse": {
+        "properties": {
+          "stranded_count": {
+            "title": "Stranded Count",
+            "type": "integer"
+          },
+          "version_code": {
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_code",
+          "stranded_count"
+        ],
+        "title": "SetMinimumVersionResponse",
+        "type": "object"
+      },
       "SetPasswordRequest": {
         "description": "``POST /api/v1/users/{id}/password`` — an admin resetting somebody else's.",
         "properties": {
@@ -4092,6 +4311,72 @@
           "history"
         ],
         "title": "StorageReportResponse",
+        "type": "object"
+      },
+      "StrandedInstallationOut": {
+        "description": "One phone a proposed minimum version would refuse.",
+        "properties": {
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "app_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version"
+          },
+          "app_version_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Version Code"
+          },
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "installation_id": {
+            "format": "uuid",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InstallationStatus"
+          }
+        },
+        "required": [
+          "installation_id",
+          "agent_name",
+          "device",
+          "app_version",
+          "app_version_code",
+          "status",
+          "last_heartbeat_at"
+        ],
+        "title": "StrandedInstallationOut",
         "type": "object"
       },
       "UpdateAgentRequest": {
@@ -4323,6 +4608,31 @@
         "title": "UpdateUserRequest",
         "type": "object"
       },
+      "UploadReleaseResponse": {
+        "description": "What the upload found in the file, alongside the row it created.",
+        "properties": {
+          "signer_sha256": {
+            "description": "SHA-256 of the signing certificate, read from the APK's v2/v3 signing block. Compare it against docs/APK-SIGNING.md by eye if no fingerprint is configured yet — a build signed by another key cannot be installed as an update, only as an uninstall that destroys the phone's unsent queue.",
+            "title": "Signer Sha256",
+            "type": "string"
+          },
+          "signer_verified": {
+            "description": "True when it was checked against the configured fingerprint.",
+            "title": "Signer Verified",
+            "type": "boolean"
+          },
+          "version": {
+            "$ref": "#/components/schemas/AppVersionResponse"
+          }
+        },
+        "required": [
+          "version",
+          "signer_sha256",
+          "signer_verified"
+        ],
+        "title": "UploadReleaseResponse",
+        "type": "object"
+      },
       "UserListResponse": {
         "description": "A page of accounts. Small table, so no cursor: the panel shows them all.",
         "properties": {
@@ -4468,6 +4778,45 @@
         ],
         "title": "VerificationMethod",
         "type": "string"
+      },
+      "VersionGateImpactResponse": {
+        "description": "What raising the floor would cost, **before** it is raised (N34, UC-28).\n\nThese are personally owned handsets. A stranded phone drains its queue,\nis then refused, and stays refused until somebody physically reaches that\nsalesperson — so this is not a preview of a config change, it is the cost\nof a decision, and the panel shows it before the button.",
+        "properties": {
+          "current_min_version_code": {
+            "title": "Current Min Version Code",
+            "type": "integer"
+          },
+          "stranded": {
+            "items": {
+              "$ref": "#/components/schemas/StrandedInstallationOut"
+            },
+            "title": "Stranded",
+            "type": "array"
+          },
+          "stranded_count": {
+            "title": "Stranded Count",
+            "type": "integer"
+          },
+          "unknown_version_count": {
+            "description": "Active phones that have never reported a version code. The gate lets these through, so they are not counted as stranded — but each one might be below the floor and we cannot say.",
+            "title": "Unknown Version Count",
+            "type": "integer"
+          },
+          "version_code": {
+            "description": "The minimum being considered.",
+            "title": "Version Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_code",
+          "current_min_version_code",
+          "stranded_count",
+          "stranded",
+          "unknown_version_count"
+        ],
+        "title": "VersionGateImpactResponse",
+        "type": "object"
       }
     }
   },
@@ -4867,6 +5216,280 @@
         "summary": "Acknowledge Alert",
         "tags": [
           "Alerts"
+        ]
+      }
+    },
+    "/api/v1/app/download/{version_code}": {
+      "get": {
+        "description": "The APK itself. **Public** (SPEC §4.1 rule 5), rate-limited.\n\nThe install landing page sends a salesperson's browser here and that\nbrowser has no session. The binary is a client and holds no secret; the\nenrolment code is the secret, and it guards the page that links here.",
+        "operationId": "download_version_api_v1_app_download__version_code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_code",
+            "required": true,
+            "schema": {
+              "title": "Version Code",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Version",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/min-version": {
+      "put": {
+        "description": "Raise or lower the floor, having stated what it costs.\n\n409 ``stranded_count_mismatch`` when the number moved since the impact was\nread. That is not pedantry — it is the case where the admin is deciding\nagainst a picture that is no longer true.",
+        "operationId": "set_min_version_api_v1_app_min_version_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMinimumVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetMinimumVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Min Version",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/min-version/impact": {
+      "get": {
+        "description": "Who a proposed minimum would strand — read this before changing it.\n\nDeliberately a ``GET`` with the candidate in the query string, so it can be\ncalled repeatedly while an admin tries numbers, and so the panel can show\nthe cost live beside the input rather than after the fact.",
+        "operationId": "min_version_impact_api_v1_app_min_version_impact_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "version_code",
+            "required": true,
+            "schema": {
+              "title": "Version Code",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionGateImpactResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Min Version Impact",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/versions": {
+      "get": {
+        "description": "Every build, newest first. Both variants — they ship in lockstep.",
+        "operationId": "list_versions_api_v1_app_versions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Versions",
+        "tags": [
+          "App versions"
+        ]
+      },
+      "post": {
+        "description": "Store a build. **Uploaded is not published** — this reaches nobody yet.\n\n``multipart/form-data`` rather than the JSON everything else uses, because\nthe payload is a binary the admin picked in a file dialog. It is the only\nsuch endpoint in the product.",
+        "operationId": "upload_version_api_v1_app_versions_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_version_api_v1_app_versions_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadReleaseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Version",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/versions/{version_id}": {
+      "delete": {
+        "description": "Take back a build that reached nobody.\n\nUnpublished only. A published build stays: it is the distribution record,\nand a phone may be downloading it right now. This exists because an upload\nwith a mistyped version code would otherwise hold that code for ever — the\nunique constraint refuses the corrected re-upload.",
+        "operationId": "discard_version_api_v1_app_versions__version_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard Version",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/versions/{version_id}/publish": {
+      "post": {
+        "description": "Make it current for its variant. Every phone is offered it from now on.",
+        "operationId": "publish_version_api_v1_app_versions__version_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Version",
+        "tags": [
+          "App versions"
         ]
       }
     },

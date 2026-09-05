@@ -139,11 +139,21 @@ def test_every_entry_point_imports_the_registry() -> None:
     assert missing == [], f"entry points not importing core.models: {missing}"
 
 
-def test_migration_enum_table_matches_core_enums() -> None:
-    """The migration writes the enum values out; the code declares them.
+#: ``ALTER TYPE <name> ADD VALUE [IF NOT EXISTS] '<value>'`` in a later revision.
+#: PostgreSQL cannot remove an enum value, so the migrations only ever add.
+ADD_VALUE = re.compile(
+    r"ALTER TYPE (\w+) ADD VALUE (?:IF NOT EXISTS )?'([\w]+)'"
+)
 
-    Two lists on purpose — a migration must keep its meaning after the
-    application's enums move on — so this test is what keeps them equal *today*.
+
+def _enum_values_from_migrations() -> dict[str, list[str]]:
+    """What the database's enums hold after every revision has run.
+
+    The baseline's ``PG_ENUMS`` table plus every later ``ADD VALUE``. Reading
+    only the baseline was correct while there was one revision and became a
+    false failure the moment a value was added in a second — and "the test
+    broke, edit the baseline" is precisely the habit that would put a column
+    back into 001.
     """
     source = MIGRATION.read_text(encoding="utf-8")
     block = re.search(
@@ -152,11 +162,29 @@ def test_migration_enum_table_matches_core_enums() -> None:
     assert block, "PG_ENUMS table not found in the migration"
     namespace: dict[str, object] = {}
     exec("PG_ENUMS = {" + block.group(1) + "\n}", namespace)  # noqa: S102
-    migration_enums = namespace["PG_ENUMS"]
+    values = {name: list(items) for name, items in namespace["PG_ENUMS"].items()}
+
+    for path in sorted(MIGRATION.parent.glob("*.py")):
+        if path == MIGRATION:
+            continue
+        for enum_name, value in ADD_VALUE.findall(path.read_text(encoding="utf-8")):
+            assert enum_name in values, f"{path.name} alters unknown enum {enum_name}"
+            if value not in values[enum_name]:
+                values[enum_name].append(value)
+    return values
+
+
+def test_migration_enum_table_matches_core_enums() -> None:
+    """The migrations write the enum values out; the code declares them.
+
+    Two lists on purpose — a migration must keep its meaning after the
+    application's enums move on — so this test is what keeps them equal *today*.
+    """
+    migration_enums = _enum_values_from_migrations()
 
     assert set(migration_enums) == set(PG_ENUM_TYPES)
     for name, values in migration_enums.items():
-        assert tuple(values) == tuple(
+        assert sorted(values) == sorted(
             member.value for member in PG_ENUM_TYPES[name]
         ), name
 

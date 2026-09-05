@@ -28,7 +28,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from src.core import ratelimit
@@ -151,6 +151,28 @@ async def publish_version(
         version_id, principal.id, _client_ip(request)
     )
     return AppVersionResponse.model_validate(row)
+
+
+@router.delete(
+    "/versions/{version_id}",
+    response_model=None,
+    dependencies=[Depends(require_permission(Perm.APPVERSIONS_WRITE))],
+)
+async def discard_version(
+    version_id: uuid.UUID,
+    principal: PrincipalDep,
+    session: SessionDep,
+    request: Request,
+) -> Response:
+    """Take back a build that reached nobody.
+
+    Unpublished only. A published build stays: it is the distribution record,
+    and a phone may be downloading it right now. This exists because an upload
+    with a mistyped version code would otherwise hold that code for ever — the
+    unique constraint refuses the corrected re-upload.
+    """
+    await ReleaseService(session).discard(version_id, principal.id, _client_ip(request))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

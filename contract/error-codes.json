@@ -1,6 +1,7 @@
 {
   "codes": [
     "agent_has_open_assignment",
+    "apk_rejected",
     "app_error",
     "app_version_unsupported",
     "assignment_overlap",
@@ -39,6 +40,7 @@
     "refresh_reused",
     "retention_confirmation_required",
     "sales_user_requires_agent",
+    "stranded_count_mismatch",
     "unauthorized",
     "upload_expired",
     "validation_error",

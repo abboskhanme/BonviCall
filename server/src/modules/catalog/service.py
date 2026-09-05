@@ -343,6 +343,44 @@ class ReleaseService:
         )
         return row
 
+    async def discard(
+        self, version_id: uuid.UUID, actor_id: uuid.UUID, ip: str | None
+    ) -> None:
+        """Remove an **unpublished** build, and only an unpublished one.
+
+        A published build is the distribution record: "which build was current
+        in March" has to stay answerable, and a phone may still be downloading
+        it. But an upload with a mistyped version code would otherwise occupy
+        that code forever — the unique constraint refuses the corrected
+        re-upload — so a build that has reached nobody can be taken back.
+        """
+        row = await self.get(version_id)
+        if row.published_at is not None:
+            raise ConflictError(
+                ErrorCode.CONFLICT,
+                detail={
+                    "reason": "published",
+                    "hint": "publish a newer build instead; the record is kept",
+                },
+            )
+        self.store.delete(row.apk_path)
+        await self.audit.record(
+            action=AuditAction.APP_VERSION_UPLOADED,
+            object_type="app_versions",
+            object_id=row.id,
+            actor_type=ActorType.USER,
+            actor_user_id=actor_id,
+            ip=ip,
+            detail={
+                "discarded": True,
+                "variant": row.variant.value,
+                "version_code": row.version_code,
+            },
+        )
+        await self.session.delete(row)
+        await self.session.commit()
+        log.info("app_version_discarded", version_code=row.version_code)
+
     async def open_download(self, version_code: int) -> tuple[AppVersionModel, IO[bytes]]:
         """The bytes a phone installs. Published builds only.
 

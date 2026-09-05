@@ -182,6 +182,9 @@ class InstallationModel(Base, UUIDMixin, TimestampMixin):
         ),
         sa.Index("ix_installations_agent", "agent_id", "status"),
         sa.Index("ix_installations_stage", "funnel_stage", sa.text("funnel_changed_at DESC")),
+        # The version-gate impact query scans the whole fleet on this column,
+        # and it is the query an admin runs immediately before stranding people.
+        sa.Index("ix_installations_app_version_code", "app_version_code"),
         sa.CheckConstraint(
             "verification_method <> 'admin_attested' OR attest_reason IS NOT NULL",
             name="attestation_needs_reason",

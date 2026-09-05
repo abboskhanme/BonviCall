@@ -117,6 +117,14 @@ MESSAGES: dict[str, str] = {
     ErrorCode.RETENTION_CONFIRMATION_REQUIRED: (
         "Saqlash muddatini qisqartirish alohida tasdiqlanishi kerak."
     ),
+    ErrorCode.STRANDED_COUNT_MISMATCH: (
+        "Eskirgan ilovali telefonlar soni o'zgardi. Ta'sirni qaytadan ko'ring "
+        "va tasdiqlang."
+    ),
+    ErrorCode.APK_REJECTED: (
+        "Bu fayl qabul qilinmadi. U APK emas yoki boshqa kalit bilan "
+        "imzolangan — bunday ilovani telefonga yangilab o'rnatib bo'lmaydi."
+    ),
     # --- Device protocol (English on purpose, see the module docstring) ----
     ErrorCode.HEADER_MISSING: "A required request header is missing.",
     ErrorCode.CHUNK_OFFSET_MISMATCH: "Chunk offset does not match the session state.",
