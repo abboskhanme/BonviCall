@@ -97,6 +97,12 @@ object Capabilities {
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
     fun supportsTelephonyCallback(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
+    /** `PackageInfo.signingInfo` replaced the deprecated `signatures` array at
+     *  API 28. Below it the old field is the only way to read a signer, and
+     *  refusing to check would be worse than checking with a deprecated API. */
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.P)
+    fun supportsSigningInfo(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+
     /** POST_NOTIFICATIONS became a runtime permission at API 33. */
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
     fun notificationPermissionRequired(): Boolean =

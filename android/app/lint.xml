@@ -54,4 +54,14 @@
       than the policy this check enforces would require.
     -->
     <issue id="BatteryLife" severity="informational" />
+    <!--
+      `UsableSpace` suggests StorageManager#getAllocatableBytes, which reports
+      space that WOULD be available if the OS cleared other apps' caches. That
+      is the right answer for "can I allocate this file"; it is the wrong one
+      for the heartbeat, which reports what the phone actually has free so an
+      admin can see a handset filling up **before** it stops recording (N18,
+      UC-17). A number that counts space belonging to other apps would show a
+      full phone as healthy.
+    -->
+    <issue id="UsableSpace" severity="informational" />
 </lint>

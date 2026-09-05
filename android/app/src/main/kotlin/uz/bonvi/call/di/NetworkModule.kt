@@ -14,6 +14,7 @@ import uz.bonvi.call.data.remote.BearerAuthInterceptor
 import uz.bonvi.call.data.remote.DeviceHeadersInterceptor
 import uz.bonvi.call.data.remote.OffsetDateTimeAdapter
 import uz.bonvi.call.data.remote.TokenAuthenticator
+import uz.bonvi.call.data.remote.api.AppUpdateApi
 import uz.bonvi.call.data.remote.api.DeviceAudioApi
 import uz.bonvi.call.data.remote.api.DeviceAuthApi
 import uz.bonvi.call.data.remote.api.DeviceCallsApi
@@ -95,6 +96,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun audioApi(retrofit: Retrofit): DeviceAudioApi = retrofit.create(DeviceAudioApi::class.java)
+
+    @Provides
+    @Singleton
+    fun appUpdateApi(retrofit: Retrofit): AppUpdateApi = retrofit.create(AppUpdateApi::class.java)
 
     /** Path versioning, never a header (CONVENTIONS.md §4.1). */
     const val DEVICE_API_PREFIX = "/api/device/v1/"

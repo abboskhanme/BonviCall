@@ -22,17 +22,18 @@ Phase 6's server-side wiring is complete as of 2026-09-05. What was here:
 
 ## Waiting on another unit
 
-**`app_version_code` on the heartbeat (Android).** The field is in the contract
-(`DeviceHeartbeatIn.app_version_code`) and the server stores it, so the Kotlin
-DTO gains it on the next generation — but something has to *populate* it with
-`BuildConfig.VERSION_CODE`, the same value `EnrolmentRepository.appInfo()`
-already sends at redeem.
+**`app_version_code` on the heartbeat (Android). — LANDED 2026-09-05.**
+`service/Heartbeat.kt` populates it from `BuildConfig.VERSION_CODE`, the same
+value `EnrolmentRepository.appInfo()` sends at redeem.
 
-Until then the gate works from the enrolment-time code and goes stale the
-moment a handset updates: the phone would report a new `app_version` string and
-an old code, and raising the minimum would strand a phone that had already
-updated. Enrolment is correct today, so this is not urgent — but it is the
-half that decides who stops reporting.
+Worth recording that the field was only half the gap: **nothing sent a
+heartbeat at all**. `DeviceCallsApi.heartbeat` existed and had no caller, so
+the fleet's `unknown_version_count` of 5/5 was the visible symptom of a device
+that reported its version once, at enrolment, and never again.
+`HeartbeatContractTest` now pins three things: the contract has the field, the
+app populates it from `BuildConfig`, and enrolment and heartbeat read the same
+constant — because if those two ever diverge the gate strands a phone that has
+already updated.
 
 **`APK_SIGNING_SHA256` (ops).** Blank until the release key is generated
 (`docs/APK-SIGNING.md`). While blank the server extracts each upload's signer

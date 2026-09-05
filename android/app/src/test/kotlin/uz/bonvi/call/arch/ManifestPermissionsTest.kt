@@ -108,6 +108,7 @@ class ManifestPermissionsTest {
             "FOREGROUND_SERVICE",                       // UC-05
             "FOREGROUND_SERVICE_MICROPHONE",            // UC-14
             "FOREGROUND_SERVICE_DATA_SYNC",             // UC-11
+            "REQUEST_INSTALL_PACKAGES",                 // UC-02, T82 — N33, no Play
             "RECEIVE_BOOT_COMPLETED",                   // UC-05
             "WAKE_LOCK",                                // UC-05, UC-11
             "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",     // UC-03

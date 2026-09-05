@@ -66,6 +66,11 @@
          stops reporting. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- UC-02, T82: install an update the server publishes. N33 — the APK is
+         self-hosted because Play is not an option, so this is the only path a
+         fix reaches the fleet by. The OS still shows its own confirmation. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- UC-05, UC-11: hold the CPU while a call is being reconciled and while a
          chunk is uploading, so doze does not truncate either. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -153,6 +158,20 @@
                 <action android:name="android.intent.action.PHONE_STATE" />
             </intent-filter>
         </receiver>
+
+        <!-- UC-02 / T82: hands the downloaded APK to the OS package installer.
+             The app cannot install silently and does not pretend to — the OS
+             shows its own confirmation, which is the same screen the agent
+             already met during enrolment. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
 
         <!-- WorkManager is initialised by Hilt, not by the default initialiser
              (androidx.hilt.work). Removing this provider is required, or the

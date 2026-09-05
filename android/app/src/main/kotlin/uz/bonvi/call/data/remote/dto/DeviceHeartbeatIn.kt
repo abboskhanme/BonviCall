@@ -30,6 +30,7 @@ import com.squareup.moshi.JsonClass
  * @param apiLevel 
  * @param appVariant 
  * @param appVersion 
+ * @param appVersionCode 
  * @param batteryCharging 
  * @param batteryLevel 
  * @param batteryOptimisationExempt 
@@ -41,6 +42,7 @@ import com.squareup.moshi.JsonClass
  * @param parkedRecords 
  * @param pendingCommandsSeen 
  * @param powerSaveMode 
+ * @param pushToken 
  * @param queueBytes 
  * @param queueOldestAt 
  * @param queueRecords 
@@ -68,6 +70,9 @@ data class DeviceHeartbeatIn (
 
     @Json(name = "app_version")
     val appVersion: kotlin.String? = null,
+
+    @Json(name = "app_version_code")
+    val appVersionCode: kotlin.Int? = null,
 
     @Json(name = "battery_charging")
     val batteryCharging: kotlin.Boolean? = null,
@@ -101,6 +106,9 @@ data class DeviceHeartbeatIn (
 
     @Json(name = "power_save_mode")
     val powerSaveMode: kotlin.Boolean? = null,
+
+    @Json(name = "push_token")
+    val pushToken: kotlin.String? = null,
 
     @Json(name = "queue_bytes")
     val queueBytes: kotlin.Long? = null,

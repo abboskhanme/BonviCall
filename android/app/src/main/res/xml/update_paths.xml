@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The downloaded APK, shared with the OS package installer and nothing else.
+     Scoped to cache/updates rather than the whole cache directory: a
+     FileProvider is a grant, and a grant should name exactly what it grants. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

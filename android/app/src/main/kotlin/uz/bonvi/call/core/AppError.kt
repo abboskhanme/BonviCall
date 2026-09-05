@@ -72,6 +72,17 @@ enum class ErrorCode(val wire: String) {
 
     // Settings
     RETENTION_CONFIRMATION_REQUIRED("retention_confirmation_required"),
+
+    // App releases (T81, T82)
+    /** An uploaded APK is signed by the wrong key. The server checks the signer
+     *  server-side; `ApkSignature` checks it again on the phone before
+     *  installing, because the consequence there is an uninstall-and-reinstall
+     *  that destroys the queue (docs/APK-SIGNING.md). */
+    APK_REJECTED("apk_rejected"),
+
+    /** The stranded-record count the device reported disagrees with what the
+     *  server holds. A reconciliation fault, not a transport one. */
+    STRANDED_COUNT_MISMATCH("stranded_count_mismatch"),
     ;
 
     companion object {
