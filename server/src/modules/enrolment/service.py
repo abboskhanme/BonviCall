@@ -265,6 +265,10 @@ class EnrolmentService:
             device_id=device_id,
             device_fingerprint_hash=payload.device_fingerprint,
             app_version=payload.app.version,
+            # The number the gate compares. It arrives on every enrolment and
+            # was previously discarded, leaving the gate to reconstruct one
+            # from the version *string* (see migration 003).
+            app_version_code=payload.app.version_code,
             app_variant=payload.app.variant,
             sim_subscription_id=payload.sim_subscription_id,
             sim_slot=payload.sim_slot,

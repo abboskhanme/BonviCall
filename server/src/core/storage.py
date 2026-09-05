@@ -25,7 +25,7 @@ import os
 import shutil
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Protocol, runtime_checkable
 
@@ -214,3 +214,70 @@ __all__ = [
     "build_audio_key",
     "sha256_of",
 ]
+
+
+class LocalFsReleaseStore:
+    """Where published APKs live (N33).
+
+    The app is not distributed through Google Play — Play policy prohibits
+    call-recording apps — so this server *is* the update channel, and these
+    bytes are what a salesperson's phone installs. Kept beside the audio store
+    rather than inside it: audio is customer data under a retention policy,
+    a release is an artefact that must never be deleted by one, and putting
+    them in one tree is how a retention sweep eventually eats the APK.
+
+    Deliberately a smaller interface than :class:`AudioStorage`: no ranges and
+    no resumable upload, because an APK is ~30 MB over the admin's office
+    Wi-Fi, not a 90-minute recording over a rural cell.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+
+    def ensure_ready(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        probe = self.root / ".write-probe"
+        probe.write_bytes(b"")
+        probe.unlink()
+
+    def key_for(self, variant: str, version_code: int) -> str:
+        """One key per variant and build. Overwriting one is not a scenario:
+        a version code is immutable once published, which is what makes the
+        stored SHA-256 mean anything."""
+        return f"{variant}/{version_code}.apk"
+
+    def put_bytes(self, key: str, payload: bytes) -> StoredObject:
+        target = self._resolve(key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        return StoredObject(
+            key=key, bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest()
+        )
+
+    def open(self, key: str) -> IO[bytes]:
+        path = self._resolve(key)
+        if not path.is_file():
+            raise NotFoundError(ErrorCode.NOT_FOUND)
+        return path.open("rb")
+
+    def stat(self, key: str) -> ObjectStat:
+        path = self._resolve(key)
+        if not path.is_file():
+            raise NotFoundError(ErrorCode.NOT_FOUND)
+        info = path.stat()
+        return ObjectStat(
+            key=key,
+            bytes=info.st_size,
+            modified_at=datetime.fromtimestamp(info.st_mtime, tz=UTC),
+        )
+
+    def delete(self, key: str) -> None:
+        self._resolve(key).unlink(missing_ok=True)
+
+    def _resolve(self, key: str) -> Path:
+        """Same escape guard as the audio store, for the same reason."""
+        candidate = (self.root / key).resolve()
+        root = self.root.resolve()
+        if not candidate.is_relative_to(root):
+            raise ValueError(f"release key escapes the release root: {key!r}")
+        return candidate

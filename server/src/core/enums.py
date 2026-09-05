@@ -364,6 +364,7 @@ class AuditAction(StrEnum):
     RETENTION_CHANGED = "retention_changed"
     LINE_DIRECTORY_UPDATED = "line_directory_updated"
     SUPPORTED_MODEL_UPDATED = "supported_model_updated"
+    APP_VERSION_UPLOADED = "app_version_uploaded"
     APP_VERSION_PUBLISHED = "app_version_published"
     SERVICE_TOKEN_CREATED = "service_token_created"
     SERVICE_TOKEN_REVOKED = "service_token_revoked"

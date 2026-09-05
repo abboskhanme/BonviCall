@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import clock
@@ -50,6 +50,7 @@ from src.modules.agents.models import AgentModel
 from src.modules.alerts.service import AlertService
 from src.modules.audit.service import AuditService
 from src.modules.catalog.service import CatalogService
+from src.modules.devices.models import DeviceHealthModel, DeviceModel
 from src.modules.devices.schemas import UpdateBlockOut
 from src.modules.devices.service import DeviceService
 from src.modules.installations.models import InstallationModel
@@ -68,14 +69,23 @@ TOKEN_TYPE_DEVICE = "device"
 SETTING_MIN_VERSION_CODE = "app.min_supported_version_code"
 
 
-def _version_code(app_version: str | None, current) -> int:
-    """Best-effort integer for a reported version string.
+def _version_code(
+    reported_code: int | None, app_version: str | None, current
+) -> int:
+    """The installed version code, or the closest honest guess.
 
-    The app sends ``X-App-Version-Code`` on every request and stores the code
-    on enrolment; this is the fallback for a row written before that, and it
-    fails **open** — an unparseable version is treated as current, because
-    refusing a client we cannot identify is the one outcome N34 forbids.
+    ``reported_code`` is what the phone actually said — stored at enrolment and
+    refreshed from ``X-App-Version-Code`` — and it is used whenever we have it.
+
+    The rest is the fallback for a row written before migration 003, and it is
+    a *guess*: it concatenates the digits of the version string, so ``"1.0.0"``
+    becomes ``100``. Keep it only as a fallback. It fails **open** — an
+    unidentifiable client is treated as current, because refusing a client we
+    cannot identify is the one outcome N34 forbids, and a phone refused in
+    error stops reporting calls nobody can recover.
     """
+    if reported_code is not None:
+        return reported_code
     if app_version is None:
         return current.version_code if current is not None else 1
     digits = "".join(part for part in app_version.split(".") if part.isdigit())
@@ -154,6 +164,7 @@ class InstallationService:
         device_fingerprint_hash: str,
         app_version: str,
         app_variant: AppVariant,
+        app_version_code: int | None = None,
         sim_subscription_id: int | None = None,
         sim_slot: int | None = None,
     ) -> InstallationModel:
@@ -171,6 +182,7 @@ class InstallationService:
             credential_hash=sha256_hex(new_opaque_token()),
             device_fingerprint_hash=device_fingerprint_hash,
             app_version=app_version,
+            app_version_code=app_version_code,
             app_variant=app_variant,
             sim_subscription_id=sim_subscription_id,
             sim_slot=sim_slot,
@@ -195,7 +207,9 @@ class InstallationService:
         current = await CatalogService(self.session).current_release(
             installation.app_variant
         )
-        installed = _version_code(installation.app_version, current)
+        installed = _version_code(
+            installation.app_version_code, installation.app_version, current
+        )
         return UpdateBlockOut(
             required=installed < minimum,
             min_version_code=minimum,
@@ -476,3 +490,156 @@ class InstallationService:
         installation.status = InstallationStatus.REVOKED
         installation.revoke_confirmed_at = clock.now()
         await self.session.commit()
+
+
+@dataclass(frozen=True)
+class StrandedInstallation:
+    """One phone that a proposed minimum version would refuse.
+
+    A plain dataclass, like :class:`DeviceTokenPair` above: the service stays
+    free of the wire layer, and the router turns it into a response schema.
+    """
+
+    installation_id: uuid.UUID
+    agent_name: str
+    device: str
+    app_version: str | None
+    app_version_code: int | None
+    status: InstallationStatus
+    last_heartbeat_at: datetime | None
+
+
+class VersionGateService:
+    """Who the version gate would strand, and the decision to strand them.
+
+    Lives beside ``installations`` and not beside the APK catalogue on purpose.
+    The minimum supported version is a statement about *the fleet* — which
+    phones may keep reporting — and only this module can see them. It also
+    keeps the import graph acyclic: ``installations`` already reaches both
+    ``catalog`` and ``settings``, and the reverse edge would be a cycle.
+
+    **Raising the minimum is not a configuration change.** These are personally
+    owned handsets; a phone below the new floor drains its queue and is then
+    refused, and it stays refused until somebody physically reaches that
+    salesperson and updates the app. So the count comes first and the change
+    has to name it (SPEC §4.3, N34, UC-28).
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.settings = SettingsService(session)
+        self.audit = AuditService(session)
+
+    async def impact_of(
+        self, version_code: int
+    ) -> tuple[int, list[StrandedInstallation]]:
+        """Installations that would be refused at ``version_code``.
+
+        Counts a phone whose reported code is **unknown** as *not* stranded, to
+        match the gate: ``_version_code`` fails open for a row with no reported
+        code, so counting it here would overstate the cost of a change and
+        report a phone as stranded that the gate will let through.
+        """
+        # One statement with the joins, not a row loop: the whole point of the
+        # page is to show *which* phones, and fetching the agent and the model
+        # per installation is the N+1 that makes an admin's confirmation screen
+        # slow exactly when the fleet is large enough for the decision to matter.
+        statement = (
+            select(
+                InstallationModel.id,
+                InstallationModel.app_version,
+                InstallationModel.app_version_code,
+                InstallationModel.status,
+                AgentModel.full_name,
+                DeviceModel.manufacturer,
+                DeviceModel.model,
+                DeviceHealthModel.last_heartbeat_at,
+            )
+            .select_from(InstallationModel)
+            .join(AgentModel, AgentModel.id == InstallationModel.agent_id)
+            .join(DeviceModel, DeviceModel.id == InstallationModel.device_id)
+            .outerjoin(
+                DeviceHealthModel,
+                DeviceHealthModel.installation_id == InstallationModel.id,
+            )
+            .where(
+                InstallationModel.status.in_(
+                    (InstallationStatus.ACTIVE, InstallationStatus.REPLACED)
+                ),
+                InstallationModel.app_version_code.is_not(None),
+                InstallationModel.app_version_code < version_code,
+            )
+            .order_by(InstallationModel.app_version_code, InstallationModel.id)
+        )
+        rows = [
+            StrandedInstallation(
+                installation_id=row.id,
+                agent_name=row.full_name,
+                device=f"{row.manufacturer} {row.model}".strip(),
+                app_version=row.app_version,
+                app_version_code=row.app_version_code,
+                status=row.status,
+                last_heartbeat_at=row.last_heartbeat_at,
+            )
+            for row in (await self.session.execute(statement)).all()
+        ]
+        return len(rows), rows
+
+    async def unknown_version_count(self) -> int:
+        """Active phones whose version we have never been told.
+
+        Shown next to the impact because it is the honest uncertainty in it: the
+        gate lets these through today, and each one is a phone that might be
+        below the new floor and we cannot say.
+        """
+        return int(
+            await self.session.scalar(
+                select(func.count())
+                .select_from(InstallationModel)
+                .where(
+                    InstallationModel.status.in_(
+                        (InstallationStatus.ACTIVE, InstallationStatus.REPLACED)
+                    ),
+                    InstallationModel.app_version_code.is_(None),
+                )
+            )
+            or 0
+        )
+
+    async def set_minimum(
+        self,
+        version_code: int,
+        acknowledged_stranded: int,
+        actor_id: uuid.UUID,
+        ip: str | None,
+    ) -> int:
+        """Raise or lower the floor, having said how many phones it costs.
+
+        ``acknowledged_stranded`` must equal the count *right now*. It is not
+        ceremony: it fails when the number changed between looking and
+        deciding, which is exactly when the admin's mental model is stale — a
+        phone enrolled in the last minute, or one that finally reported an old
+        version. Lowering the floor strands nobody, so a zero cost is trivially
+        acknowledged and the check costs nothing.
+        """
+        stranded, _ = await self.impact_of(version_code)
+        if acknowledged_stranded != stranded:
+            raise ConflictError(
+                ErrorCode.STRANDED_COUNT_MISMATCH,
+                detail={
+                    "stranded_now": stranded,
+                    "acknowledged": acknowledged_stranded,
+                    "hint": "re-read the impact and confirm the current number",
+                },
+            )
+        await self.settings.update(
+            SETTING_MIN_VERSION_CODE,
+            version_code,
+            confirm=True,
+            actor_id=actor_id,
+            ip=ip,
+        )
+        log.info(
+            "min_version_raised", version_code=version_code, stranded=stranded
+        )
+        return stranded

@@ -79,6 +79,18 @@ object Capabilities {
     fun phoneCallServiceTypeIsRestricted(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
+    /**
+     * Can `MediaMuxer` write Opus into an Ogg container?
+     *
+     * `MUXER_OUTPUT_OGG` arrived at API 29, and the `legacy28` variant has to
+     * run on API 26–28 — which is the variant S1 says captures both voices, so
+     * it cannot simply be dropped. Below this the decided fallback is AAC-LC in
+     * MP4 at the same 24 kbps mono 16 kHz (SPEC §7.6), so the storage and data
+     * budgets are identical either way.
+     */
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
+    fun canMuxOpusOgg(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+
     /** `TelephonyCallback` replaced `PhoneStateListener` at API 31. Below it
      *  the deprecated listener is the only option, which is a capability
      *  question rather than a preference. */

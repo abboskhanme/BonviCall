@@ -69,6 +69,17 @@ class Settings(BaseSettings):
 
     # --- Audio storage (core/storage.py) -----------------------------------
     audio_storage_path: Path = Path("/data/audio")
+    release_storage_path: Path = Path("/data/releases")
+    """Published APKs (N33). Separate from the audio tree on purpose: audio is
+    customer data under a retention policy and a release must never be deleted
+    by one."""
+
+    apk_signing_sha256: str | None = None
+    """SHA-256 fingerprint of the signing certificate, uppercase hex with or
+    without colons. When set, publishing an APK signed by any other key is
+    refused: Android will not install a differently-signed build as an update,
+    only as an uninstall-and-reinstall, which destroys the phone's queue.
+    Blank until the key is generated — see docs/APK-SIGNING.md."""
     audio_retention_months: int = 12
     """Bootstrap default only. Once the server runs, ``retention.audio_months``
     in ``app_settings`` is the value that decides (SPEC §3.8)."""

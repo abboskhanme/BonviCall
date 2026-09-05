@@ -11,7 +11,7 @@ superseded phone keeps draining (SPEC §9.3).
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from src.api.device.deps import ActiveInstallationDep
 from src.core import clock
@@ -36,6 +36,7 @@ async def heartbeat(
     payload: DeviceHeartbeatIn,
     installation: ActiveInstallationDep,
     session: SessionDep,
+    request: Request,
 ) -> DeviceHeartbeatOut:
     """Every 120 seconds while the foreground service is alive (UC-17).
 
@@ -44,13 +45,30 @@ async def heartbeat(
     is fifteen minutes, and that distinction is the difference between UC-17's
     detection window working and not.
     """
-    skew, update = await DeviceService(session).ingest_heartbeat(installation, payload)
+    # ``X-App-Version-Code`` is the number the version gate compares (N34) and
+    # the app sends it on every request. The heartbeat is where it is persisted:
+    # every 120 s is current enough for a value that changes on update, and
+    # writing it on *every* request would be a row update per call ingest.
+    skew, update = await DeviceService(session).ingest_heartbeat(
+        installation, payload, reported_version_code=_reported_code(request)
+    )
     return DeviceHeartbeatOut(
         server_time=clock.now(),
         clock_skew_sec=skew,
         pending_command_count=0,
         update=update,
     )
+
+
+def _reported_code(request: Request) -> int | None:
+    """``X-App-Version-Code``, or ``None`` if the app did not send a number.
+
+    Optional and unvalidated on purpose: the header is not in
+    ``REQUIRED_DEVICE_HEADERS``, an older build may not send it, and a
+    heartbeat is ingest — it must never be refused over a version (N34, §4.3).
+    """
+    raw = request.headers.get("X-App-Version-Code")
+    return int(raw) if raw and raw.isdigit() else None
 
 
 @router.post("/capabilities", response_model=DeviceCapabilityBatchOut)

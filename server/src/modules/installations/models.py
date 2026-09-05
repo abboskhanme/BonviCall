@@ -129,6 +129,16 @@ class InstallationModel(Base, UUIDMixin, TimestampMixin):
             "DTO. NULL means we have no address for this phone."
         ),
     )
+    app_version_code: Mapped[int | None] = mapped_column(
+        sa.Integer,
+        nullable=True,
+        doc=(
+            "The integer the version gate compares (N34). Reported at "
+            "enrolment and refreshed from X-App-Version-Code. NULL for a row "
+            "written before it was stored — the gate then falls back and fails "
+            "open, which is what N34 requires."
+        ),
+    )
     app_version: Mapped[str | None] = mapped_column(
         sa.String(20),
         nullable=True,

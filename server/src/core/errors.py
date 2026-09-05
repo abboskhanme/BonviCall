@@ -85,6 +85,15 @@ class ErrorCode:
     # --- Settings (SPEC §3.11) --------------------------------------------
     RETENTION_CONFIRMATION_REQUIRED = "retention_confirmation_required"
 
+    # --- App versions (N33, N34) ------------------------------------------
+    #: Raising the minimum supported version strands every handset below it,
+    #: and these are personally owned phones: a stranded one stops reporting
+    #: until somebody physically reaches that salesperson. The caller has to
+    #: state the current count, so the change is a decision and not a typo.
+    STRANDED_COUNT_MISMATCH = "stranded_count_mismatch"
+    #: The uploaded file is not an APK, or is signed by a key that is not ours.
+    APK_REJECTED = "apk_rejected"
+
     @classmethod
     def all_codes(cls) -> frozenset[str]:
         """Every declared code. Used by the contract export and by tests."""

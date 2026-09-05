@@ -9,13 +9,28 @@ BonviZvonki's directory starved — somebody had to remember to update it, and
 
 from __future__ import annotations
 
+import uuid
+from typing import IO
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core import clock
+from src.core.config import get_settings
 from src.core.enums import ActorType, AppVariant, AuditAction
-from src.core.errors import ConflictError, ErrorCode, NotFoundError
+from src.core.errors import ConflictError, ErrorCode, NotFoundError, ValidationError
+from src.core.logging import get_logger
+from src.core.storage import LocalFsReleaseStore
 from src.modules.audit.service import AuditService
 from src.modules.catalog.models import AppVersionModel, LineDirectoryEntryModel
+from src.modules.catalog.rules import (
+    ApkInspection,
+    inspect_apk,
+    normalise_fingerprint,
+)
+from src.modules.catalog.schemas import UploadReleaseRequest
+
+log = get_logger(__name__)
 
 
 class CatalogService:
@@ -136,3 +151,211 @@ class CatalogService:
             if digits:
                 pairs.append((str(kind), digits))
         return tuple(pairs)
+
+
+class ReleaseService:
+    """The self-hosted update channel (T58, N33, N34).
+
+    The APK is not on Google Play — Play policy prohibits call-recording apps —
+    so this table is the distribution record: which build is published, its
+    version code, its size, its SHA-256 and when. That record is what makes
+    "which build is that phone running" answerable at all.
+
+    **The signing key is the dangerous part.** Android refuses to install a
+    differently-signed build as an update; the only way to apply one is to
+    uninstall first, which deletes the phone's unsent queue. So the signer is
+    read out of the file and compared against the configured fingerprint, and a
+    mismatch is a refusal rather than a warning. ``docs/APK-SIGNING.md`` holds
+    the fingerprint; until it is filled in, the comparison is skipped and the
+    extracted value is recorded so it can be checked by eye.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.audit = AuditService(session)
+        self.store = LocalFsReleaseStore(get_settings().release_storage_path)
+
+    async def list_versions(self) -> tuple[list[AppVersionModel], int]:
+        """Newest build first, both variants. Small table, no pagination."""
+        rows = list(
+            (
+                await self.session.scalars(
+                    select(AppVersionModel).order_by(
+                        AppVersionModel.version_code.desc(),
+                        AppVersionModel.variant,
+                    )
+                )
+            ).all()
+        )
+        return rows, len(rows)
+
+    async def get(self, version_id: uuid.UUID) -> AppVersionModel:
+        row = await self.session.get(AppVersionModel, version_id)
+        if row is None:
+            raise NotFoundError()
+        return row
+
+    async def upload(
+        self,
+        payload: bytes,
+        meta: UploadReleaseRequest,
+        actor_id: uuid.UUID,
+        ip: str | None,
+    ) -> tuple[AppVersionModel, ApkInspection]:
+        """Store an APK and record it. **Uploaded is not published** (N33).
+
+        Nothing about the file is taken on trust: the SHA-256 and the size are
+        computed here rather than accepted, and the signer is read out of the
+        signing block. The admin supplies the version code because reading it
+        would mean decoding a binary ``AndroidManifest.xml``, and a wrong code
+        is caught by the unique constraint and by the phones failing to see an
+        update — whereas a wrong *signature* is caught by nothing until fifteen
+        people cannot install it.
+        """
+        inspection = inspect_apk(payload)
+        if not inspection.is_apk:
+            raise ValidationError(
+                ErrorCode.APK_REJECTED, detail={"reason": inspection.reason}
+            )
+
+        expected = normalise_fingerprint(get_settings().apk_signing_sha256)
+        if not inspection.is_signed:
+            raise ValidationError(
+                ErrorCode.APK_REJECTED,
+                detail={
+                    "reason": inspection.reason,
+                    "hint": (
+                        "a build with no v2/v3 signature will not install on a "
+                        "modern Android target"
+                    ),
+                },
+            )
+        if expected is not None and inspection.signer_sha256 != expected:
+            # Refused, not warned. Installing this over the existing app is
+            # impossible; the only route is uninstall-and-reinstall, which
+            # destroys every unsent call on the handset.
+            raise ValidationError(
+                ErrorCode.APK_REJECTED,
+                detail={
+                    "reason": "signer_mismatch",
+                    "expected_sha256": expected,
+                    "found_sha256": inspection.signer_sha256,
+                },
+            )
+
+        clash = await self.session.scalar(
+            select(AppVersionModel).where(
+                AppVersionModel.variant == meta.variant,
+                AppVersionModel.version_code == meta.version_code,
+            )
+        )
+        if clash is not None:
+            raise ConflictError(
+                ErrorCode.CONFLICT,
+                detail={
+                    "variant": meta.variant.value,
+                    "version_code": meta.version_code,
+                    "sha256": clash.apk_sha256,
+                },
+            )
+
+        key = self.store.key_for(meta.variant.value, meta.version_code)
+        stored = self.store.put_bytes(key, payload)
+        row = AppVersionModel(
+            version=meta.version,
+            version_code=meta.version_code,
+            variant=meta.variant,
+            apk_path=stored.key,
+            apk_sha256=stored.sha256,
+            size_bytes=stored.bytes,
+            min_api_level=meta.min_api_level,
+            release_notes_uz=meta.release_notes_uz,
+            is_mandatory=meta.is_mandatory,
+            created_by=actor_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        await self.audit.record(
+            action=AuditAction.APP_VERSION_UPLOADED,
+            object_type="app_versions",
+            object_id=row.id,
+            actor_type=ActorType.USER,
+            actor_user_id=actor_id,
+            ip=ip,
+            detail={
+                "variant": meta.variant.value,
+                "version_code": meta.version_code,
+                "sha256": stored.sha256,
+                "signer_sha256": inspection.signer_sha256,
+            },
+        )
+        await self.session.commit()
+        log.info(
+            "app_version_uploaded",
+            version_code=meta.version_code,
+            variant=meta.variant.value,
+            bytes=stored.bytes,
+        )
+        return row, inspection
+
+    async def publish(
+        self, version_id: uuid.UUID, actor_id: uuid.UUID, ip: str | None
+    ) -> AppVersionModel:
+        """Make this build the current one for its variant.
+
+        One current build per variant, enforced by a partial unique index, so
+        the previous one is stood down in the same transaction. The old build
+        is **not** deleted: a phone mid-download still needs those bytes, and
+        the distribution record is the point of the table.
+        """
+        row = await self.get(version_id)
+        previous = await self.session.scalar(
+            select(AppVersionModel).where(
+                AppVersionModel.variant == row.variant,
+                AppVersionModel.is_current.is_(True),
+                AppVersionModel.id != row.id,
+            )
+        )
+        if previous is not None:
+            previous.is_current = False
+            await self.session.flush()
+
+        row.is_current = True
+        row.published_at = row.published_at or clock.now()
+        await self.audit.record(
+            action=AuditAction.APP_VERSION_PUBLISHED,
+            object_type="app_versions",
+            object_id=row.id,
+            actor_type=ActorType.USER,
+            actor_user_id=actor_id,
+            ip=ip,
+            detail={
+                "variant": row.variant.value,
+                "version_code": row.version_code,
+                "replaced_version_code": previous.version_code if previous else None,
+            },
+        )
+        await self.session.commit()
+        log.info(
+            "app_version_published",
+            version_code=row.version_code,
+            variant=row.variant.value,
+        )
+        return row
+
+    async def open_download(self, version_code: int) -> tuple[AppVersionModel, IO[bytes]]:
+        """The bytes a phone installs. Published builds only.
+
+        An unpublished row is a 404 and not a 403: this endpoint is public
+        (SPEC §4.1 rule 5) and "that build exists but you may not have it" is
+        information a stranger has no reason to receive.
+        """
+        row = await self.session.scalar(
+            select(AppVersionModel).where(
+                AppVersionModel.version_code == version_code,
+                AppVersionModel.published_at.is_not(None),
+            )
+        )
+        if row is None:
+            raise NotFoundError()
+        return row, self.store.open(row.apk_path)

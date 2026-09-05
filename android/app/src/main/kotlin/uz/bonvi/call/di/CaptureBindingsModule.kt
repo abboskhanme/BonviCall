@@ -7,6 +7,10 @@ import dagger.hilt.components.SingletonComponent
 import uz.bonvi.call.capture.CaptureCapabilityChecker
 import uz.bonvi.call.capture.PermissionCaptureCapabilityChecker
 import uz.bonvi.call.capture.SubscriptionPrivacyBoundary
+import uz.bonvi.call.capture.transcode.AudioTranscoder
+import uz.bonvi.call.capture.transcode.MediaCodecAudioTranscoder
+import uz.bonvi.call.data.repository.AudioUpload
+import uz.bonvi.call.data.repository.AudioUploader
 import uz.bonvi.call.data.repository.RoomCallSessionStore
 import uz.bonvi.call.data.repository.RoomPendingCallStore
 import uz.bonvi.call.domain.PrivacyBoundary
@@ -35,6 +39,14 @@ abstract class CaptureBindingsModule {
     @Binds
     @Singleton
     abstract fun callSessionStore(impl: RoomCallSessionStore): CallSessionStore
+
+    @Binds
+    @Singleton
+    abstract fun audioTranscoder(impl: MediaCodecAudioTranscoder): AudioTranscoder
+
+    @Binds
+    @Singleton
+    abstract fun audioUpload(impl: AudioUploader): AudioUpload
 
     @Binds
     @Singleton

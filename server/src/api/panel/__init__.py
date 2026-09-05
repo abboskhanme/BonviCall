@@ -13,6 +13,7 @@ from src.api import PANEL_API_PREFIX
 from src.api.panel import (
     agents,
     alerts,
+    app_versions,
     audio,
     audit,
     auth,
@@ -42,6 +43,7 @@ router.include_router(commands.router)
 router.include_router(alerts.router)
 router.include_router(audio.router)
 router.include_router(catalog.router)
+router.include_router(app_versions.router)
 router.include_router(reports.router)
 router.include_router(audit.router)
 router.include_router(settings.router)
