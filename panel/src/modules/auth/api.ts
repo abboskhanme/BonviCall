@@ -34,6 +34,19 @@ export function fetchMe(): Promise<SessionUser> {
   return api.get<SessionUser>('/auth/me')
 }
 
+/**
+ * `POST /auth/password` — the user's OWN password.
+ *
+ * Takes the current one, which is what makes it self-service: an admin never
+ * has it and uses `POST /users/{id}/password` instead. Success revokes every
+ * other session this user holds, so a stolen session dies with the change.
+ */
+export type ChangePasswordRequest = components['schemas']['ChangePasswordRequest']
+
+export function changePassword(body: ChangePasswordRequest): Promise<void> {
+  return api.post<void>('/auth/password', body)
+}
+
 /** `POST /auth/logout` — revokes the refresh token server-side. */
 export function logout(): Promise<void> {
   return api.postWithoutRefresh<void>('/auth/logout')

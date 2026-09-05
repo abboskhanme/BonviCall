@@ -31,7 +31,11 @@ Buni aniq va qisqa aytamiz:
   qilgan qo'ng'iroqlaringiz qayd etilmaydi, yozilmaydi va serverga
   yuborilmaydi. Ilova qo'ng'iroq qaysi SIM kartadan ekanini aniqlay olmasa,
   **o'sha qo'ng'iroqni umuman qayd etmaydi** — ya'ni shubha bo'lsa, yozmaydi.
-- **Kontaktlaringiz yuborilmaydi.** Telefon kitobingiz serverga ketmaydi.
+- **Telefon kitobingiz yuborilmaydi.** Kontaktlaringiz ro'yxati serverga
+  ketmaydi va nusxasi olinmaydi. Ilova faqat **siz gaplashgan odamning ismini**
+  aniqlaydi va uni o'sha bitta qo'ng'iroq yoniga yozib qo'yadi — shunda ro'yxatda
+  raqam o'rniga ism ko'rinadi. Xohlamasangiz bu ruxsatni bermasangiz ham
+  bo'ladi: qo'ng'iroqlar baribir qayd etiladi, faqat ism o'rniga raqam turadi.
 - **SMS'laringiz o'qilmaydi.**
 - **Suratlar, videolar, fayllaringiz o'qilmaydi.**
 - **Joylashuvingiz kuzatilmaydi.** Ilova GPS'ga umuman murojaat qilmaydi.
@@ -113,6 +117,11 @@ qo'yadi va qo'ng'iroqlaringiz yozilmay qoladi.
 
 Internet bo'lmasa xavotir olmang: qo'ng'iroqlar telefonda saqlanadi va aloqa
 paydo bo'lishi bilan o'zi yuboriladi.
+
+**Ilova ishlayaptimi, tekshirmoqchi bo'lsangiz** ilovani oching va **"Ilova
+holati"** bo'limiga kiring. U yerda ko'rinadi: qaysi raqam yozilmoqda, nechta
+qo'ng'iroq hali yuborilmagan, va nima ishlamayapti. Administrator sizga
+qo'ng'iroq qilsa, aksar hollarda shu ekrandagi ma'lumotni so'raydi.
 
 ## 7. Agar ilovani o'chirsangiz nima bo'ladi
 

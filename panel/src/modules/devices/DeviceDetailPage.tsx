@@ -185,8 +185,9 @@ function DeviceBody({
   const issue = useIssueCommand(health.installation_id)
   const [revoking, setRevoking] = useState(false)
 
-  const state = stateFor(health)
-  const problems = problemsFor(health)
+  const stage = installation?.funnel_stage ?? null
+  const state = stateFor(health, stage)
+  const problems = problemsFor(health, stage)
 
   return (
     <div className="flex flex-col gap-4">

@@ -59,11 +59,14 @@ function DeviceSection({ agentId }: { agentId: string }) {
 
   // `/devices` carries `never_reported` now, so a phone that was bound and
   // never spoke arrives in this list rather than being absent from it.
-  const fleet = buildFleet(devicesQuery.data?.items).filter(
-    (row) => row.health.agent_id === agentId,
-  )
   const installationById = new Map(
     (installationsQuery.data?.items ?? []).map((item) => [item.id, item]),
+  )
+  const stageByInstallation = new Map(
+    (installationsQuery.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
+  )
+  const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation).filter(
+    (row) => row.health.agent_id === agentId,
   )
 
   return (

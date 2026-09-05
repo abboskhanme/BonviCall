@@ -42,7 +42,7 @@ import { EnumFilter } from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
-import { buildFleet, useDevices, type FleetRow, type FleetState } from './api'
+import { buildFleet, useDevices, useInstallations, type FleetRow, type FleetState } from './api'
 import {
   CAPTURE_ROUTE_LABEL,
   FLEET_PROBLEM_LABEL,
@@ -128,6 +128,9 @@ export function DevicesPage() {
   const stateFilter = parseState(searchParams.get(PARAM_STATE))
 
   const devicesQuery = useDevices()
+  // The server's own `install_disappeared` stage outranks our silence
+  // heuristic: it sees an uninstall the panel could only guess at.
+  const installationsQuery = useInstallations()
   const agentsQuery = useAgentDirectory(can(Perm.AGENTS_READ))
   const agentName = agentNameLookup(agentsQuery.data?.items)
 
@@ -141,7 +144,10 @@ export function DevicesPage() {
   // `GET /devices` LEFT OUTER JOINs `device_health` now, so a phone that has
   // never reported arrives here with `never_reported: true` rather than being
   // absent from the response.
-  const fleet = buildFleet(devicesQuery.data?.items)
+  const stageByInstallation = new Map(
+    (installationsQuery.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
+  )
+  const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation)
   const visible = stateFilter ? fleet.filter((row) => row.state === stateFilter) : fleet
   const needAttention = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
 

@@ -16,10 +16,16 @@ enum class Capability(val wire: String) {
     MICROPHONE("microphone"),
 
     /**
-     * Present because the panel reports on it, NOT because the app asks for it.
-     * The contact book is never read and never uploaded (N28), so on every
-     * handset this is [CapabilityState.NOT_APPLICABLE]. READ_CONTACTS is
-     * absent from both manifests and must stay absent.
+     * **Optional**, and it degrades one field only (SPEC §7.8).
+     *
+     * With it, a call the app captured on the registered number can carry the
+     * name of the person spoken to. Without it the call ships without a name,
+     * which is not a failure and never becomes an `audio_missing_reason` —
+     * E2 marks the step *ixtiyoriy* and an agent may skip it.
+     *
+     * N28 allows a resolved NAME off the handset; it does not allow the book.
+     * `capture/ContactNameResolver.kt` is the only reader, it looks up one
+     * number at a time, and it caches nothing.
      */
     CONTACTS("contacts"),
 
@@ -62,9 +68,9 @@ fun Capability.runtimePermission(): String? = when (this) {
     Capability.MICROPHONE -> android.Manifest.permission.RECORD_AUDIO
     Capability.CALL_PHONE -> android.Manifest.permission.CALL_PHONE
     Capability.NOTIFICATIONS -> "android.permission.POST_NOTIFICATIONS"
-    // Never requested: the contact book is not read (N28). Present only so the
-    // panel can report it as not_applicable.
-    Capability.CONTACTS -> null
+    // Optional, and the only permission in E2 an agent may decline without
+    // blocking E6 (SPEC §8.2 marks it *ixtiyoriy*).
+    Capability.CONTACTS -> android.Manifest.permission.READ_CONTACTS
     Capability.BATTERY_EXEMPTION, Capability.STORAGE_ACCESS, Capability.OEM_AUTOSTART,
     Capability.FOREGROUND_SERVICE, Capability.OEM_RECORDER, Capability.SUBSCRIPTION_RESOLUTION,
     -> null

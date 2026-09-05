@@ -103,6 +103,7 @@ class ManifestPermissionsTest {
             "READ_PHONE_STATE",                         // UC-09, UC-15
             "READ_PHONE_NUMBERS",                       // UC-04
             "READ_CALL_LOG",                            // UC-13
+            "READ_CONTACTS",                            // UC-19, T139 — one name, never the book
             "RECORD_AUDIO",                             // UC-14
             "CALL_PHONE",                               // UC-16 — T104 keep-list
             "FOREGROUND_SERVICE",                       // UC-05
@@ -126,7 +127,9 @@ class ManifestPermissionsTest {
     @Test
     fun `nothing the product promises never to read is declared`() {
         val forbidden = listOf(
-            "READ_CONTACTS", "WRITE_CONTACTS",
+            // READ_CONTACTS is declared (T139) and WRITE is not: the app turns
+            // one number into one name and never modifies the book.
+            "WRITE_CONTACTS",
             "READ_SMS", "RECEIVE_SMS", "SEND_SMS",
             "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION",
             "CAMERA",

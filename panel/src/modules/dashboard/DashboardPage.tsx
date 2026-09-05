@@ -25,7 +25,7 @@ import { BellRing, FileWarning, Phone, Smartphone } from 'lucide-react'
 import { useAlerts } from '@/modules/alerts/api'
 import { ALERT_SEVERITY_LABEL, ALERT_SEVERITY_TONE } from '@/modules/alerts/routing'
 import { useAuth } from '@/modules/auth/store'
-import { buildFleet, useDevices } from '@/modules/devices/api'
+import { buildFleet, useDevices, useInstallations } from '@/modules/devices/api'
 import { FLEET_STATE_LABEL } from '@/modules/devices/labels'
 import { useCallsPage } from '@/modules/calls/api'
 import { useGapReport } from '@/modules/reports/api'
@@ -97,9 +97,17 @@ function CallsTile() {
  *  somebody. `never_reported` is in it, which is the whole point. */
 function DevicesTile() {
   const query = useDevices()
-  const fleet = buildFleet(query.data?.items)
+  const installations = useInstallations()
+  const stageByInstallation = new Map(
+    (installations.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
+  )
+  const fleet = buildFleet(query.data?.items, stageByInstallation)
   const problems = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
-  const silent = fleet.filter((row) => row.state === 'never_reported')
+  // The two states that need a person to travel, as opposed to a phone that
+  // will come back by itself.
+  const silent = fleet.filter(
+    (row) => row.state === 'never_reported' || row.state === 'install_disappeared',
+  )
   return (
     <Tile
       icon={<Smartphone className="size-4" aria-hidden />}

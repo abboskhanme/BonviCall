@@ -84,7 +84,13 @@ export function useInstallations(params?: {
  * offline phone worked once and stopped, a never-reported one was handed over
  * and never started, and the second is a person waiting for help right now.
  */
-export type FleetState = 'never_reported' | 'revoked' | 'offline' | 'degraded' | 'healthy'
+export type FleetState =
+  | 'never_reported'
+  | 'install_disappeared'
+  | 'revoked'
+  | 'offline'
+  | 'degraded'
+  | 'healthy'
 
 export interface FleetRow {
   health: DeviceHealth
@@ -95,6 +101,7 @@ export interface FleetRow {
 
 export type FleetProblem =
   | 'never_reported'
+  | 'install_disappeared'
   | 'revoked'
   | 'offline'
   | 'capture_route_broken'
@@ -110,6 +117,62 @@ export const CLOCK_SKEW_LIMIT_SEC = 120
 /** A queue this deep means uploads are not draining. */
 export const QUEUE_DEPTH_LIMIT = 50
 
+/**
+ * How long a phone must stay silent before "offline" stops being the honest
+ * word for it (T140).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * **`offline` and `install_disappeared` are different faults and need
+ * different people.**
+ *
+ * A handset that has missed a few heartbeats is offline: switched off, out of
+ * signal, on a charger in a drawer for the afternoon. It almost always needs
+ * nothing — it comes back by itself, and treating every one of them as an
+ * incident is how a fleet page becomes noise.
+ *
+ * A handset that reported normally and has then said nothing for two days has
+ * almost certainly had the app removed, force-stopped permanently, or been
+ * replaced. Nothing brings that back on its own. Somebody has to go and find
+ * that salesperson, which is a different-sized request and belongs to a
+ * different day.
+ *
+ * Two days rather than one: a phone left off over a weekend is common and is
+ * not a disappeared install, and a page that cries wolf every Monday morning
+ * gets ignored by Tuesday.
+ *
+ * `never_reported` stays distinct from both. That is somebody who never got
+ * started, and the fix is an enrolment, not a visit.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const DISAPPEARED_AFTER_HOURS = 48
+
+function hoursSince(iso: string | null | undefined, now: Date): number | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return null
+  return (now.getTime() - then) / 3_600_000
+}
+
+/**
+ * Has this phone been silent long enough to look removed rather than merely
+ * offline?
+ *
+ * The server's own `funnel_stage` is authoritative when it says so — it sees
+ * things the panel cannot, such as an uninstall reported by the OS — and the
+ * heartbeat age is the fallback that catches the ordinary case where nothing
+ * announced itself.
+ */
+export function hasDisappeared(
+  health: DeviceHealth,
+  funnelStage?: FunnelStage | null,
+  now: Date = new Date(),
+): boolean {
+  if (health.never_reported) return false
+  if (funnelStage === 'install_disappeared') return true
+  const age = hoursSince(health.last_heartbeat_at, now)
+  return age !== null && age >= DISAPPEARED_AFTER_HOURS
+}
+
 function isRevoked(health: DeviceHealth): boolean {
   return (
     health.installation_status === 'revoked' ||
@@ -117,7 +180,11 @@ function isRevoked(health: DeviceHealth): boolean {
   )
 }
 
-export function problemsFor(health: DeviceHealth): FleetProblem[] {
+export function problemsFor(
+  health: DeviceHealth,
+  funnelStage?: FunnelStage | null,
+  now: Date = new Date(),
+): FleetProblem[] {
   const problems: FleetProblem[] = []
   if (isRevoked(health)) problems.push('revoked')
   if (health.never_reported) {
@@ -126,7 +193,13 @@ export function problemsFor(health: DeviceHealth): FleetProblem[] {
     problems.push('never_reported')
     return problems
   }
-  if (!health.is_online) problems.push('offline')
+  if (hasDisappeared(health, funnelStage, now)) {
+    // Not also "offline": it is offline, but saying so would put it in the
+    // bucket that needs nothing, which is the whole distinction.
+    problems.push('install_disappeared')
+  } else if (!health.is_online) {
+    problems.push('offline')
+  }
   if (health.recording_route_ok === false) problems.push('capture_route_broken')
   if (health.capture_enabled === false) problems.push('capture_disabled')
   if (health.service_running === false) problems.push('service_stopped')
@@ -137,28 +210,45 @@ export function problemsFor(health: DeviceHealth): FleetProblem[] {
   return problems
 }
 
-export function stateFor(health: DeviceHealth): FleetState {
+export function stateFor(
+  health: DeviceHealth,
+  funnelStage?: FunnelStage | null,
+  now: Date = new Date(),
+): FleetState {
   if (health.never_reported) return 'never_reported'
   if (isRevoked(health)) return 'revoked'
+  if (hasDisappeared(health, funnelStage, now)) return 'install_disappeared'
   if (!health.is_online) return 'offline'
-  return problemsFor(health).length > 0 ? 'degraded' : 'healthy'
+  return problemsFor(health, funnelStage, now).length > 0 ? 'degraded' : 'healthy'
 }
 
 /** Worst first. The default order must serve the problem, not the alphabet. */
 export const FLEET_STATE_ORDER: Record<FleetState, number> = {
   never_reported: 0,
-  offline: 1,
-  degraded: 2,
-  revoked: 3,
-  healthy: 4,
+  // Above `offline` because it needs a person to travel; an offline phone
+  // usually needs nobody.
+  install_disappeared: 1,
+  offline: 2,
+  degraded: 3,
+  revoked: 4,
+  healthy: 5,
 }
 
-export function buildFleet(devices: DeviceHealth[] | undefined): FleetRow[] {
-  const rows = (devices ?? []).map((health) => ({
-    health,
-    state: stateFor(health),
-    problems: problemsFor(health),
-  }))
+export function buildFleet(
+  devices: DeviceHealth[] | undefined,
+  /** `funnel_stage` per installation, when the caller has it. The server sees
+   *  an uninstall the panel cannot infer from silence alone. */
+  stageByInstallation?: ReadonlyMap<string, FunnelStage>,
+  now: Date = new Date(),
+): FleetRow[] {
+  const rows = (devices ?? []).map((health) => {
+    const stage = stageByInstallation?.get(health.installation_id) ?? null
+    return {
+      health,
+      state: stateFor(health, stage, now),
+      problems: problemsFor(health, stage, now),
+    }
+  })
   rows.sort((a, b) => {
     const byState = FLEET_STATE_ORDER[a.state] - FLEET_STATE_ORDER[b.state]
     if (byState !== 0) return byState

@@ -124,6 +124,32 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    fun `the contact book is read in one place only`() {
+        // T139, N28. The address book is on a phone the employee bought.
+        // Holding READ_CONTACTS to turn one number into one name does not make
+        // the rest of it ours, and one reader is one place that can decide to
+        // read more than one row. Same mechanism as SubscriptionManager above.
+        val offenders = sources
+            .filter { it.code.contains("ContactsContract") }
+            .map { it.relativePath }
+            .filterNot { it.endsWith("capture/ContactNameResolver.kt") }
+        assertThat(offenders).isEmpty()
+    }
+
+    @Test
+    fun `nothing sweeps the contact book`() {
+        // A single-number lookup through PhoneLookup is allowed; a cursor over
+        // the contacts table is what "reading the contact book" means, and it
+        // must not exist anywhere.
+        val sweeps = sources.flatMap { source ->
+            listOf("Contacts.CONTENT_URI", "CommonDataKinds.Phone.CONTENT_URI", "Data.CONTENT_URI")
+                .filter { source.code.contains(it) }
+                .map { "${source.relativePath}: $it" }
+        }
+        assertThat(sweeps).isEmpty()
+    }
+
+    @Test
     fun `no device DTO carries a free-form map`() {
         // CONVENTIONS.md §8.5: the wire schema is the allow-list. A field the
         // contract does not name must not be able to leave the phone.

@@ -25,6 +25,7 @@ import {
   FileWarning,
   HardDrive,
   LayoutDashboard,
+  KeyRound,
   LogOut,
   Menu,
   MonitorPlay,
@@ -39,9 +40,10 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { ChangePasswordModal } from '@/modules/auth/ChangePasswordModal'
 import { useAuth } from '@/modules/auth/store'
 import { Perm, type Permission } from '@/shared/auth/permissions'
 import { t, type MessageKey } from '@/shared/i18n'
@@ -66,9 +68,32 @@ export interface NavItem {
 }
 
 /**
- * Every navigable page of SPEC §5.2. Detail routes (`/agents/:id`,
- * `/calls/:id`, `/devices/:installationId`) are reached from their list and
- * are deliberately absent; `/login` and `/i/:code` are outside the shell.
+ * The finished menu (T103). Detail routes (`/agents/:id`, `/calls/:id`,
+ * `/devices/:installationId`) are reached from their list and are deliberately
+ * absent; `/login` and `/i/:code` are outside the shell.
+ *
+ * ═══ Ordering ═══════════════════════════════════════════════════════════
+ * Within **Kundalik ish** the order is what somebody opens the panel to do,
+ * most often first:
+ *
+ *   Calls    the product. The reason anybody logs in.
+ *   Alerts   the to-do list — the only page that tells you something needs
+ *            doing rather than waiting to be asked. Second because a fault
+ *            nobody looks for is a fault nobody fixes.
+ *   Devices  fleet health, read when an alert points here or weekly.
+ *   Agents   the rollout. Heavy for a few weeks, then rare — so it sorts
+ *            last despite being where enrolment lives.
+ *
+ * Reports are weekly, administration is occasional, and both keep their own
+ * groups so the daily four are never more than four.
+ *
+ * ═══ RBAC ═══════════════════════════════════════════════════════════════
+ * **Hiding a menu item is not access control**, and this is the file where
+ * that is easiest to forget, because it is the file where visibility is
+ * decided. `<Gate anyOf>` in `app/router.tsx` still guards every route, the
+ * server still guards every request, and `nav.parity.test.ts` still asserts
+ * that a permission which shows an entry also opens its gate.
+ * ════════════════════════════════════════════════════════════════════════
  */
 export const NAV: readonly NavItem[] = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
@@ -81,10 +106,10 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
-    to: '/agents',
-    labelKey: 'nav.agents',
-    icon: Users,
-    anyOf: [Perm.AGENTS_READ],
+    to: '/alerts',
+    labelKey: 'nav.alerts',
+    icon: BellRing,
+    anyOf: [Perm.ALERTS_READ],
     group: 'nav.groupOperations',
   },
   {
@@ -99,10 +124,13 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
-    to: '/alerts',
-    labelKey: 'nav.alerts',
-    icon: BellRing,
-    anyOf: [Perm.ALERTS_READ],
+    // Where the rollout lives since `/enrolment` and `/numbers` were removed:
+    // issuing a code, assigning a work number and reading the funnel are all
+    // on the agent's own card now.
+    to: '/agents',
+    labelKey: 'nav.agents',
+    icon: Users,
+    anyOf: [Perm.AGENTS_READ],
     group: 'nav.groupOperations',
   },
 
@@ -243,11 +271,13 @@ function Sidebar({
   onToggleCollapsed,
   items,
   onNavigate,
+  onChangePassword,
 }: {
   collapsed: boolean
   onToggleCollapsed?: () => void
   items: readonly NavItem[]
   onNavigate?: () => void
+  onChangePassword: () => void
 }) {
   const { user, logout } = useAuth()
   return (
@@ -276,6 +306,16 @@ function Sidebar({
             <p className="truncate text-2xs text-muted">{user.email}</p>
           </div>
         ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onChangePassword}
+          className={cn('w-full justify-start', collapsed && 'justify-center px-2')}
+          aria-label={t('password.title')}
+        >
+          <KeyRound className="size-4 shrink-0" aria-hidden />
+          {collapsed ? null : <span className="truncate">{t('password.title')}</span>}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -309,9 +349,18 @@ function Sidebar({
 
 export function AppShell() {
   const permissions = useAuth((state) => state.permissions)
+  const mustChangePassword = useAuth((state) => state.user?.must_change_password ?? false)
   const [collapsed, setCollapsed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const items = visibleNav(permissions)
+
+  // `seed.py` and every admin reset set this flag, so the first thing a new
+  // account does is choose a password only they know. Opened rather than
+  // rendered inline so closing it after a successful change is one state.
+  useEffect(() => {
+    if (mustChangePassword) setPasswordOpen(true)
+  }, [mustChangePassword])
 
   return (
     <div className="min-h-screen bg-bg">
@@ -347,7 +396,15 @@ export function AppShell() {
             >
               <X className="size-4" aria-hidden />
             </Button>
-            <Sidebar collapsed={false} items={items} onNavigate={() => setDrawerOpen(false)} />
+            <Sidebar
+              collapsed={false}
+              items={items}
+              onNavigate={() => setDrawerOpen(false)}
+              onChangePassword={() => {
+                setDrawerOpen(false)
+                setPasswordOpen(true)
+              }}
+            />
           </div>
         </div>
       ) : null}
@@ -363,6 +420,7 @@ export function AppShell() {
             collapsed={collapsed}
             onToggleCollapsed={() => setCollapsed((value) => !value)}
             items={items}
+            onChangePassword={() => setPasswordOpen(true)}
           />
         </aside>
 
@@ -370,6 +428,12 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <ChangePasswordModal
+        open={passwordOpen}
+        onOpenChange={setPasswordOpen}
+        forced={mustChangePassword}
+      />
     </div>
   )
 }

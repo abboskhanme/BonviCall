@@ -11,7 +11,7 @@
     <!-- Foreground service notification (UC-05). It is permanent and an
          employee reads it every day, so it says what the app is doing and on
          which number — N41 transparency, not a blank "app is running". -->
-    <string name="service_channel_name">Qo\'ng\'iroqlar nazorati</string>
+    <string name="service_channel_name">Ish qo\'ng\'iroqlarini qayd etish</string>
     <string name="service_channel_description">Ish raqamidagi qo\'ng\'iroqlarni qayd etadi</string>
     <string name="service_notification_title">Ish qo\'ng\'iroqlari qayd etilmoqda</string>
     <string name="service_notification_text">Faqat ish raqamingizdagi qo\'ng\'iroqlar</string>
@@ -27,7 +27,7 @@
     <!-- Main destinations -->
     <string name="home_title">Bosh sahifa</string>
     <string name="calls_title">Qo\'ng\'iroqlar</string>
-    <string name="diagnostics_title">Tashxis</string>
+    <string name="diagnostics_title">Ilova holati</string>
 
 
     <!-- ══ N41 ══════════════════════════════════════════════════════════════
@@ -38,7 +38,7 @@
          phone, and the install landing page has already said it once. -->
     <string name="n41_recording_number">Yozib olinadi: %1$s</string>
     <string name="n41_only_this_number">Faqat shu raqamdagi ish qo\'ng\'iroqlari yoziladi. Ikkinchi SIM karta hech qachon tegilmaydi.</string>
-    <string name="n41_never_uploaded">Kontaktlar, SMS, suratlar va joylashuv hech qachon yuborilmaydi.</string>
+    <string name="n41_never_uploaded">SMS, suratlar va joylashuv hech qachon yuborilmaydi. Telefon kitobingiz ham yuborilmaydi — faqat siz gaplashgan odamning ismi o\'sha qo\'ng\'iroq yonida ko\'rinadi.</string>
 
     <!-- E1 — the code -->
     <string name="enrol_code_hint">Kod</string>
@@ -83,10 +83,10 @@
     <string name="perm_microphone_why">Mikrofon bo\'lmasa suhbat yozilmaydi, lekin qo\'ng\'iroq baribir qayd etiladi.</string>
 
     <string name="perm_call_phone_title">Qo\'ng\'iroq qilish</string>
-    <string name="perm_call_phone_why">Panelidan raqamni bosib qo\'ng\'iroq qilish uchun kerak.</string>
+    <string name="perm_call_phone_why">Paneldan raqamni bosib qo\'ng\'iroq qilish uchun kerak.</string>
 
     <string name="perm_contacts_title">Kontaktlar</string>
-    <string name="perm_contacts_why">Faqat ro\'yxatda ismni ko\'rsatish uchun. Kontaktlaringiz hech qayerga yuborilmaydi va bu qadamni o\'tkazib yuborsangiz ham bo\'ladi.</string>
+    <string name="perm_contacts_why">Ro\'yxatda raqam o\'rniga ism ko\'rinishi uchun. Telefon kitobingiz yuborilmaydi — faqat siz gaplashgan odamning ismi o\'sha qo\'ng\'iroq yonida saqlanadi. Bu qadamni o\'tkazib yuborsangiz ham bo\'ladi.</string>
 
     <string name="perm_battery_title">Batareya cheklovini olib tashlash</string>
     <string name="perm_battery_why">Telefon batareyani tejash uchun ilovani to\'xtatadi va qo\'ng\'iroqlar yozilmay qoladi.</string>
@@ -125,7 +125,7 @@
     <string name="enrol_done_ready">Hammasi tayyor. Ish qo\'ng\'iroqlaringiz qayd etilmoqda.</string>
     <string name="enrol_done_blocked">Hali tayyor emas: %1$s</string>
     <string name="enrol_done_attested">Raqamni administrator tasdiqlagan.</string>
-    <string name="enrol_done_diagnostics">Tashxis sahifasi</string>
+    <string name="enrol_done_diagnostics">Ilova holatini ko\'rish</string>
     <string name="enrol_not_finished">Ro\'yxatdan o\'tish tugamagan — qo\'ng\'iroqlar hali yuborilmaydi.</string>
 
     <string name="common_not_ready">Bu ekran hali tayyor emas.</string>

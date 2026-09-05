@@ -161,6 +161,7 @@ export const ENROLMENT_ATTEMPT_KIND_LABEL: Record<EnrolmentAttemptKind, MessageK
 
 export const FLEET_STATE_LABEL: Record<FleetState, MessageKey> = {
   never_reported: 'fleet.never_reported',
+  install_disappeared: 'fleet.install_disappeared',
   revoked: 'fleet.revoked',
   offline: 'fleet.offline',
   degraded: 'fleet.degraded',
@@ -169,6 +170,7 @@ export const FLEET_STATE_LABEL: Record<FleetState, MessageKey> = {
 
 export const FLEET_STATE_TONE: Record<FleetState, Tone> = {
   never_reported: 'bad',
+  install_disappeared: 'bad',
   revoked: 'neutral',
   offline: 'bad',
   degraded: 'warn',
@@ -177,6 +179,7 @@ export const FLEET_STATE_TONE: Record<FleetState, Tone> = {
 
 export const FLEET_PROBLEM_LABEL: Record<FleetProblem, MessageKey> = {
   never_reported: 'fleetProblem.never_reported',
+  install_disappeared: 'fleetProblem.install_disappeared',
   revoked: 'fleetProblem.revoked',
   offline: 'fleetProblem.offline',
   capture_route_broken: 'fleetProblem.capture_route_broken',

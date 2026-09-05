@@ -83,8 +83,9 @@ export const ROUTES: readonly RouteSpec[] = [
   // number and issuing an enrolment code are things you do *to an agent*, so
   // they belong on the agent's own page rather than in two more top-level
   // sections. The capability is not gone — `AgentDetailPage` owns it.
-  { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
-  { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
+  { path: '/calls', element: <CallsPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  { path: '/calls/:id', element: <CallDetailPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  { path: '/alerts', element: <AlertsPage />, anyOf: [Perm.ALERTS_READ] },
   {
     // Own-scope passes the gate and the SERVER narrows the query to the
     // caller's own installations — the house rule (CONVENTIONS.md §11), the
@@ -101,9 +102,8 @@ export const ROUTES: readonly RouteSpec[] = [
     element: <DeviceDetailPage />,
     anyOf: [Perm.DEVICES_READ, Perm.DEVICES_READ_OWN],
   },
-  { path: '/calls', element: <CallsPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
-  { path: '/calls/:id', element: <CallDetailPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
-  { path: '/alerts', element: <AlertsPage />, anyOf: [Perm.ALERTS_READ] },
+  { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
+  { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
 
   // ── Reports ───────────────────────────────────────────────────────────
   { path: '/reports/gap', element: <GapReportPage />, anyOf: [Perm.REPORTS_READ] },
@@ -118,7 +118,6 @@ export const ROUTES: readonly RouteSpec[] = [
     element: <AppVersionsPage />,
     anyOf: [Perm.APPVERSIONS_READ],
   },
-
 ]
 
 function FullPageLoader() {

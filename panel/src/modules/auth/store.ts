@@ -34,6 +34,9 @@ interface AuthState {
   restore: () => Promise<void>
   login: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
+  /** Clears `must_change_password` after a successful self-change, so the
+   *  forced dialog does not reappear on the next render. */
+  passwordChanged: () => void
 }
 
 function settle(user: SessionUser) {
@@ -96,6 +99,11 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ ...ANONYMOUS, loginError: messageForError(error) })
       return false
     }
+  },
+
+  passwordChanged: () => {
+    const user = get().user
+    if (user) set({ user: { ...user, must_change_password: false } })
   },
 
   logout: async () => {

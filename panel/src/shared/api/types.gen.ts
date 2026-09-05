@@ -1296,6 +1296,12 @@ export interface components {
             /** Created By */
             created_by: string | null;
             /**
+             * Created By Name
+             * @description Who uploaded it, resolved server-side. The id alone would make every page re-solve it through `GET /users`, which a manager cannot read — so a manager would see a bare uuid.
+             * @default
+             */
+            created_by_name: string;
+            /**
              * Id
              * Format: uuid
              */

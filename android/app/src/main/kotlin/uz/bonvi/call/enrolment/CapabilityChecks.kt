@@ -41,6 +41,7 @@ import javax.inject.Singleton
 class CapabilityChecks @Inject constructor(
     @ApplicationContext private val context: Context,
     private val microphone: MicrophoneProbe,
+    private val contactNames: uz.bonvi.call.capture.ContactNameResolver,
     private val storageAccessProbe: StorageAccessProbe,
     private val subscriptionProbe: SubscriptionPresenceProbe,
     private val serviceState: CaptureServiceState,
@@ -51,7 +52,7 @@ class CapabilityChecks @Inject constructor(
         Capability.MICROPHONE -> microphone.probe()
         Capability.PHONE_STATE -> checkPhoneState()
         Capability.CALL_LOG -> checkCallLog()
-        Capability.CONTACTS -> notApplicable(capability, "the contact book is never read (N28)")
+        Capability.CONTACTS -> checkContacts()
         Capability.NOTIFICATIONS -> checkNotifications()
         Capability.CALL_PHONE -> checkCallPhone()
         Capability.BATTERY_EXEMPTION -> checkBatteryExemption()
@@ -94,6 +95,28 @@ class CapabilityChecks @Inject constructor(
             } else {
                 CapabilityState.GRANTED_WORKING to "call-log query returned ${cursor.count} row(s)"
             }
+        }
+    }
+
+    /**
+     * A 1-row lookup through the same resolver the capture path uses
+     * (SPEC §7.8). Exercised, not read off the flag — and it is the ONLY
+     * capability whose failure is `not_applicable` rather than `denied`, since
+     * declining it is a legitimate choice rather than a fault.
+     */
+    private suspend fun checkContacts(): CapabilityResult = withContext(io) {
+        if (!contactNames.hasPermission()) {
+            CapabilityResult(
+                Capability.CONTACTS,
+                CapabilityState.NOT_APPLICABLE,
+                "declined — calls ship without a name",
+            )
+        } else {
+            CapabilityResult(
+                Capability.CONTACTS,
+                CapabilityState.GRANTED_WORKING,
+                "contact lookup available",
+            )
         }
     }
 

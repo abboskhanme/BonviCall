@@ -9,10 +9,6 @@
   and T107 photographs those screens against whatever set T104 leaves behind.
 
   Deliberately ABSENT, and they must stay absent:
-    READ_CONTACTS       the contact book is never uploaded (N28, §8.1 line 2).
-                        `contacts` exists as a CAPABILITY in SPEC §3.1 so the
-                        panel can report it as not_applicable — it is not a
-                        permission this app asks for.
     READ_SMS / RECEIVE_SMS, ACCESS_FINE_LOCATION, CAMERA, READ_MEDIA_IMAGES
                         nothing in UC-01…UC-29 reads any of them, and each is a
                         screen that makes an employee hand back their own phone.
@@ -48,6 +44,17 @@
     <!-- UC-14: the MediaRecorder fallback route, for handsets whose own
          recorder produces nothing. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- UC-19, T139: turn ONE number into ONE name, for a call already
+         captured on the registered number.
+         ⚠️ N28 allows exactly three things off the handset: call metadata,
+         audio, and a contact name where one resolves. NOT the book. The single
+         reader is capture/ContactNameResolver.kt, its lookup is by number
+         through PhoneLookup, nothing is cached, and the request takes a
+         Decision.Capture so a name cannot be resolved for a personal call.
+         OPTIONAL: E2 marks this step *ixtiyoriy* and an agent may skip it —
+         the call then ships without a name, which is not a failure. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <!-- UC-16: click-to-call from the panel.
          ⚠️ T104 KEEP-LIST. This was nearly minimised away once; without it the
