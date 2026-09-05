@@ -56,8 +56,16 @@ class AlertResponse(BaseModel):
         ``kind`` is a closed enum and part of the machine contract; the
         sentence is presentation, and presentation belongs to whatever is
         rendering it now. ``core/messages_uz.py`` is the one place it lives.
+
+        ``detail["first_report"]`` selects the wording for a capability that was
+        broken the first time it was ever checked — "hech qachon ishlamagan"
+        rather than "ishlamay qoldi". Same cause, same severity; only the claim
+        about history changes.
         """
-        self.title_uz, self.body_uz = alert_text(self.kind.value)
+        self.title_uz, self.body_uz = alert_text(
+            self.kind.value,
+            first_report=bool(self.detail and self.detail.get("first_report")),
+        )
         return self
 
 

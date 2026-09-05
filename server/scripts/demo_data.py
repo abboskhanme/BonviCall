@@ -20,14 +20,18 @@ Never run against production — it creates accounts with a published password.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import random
 import sys
+import time
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
 
 import httpx
 import synthetic_audio
+import websockets
+from websockets.sync.client import connect as ws_connect
 
 BASE = os.environ.get("DEMO_BASE_URL", "http://localhost:8000")
 ADMIN_EMAIL = os.environ.get("DEMO_ADMIN_EMAIL", "admin@bonvi.uz")
@@ -122,6 +126,12 @@ CAPABILITY_OVERRIDES: dict[str, dict[str, tuple[str, str | None]]] = {
     "V2111": {
         "oem_autostart": ("granted_working", "iManager autostart allowed"),
         "oem_recorder": ("not_applicable", "no call recorder in this ROM"),
+        # Refused at install and never granted since — a first observation, not
+        # a loss. The alert still fires (a phone that arrives broken is the one
+        # nobody notices), but it reads "hech qachon ishlamagan" rather than
+        # claiming a permission was taken away. Without this the demo has no
+        # example of that wording at all.
+        "notifications": ("denied", "permission refused at install"),
     },
 }
 
@@ -264,6 +274,56 @@ def make_call(
         call["capture_route"] = "none"
         call["audio_missing_reason"] = "not_expected"
     return call
+
+
+def click_to_call(api: Api, installation_id: str, device, number: str) -> dict | None:
+    """A dial through the socket, exactly as UC-16 runs it. Returns the command.
+
+    Holds a real WebSocket open while the panel issues the command, so this
+    exercises the whole of §4.6 rather than the REST fallback: handshake auth on
+    headers, the ``command`` frame, and the ``ack`` that closes the loop and
+    stores ``latency_ms`` — the number UC-16's five-second bar is measured
+    against, and the reason ``latency_ms`` exists at all (R3).
+    """
+    token, headers, _route = device
+    url = BASE.replace("http://", "ws://").replace("https://", "wss://")
+    socket_headers = {**headers, "Authorization": f"Bearer {token}"}
+
+    try:
+        with ws_connect(
+            f"{url}/api/device/v1/ws", additional_headers=socket_headers, open_timeout=10
+        ) as socket:
+            api.post(
+                f"/api/v1/devices/{installation_id}/commands",
+                json={"kind": "dial", "number": number, "reason": "demo"},
+            )
+            frame = json.loads(socket.recv(timeout=10))
+            if frame.get("type") != "command":
+                raise SystemExit(f"kutilmagan freym: {frame}")
+            socket.send(
+                json.dumps(
+                    {
+                        "type": "ack",
+                        "command_id": frame["command_id"],
+                        "status": "acknowledged",
+                        "at": iso(datetime.now(UTC)),
+                    }
+                )
+            )
+            # Read back through the panel, so what is printed is what an admin
+            # would see rather than what this script believes it sent.
+            for _ in range(40):
+                detail = api.get(f"/api/v1/commands/{frame['command_id']}")
+                if detail["status"] == "acknowledged":
+                    return detail
+                time.sleep(0.1)
+            return detail
+    except (OSError, websockets.exceptions.WebSocketException) as error:
+        # A demo that half-works teaches nothing, but a socket refused by a
+        # proxy is a deployment fact rather than a bug in the chain — so it is
+        # reported and the rest of the demo continues.
+        print(f"    soket ochilmadi: {type(error).__name__}: {error}")
+        return None
 
 
 def capability_report(model: str, drift: bool = False) -> list[dict]:
@@ -579,6 +639,40 @@ def main() -> int:
             f"({EXPIRED_CALL_AGE_DAYS} kun), 1 tasi qisqa (davomiylik mos emas)"
         )
 
+        print("\n  qo'ng'iroq buyrug'i (click-to-call)…")
+        # The fast path: a phone holding a live socket. This is the only shape
+        # with a chance at UC-16's five-second bar, and until now nothing but
+        # its own tests had ever driven it.
+        live_agent, _n, live_token, live_headers, live_model, _v = installations[0]
+        live_installation = live_headers["X-Installation-Id"]
+        acknowledged = click_to_call(
+            api,
+            live_installation,
+            (live_token, live_headers, None),
+            "+998901234567",
+        )
+        if acknowledged:
+            print(
+                f"    {live_model:16} soket orqali → {acknowledged['status']}, "
+                f"{acknowledged['latency_ms']} ms"
+            )
+
+        # And the slow path. The last handset is the one deliberately kept
+        # silent, so it holds no socket: the command is sent, nothing answers,
+        # and `command_timeout` turns it into failed/device_offline after 15 s.
+        # That pair — one acknowledged, one refused with a reason — is what the
+        # panel's command list has to render, and UC-16 requires the reason.
+        *_, silent_model, _sv = installations[-1]
+        silent_installation = installations[-1][3]["X-Installation-Id"]
+        pending = api.post(
+            f"/api/v1/devices/{silent_installation}/commands",
+            json={"kind": "dial", "number": "+998901234567", "reason": "demo"},
+        )
+        print(
+            f"    {silent_model:16} soketsiz    → {pending['status']}; "
+            "15 soniyadan keyin command_timeout uni device_offline qiladi"
+        )
+
         print("\n  qurilma holati yuborilmoqda…")
         for position, (
             _agent,
@@ -611,6 +705,11 @@ def main() -> int:
                     "app_variant": variant,
                     "app_version": "1.0.0",
                     "api_level": 34 if variant == "modern34" else 31,
+                    # The app sends this on the first heartbeat after
+                    # `onNewToken`, not on every one. It is how a phone whose
+                    # socket is dead gets woken (SPEC §4.6) — and a credential,
+                    # so it never comes back out on a panel response.
+                    "push_token": f"demo-fcm-{sha256(model)[:32]}",
                     "recording_route": CAPTURE[model][0],
                     "recording_route_ok": CAPTURE[model][1] is None,
                 },

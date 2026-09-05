@@ -1308,6 +1308,19 @@
             ],
             "title": "Power Save Mode"
           },
+          "push_token": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "FCM registration token, sent **only when it changes** — on the first heartbeat after `onNewToken`. Omitting it leaves the stored one alone; sending it on every heartbeat would spend part of the cellular budget (N15) on a value that changes twice a year.",
+            "title": "Push Token"
+          },
           "queue_bytes": {
             "anyOf": [
               {

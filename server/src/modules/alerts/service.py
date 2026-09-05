@@ -68,7 +68,9 @@ class AlertService:
         The Uzbek wording comes from ``core/messages_uz.py``: a caller names the
         cause, it never writes the sentence (§14).
         """
-        title_uz, body_uz = alert_text(kind.value)
+        title_uz, body_uz = alert_text(
+            kind.value, first_report=bool(detail and detail.get("first_report"))
+        )
         key = dedupe_key(kind, scope)
         existing = await self.session.scalar(
             select(AlertModel).where(

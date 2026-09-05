@@ -240,6 +240,13 @@ class DeviceService:
             if value is not None:
                 setattr(health, field_name, value)
 
+        if payload.push_token is not None:
+            # Lives on the installation, not on device_health: it is a
+            # credential bound to this app on this phone, and device_health is
+            # a snapshot the panel reads. Only written when the app sends one —
+            # an omitted field must never clear a working token.
+            installation.push_token = payload.push_token
+
         if was_offline:
             # It is back. Clear the alert rather than leaving an admin to tick
             # off a phone that fixed itself.
@@ -363,6 +370,11 @@ class DeviceService:
                         "capability": report.capability.value,
                         "from": previous.value if previous else None,
                         "to": report.state.value,
+                        # Nothing was *lost* if we had never seen it working.
+                        # The alert still fires — a phone that arrives broken
+                        # is the one nobody notices otherwise (R3) — but the
+                        # sentence it renders as changes.
+                        "first_report": previous is None,
                     },
                 )
                 alerts += 1

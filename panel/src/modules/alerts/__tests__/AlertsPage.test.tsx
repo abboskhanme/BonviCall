@@ -4,9 +4,9 @@
  * An alert nobody acts on is worse than no alert, so what is pinned here is
  * actionability, not layout:
  *
- *  • the wording comes from `kind`, NOT from the server's `title_uz` — which
- *    is English today — and never from `body_uz`, which is the generic
- *    "contact the administrator";
+ *  • the wording comes from the server's `title_uz` / `body_uz`, which are
+ *    derived from `kind` out of this panel's own former catalogue — the two
+ *    cannot disagree because there is now only one copy;
  *  • every row carries a next action;
  *  • every row carries a way through to the thing that can fix it;
  *  • worst first, because the page is read top-down by somebody with an hour;
@@ -19,7 +19,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AlertsPage } from '@/modules/alerts/AlertsPage'
-import { ALERT_KIND_HINT, ALERT_KIND_LABEL } from '@/modules/alerts/labels'
+import { isFirstObservation } from '@/modules/alerts/routing'
 import type { Alert } from '@/modules/alerts/api'
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
@@ -34,10 +34,9 @@ function makeAlert(overrides: Partial<Alert> = {}): Alert {
     id: 'alert-1',
     kind: 'device_offline',
     severity: 'warning',
-    // Exactly what the live server sends today: an English title and a body
-    // that says nothing. The page must not lean on either.
-    title_uz: 'Device offline',
-    body_uz: 'Xatolik yuz berdi. Administratorga murojaat qiling.',
+    // Derived from `kind` server-side; the page renders them as sent.
+    title_uz: 'Qurilma aloqada emas',
+    body_uz: 'Telefon uzoq vaqt aloqaga chiqmadi.',
     agent_id: AGENT_ID,
     installation_id: INSTALLATION_ID,
     number_id: 'number-1',
@@ -135,27 +134,52 @@ afterEach(() => {
 })
 
 describe('an alert somebody can act on', () => {
-  it('names the problem from the kind, not from the English title_uz', async () => {
+  it('renders the server-derived title', async () => {
     world([makeAlert()])
     renderPage()
 
-    expect(await screen.findByText(t(ALERT_KIND_LABEL.device_offline))).toBeInTheDocument()
-    // The server's own strings are unusable today and the page must not show
-    // them: one is English, the other says nothing at all.
-    expect(screen.queryByText('Device offline')).toBeNull()
-    expect(
-      screen.queryByText('Xatolik yuz berdi. Administratorga murojaat qiling.'),
-    ).toBeNull()
+    expect(await screen.findByText('Qurilma aloqada emas')).toBeInTheDocument()
   })
 
   it('tells the reader what to do next', async () => {
     world([makeAlert()])
     renderPage()
 
-    expect(await screen.findByText(t(ALERT_KIND_HINT.device_offline))).toBeInTheDocument()
-    // A hint that merely restates the title would leave the page a list of
-    // nouns, which is the failure this page exists to avoid.
-    expect(t(ALERT_KIND_HINT.device_offline)).not.toBe(t(ALERT_KIND_LABEL.device_offline))
+    // Without a next action the page is a list of nouns, which is the failure
+    // it exists to avoid.
+    expect(await screen.findByText('Telefon uzoq vaqt aloqaga chiqmadi.')).toBeInTheDocument()
+  })
+
+  it('says an already-broken phone never LOST the permission', async () => {
+    // A handset that arrived with the permission denied never lost it, and
+    // wording that asserts a change sends an admin hunting for one that never
+    // happened.
+    world([
+      makeAlert({
+        kind: 'permission_lost_microphone',
+        title_uz: 'Mikrofon ruxsati yo\'q',
+        body_uz: 'Ruxsatni qaytaring.',
+        detail: { capability: 'microphone', to: 'denied', first_observation: true },
+      }),
+    ])
+    renderPage()
+
+    expect(await screen.findByText(t('alerts.firstObservation'))).toBeInTheDocument()
+  })
+
+  it('says nothing of the sort for a real transition', async () => {
+    world([
+      makeAlert({
+        kind: 'permission_lost_microphone',
+        title_uz: 'Mikrofon ruxsati yo\'qolgan',
+        body_uz: 'Ruxsatni qaytaring.',
+        detail: { capability: 'microphone', from: 'granted_working', to: 'denied' },
+      }),
+    ])
+    renderPage()
+
+    await screen.findByText('Mikrofon ruxsati yo\'qolgan')
+    expect(screen.queryByText(t('alerts.firstObservation'))).toBeNull()
   })
 
   it('says who it is about and links to them', async () => {
@@ -186,10 +210,17 @@ describe('an alert somebody can act on', () => {
 
   it('offers no link at all for a server-side problem', async () => {
     // Nothing on a phone fixes a failed retention job.
-    world([makeAlert({ kind: 'retention_job_failed', agent_id: null, installation_id: null })])
+    world([
+      makeAlert({
+        kind: 'retention_job_failed',
+        agent_id: null,
+        installation_id: null,
+        title_uz: 'Saqlash vazifasi bajarilmadi',
+      }),
+    ])
     renderPage()
 
-    await screen.findByText(t(ALERT_KIND_LABEL.retention_job_failed))
+    await screen.findByText('Saqlash vazifasi bajarilmadi')
     expect(screen.queryByRole('link', { name: t('alerts.openDevice') })).toBeNull()
     expect(screen.queryByRole('link', { name: t('alerts.openAgent') })).toBeNull()
   })
@@ -200,23 +231,23 @@ describe('an alert somebody can act on', () => {
 
     expect(await screen.findByText(t('alerts.occurrences', { n: '21' }))).toBeInTheDocument()
     // 21 occurrences, one row.
-    expect(screen.getAllByText(t(ALERT_KIND_LABEL.device_offline))).toHaveLength(1)
+    expect(screen.getAllByText('Qurilma aloqada emas')).toHaveLength(1)
   })
 })
 
 describe('ordering', () => {
   it('puts the worst first', async () => {
     world([
-      makeAlert({ id: 'info', kind: 'attribution_out_of_range', severity: 'info' }),
+      makeAlert({ id: 'info', kind: 'attribution_out_of_range', severity: 'info', title_uz: 'Muddatdan tashqari' }),
       makeAlert({ id: 'warn', kind: 'device_offline', severity: 'warning' }),
-      makeAlert({ id: 'crit', kind: 'credential_replay', severity: 'critical' }),
+      makeAlert({ id: 'crit', kind: 'credential_replay', severity: 'critical', title_uz: 'Token qayta ishlatildi' }),
     ])
     renderPage()
 
     // The order on screen, read as the page is read: top to bottom.
-    const critical = await screen.findByText(t(ALERT_KIND_LABEL.credential_replay))
-    const warning = screen.getByText(t(ALERT_KIND_LABEL.device_offline))
-    const info = screen.getByText(t(ALERT_KIND_LABEL.attribution_out_of_range))
+    const critical = await screen.findByText('Token qayta ishlatildi')
+    const warning = screen.getByText('Qurilma aloqada emas')
+    const info = screen.getByText('Muddatdan tashqari')
 
     expect(critical.compareDocumentPosition(warning)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(warning.compareDocumentPosition(info)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
@@ -236,7 +267,7 @@ describe('permissions and states', () => {
     world([makeAlert()])
     renderPage()
 
-    await screen.findByText(t(ALERT_KIND_LABEL.device_offline))
+    await screen.findByText('Qurilma aloqada emas')
     expect(screen.queryByRole('button', { name: t('alerts.acknowledge') })).toBeNull()
   })
 
@@ -279,7 +310,7 @@ describe('permissions and states', () => {
     world([makeAlert()])
     renderPage()
 
-    await screen.findByText(t(ALERT_KIND_LABEL.device_offline))
+    await screen.findByText('Qurilma aloqada emas')
     const url = String(fetchMock.mock.calls.find(([i]) => String(i).includes('/alerts'))?.[0] ?? '')
     // The inbox is a to-do list, not an archive.
     expect(url).toContain('open_only=true')
@@ -291,5 +322,25 @@ describe('permissions and states', () => {
 
     const detail = await screen.findByText(/offline_minutes=10/)
     expect(within(detail).queryByText(/token/i)).toBeNull()
+  })
+})
+
+describe('isFirstObservation', () => {
+  it('recognises the flag whichever way it is spelled', () => {
+    // The flag is landing separately from the alerts that already carry
+    // from/to, so both spellings are accepted rather than one guessed at.
+    expect(isFirstObservation({ first_observation: true })).toBe(true)
+    expect(isFirstObservation({ first_seen: true })).toBe(true)
+  })
+
+  it('treats an absent or unknown prior state as a first observation', () => {
+    expect(isFirstObservation({ to: 'denied', from: null })).toBe(true)
+    expect(isFirstObservation({ to: 'denied', from: 'unknown' })).toBe(true)
+  })
+
+  it('leaves a real transition alone', () => {
+    expect(isFirstObservation({ from: 'granted_working', to: 'denied' })).toBe(false)
+    expect(isFirstObservation({ offline_minutes: 10 })).toBe(false)
+    expect(isFirstObservation(null)).toBe(false)
   })
 })

@@ -6,10 +6,8 @@
  * to scroll past the next one. Every row therefore answers four questions
  * without being clicked:
  *
- *   what it is    — the kind, in Uzbek, from this module's own catalogue
- *                   (the server's `title_uz` is English today and its
- *                   `body_uz` is a generic "contact the administrator")
- *   what to do    — `ALERT_KIND_HINT`, one sentence, the next action
+ *   what it is    — `title_uz`, derived server-side from `kind`
+ *   what to do    — `body_uz`, one sentence, the next action
  *   who it is about — the agent, by name, linked
  *   when          — first seen, last seen, and how many times
  *
@@ -38,14 +36,13 @@ import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 
 import { useAcknowledgeAlert, useAlerts, type Alert } from './api'
 import {
-  ALERT_KIND_HINT,
-  ALERT_KIND_LABEL,
   ALERT_SEVERITY_LABEL,
   ALERT_SEVERITY_ORDER,
   ALERT_SEVERITY_TONE,
   ALERT_TARGET,
+  isFirstObservation,
   type AlertSeverity,
-} from './labels'
+} from './routing'
 
 const PARAM_SEVERITY = 'severity'
 const PARAM_OPEN = 'open'
@@ -79,6 +76,10 @@ function AlertRow({ alert, agentName }: { alert: Alert; agentName: (id: string) 
   const mayAck = can(Perm.ALERTS_ACK)
   const target = ALERT_TARGET[alert.kind]
   const name = alert.agent_id ? agentName(alert.agent_id) : null
+  const detail = alert.detail as Record<string, unknown> | null
+  // A phone that arrived already broken never LOST anything, so wording that
+  // asserts a change would send an admin hunting for one that never happened.
+  const firstObservation = isFirstObservation(detail)
 
   return (
     <Card className="p-4">
@@ -89,12 +90,16 @@ function AlertRow({ alert, agentName }: { alert: Alert; agentName: (id: string) 
 
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-text">
-            {/* From `kind`, not from `title_uz` — see ./labels for why. */}
-            {t(ALERT_KIND_LABEL[alert.kind])}
+            {/* Derived from `kind` server-side, out of this panel's own Uzbek,
+                so the two cannot disagree. */}
+            {alert.title_uz}
           </p>
           {/* The next action. Without this the page is a list of nouns. */}
-          <p className="mt-1 text-sm text-muted">{t(ALERT_KIND_HINT[alert.kind])}</p>
-          <AlertDetail detail={alert.detail as Record<string, unknown> | null} />
+          {alert.body_uz ? <p className="mt-1 text-sm text-muted">{alert.body_uz}</p> : null}
+          {firstObservation ? (
+            <p className="mt-1 text-xs text-warn">{t('alerts.firstObservation')}</p>
+          ) : null}
+          <AlertDetail detail={detail} />
 
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-muted">
             {name ? (

@@ -592,3 +592,112 @@ async def test_a_push_outage_does_not_break_click_to_call(
     )
     assert response.status_code == 202
     assert response.json()["status"] == "sent"
+
+
+# --- the FCM wake-up -------------------------------------------------------
+
+
+async def test_the_heartbeat_stores_the_push_token(
+    db, installation_factory, device_client_factory
+) -> None:
+    """How the server learns where to wake a phone (SPEC §4.6 step 2)."""
+    from datetime import UTC, datetime
+
+    installation = await installation_factory()
+    device = await device_client_factory(installation)
+    await device.post(
+        "/api/device/v1/heartbeat",
+        json={
+            "device_epoch_ms": int(datetime.now(UTC).timestamp() * 1000),
+            "device_timezone": "Asia/Tashkent",
+            "push_token": "fcm-registration-token-abc123",
+        },
+    )
+    await db.refresh(installation)
+    assert installation.push_token == "fcm-registration-token-abc123"
+
+
+async def test_a_heartbeat_without_a_token_does_not_clear_the_stored_one(
+    db, installation_factory, device_client_factory
+) -> None:
+    """The app sends it only when it changes, so absence means "unchanged".
+
+    Treating an omitted field as ``NULL`` would erase the token on the very
+    next heartbeat, 120 seconds later, and leave every phone unwakeable while
+    looking like it had never registered.
+    """
+    from datetime import UTC, datetime
+
+    installation = await installation_factory()
+    installation.push_token = "fcm-registration-token-abc123"
+    await db.flush()
+
+    device = await device_client_factory(installation)
+    await device.post(
+        "/api/device/v1/heartbeat",
+        json={
+            "device_epoch_ms": int(datetime.now(UTC).timestamp() * 1000),
+            "device_timezone": "Asia/Tashkent",
+        },
+    )
+    await db.refresh(installation)
+    assert installation.push_token == "fcm-registration-token-abc123"
+
+
+async def test_the_wake_up_is_sent_to_the_phones_own_token(
+    db, installation_factory, user_factory, monkeypatch
+) -> None:
+    """A command to a phone with no socket goes to *that* phone's address."""
+    from src.core.enums import UserRole
+
+    installation = await installation_factory()
+    installation.push_token = "fcm-registration-token-abc123"
+    await db.flush()
+    user = await user_factory(UserRole.ADMIN)
+    seen: list[tuple[uuid.UUID, str | None]] = []
+
+    class Recording(LoggingPushSender):
+        async def wake(self, installation_id, push_token):
+            seen.append((installation_id, push_token))
+            return True
+
+    monkeypatch.setattr("src.core.push._sender", Recording())
+
+    service = CommandService(db)
+    command = await service.issue(
+        installation.id,
+        CreateCommandRequest(kind=CommandKind.DIAL, number="+998935554433"),
+        user.id,
+        ip=None,
+    )
+    assert await service.deliver(command) is False  # no socket: this is the wake-up
+    assert seen == [(installation.id, "fcm-registration-token-abc123")]
+
+
+async def test_the_push_token_never_reaches_a_panel_response() -> None:
+    """N26. It is a credential: holding it lets anyone wake the handset.
+
+    Checked against the generated contract rather than the schemas, because the
+    contract is what a client is built from and what a browser can read.
+    """
+    from src.contract_export import build_documents
+
+    leaks = []
+    for stem, document in build_documents().items():
+        if stem in ("openapi-device-v1", "error-codes", "device-ws-frames"):
+            continue  # the device DTO is where the phone *sends* it
+        for name, schema in document.get("components", {}).get("schemas", {}).items():
+            if "push_token" in (schema.get("properties") or {}):
+                leaks.append(f"{stem}: {name}")
+    assert leaks == [], f"the FCM token is exposed on: {leaks}"
+
+
+async def test_the_push_token_is_redacted_in_logs() -> None:
+    """N26: a credential must not be readable in a log line."""
+    from src.core.logging import redaction_processor
+
+    event = redaction_processor(
+        None, "info", {"push_token": "fcm-registration-token-abc123"}
+    )
+    assert "abc123" not in str(event["push_token"])
+    assert event["push_token"] != "fcm-registration-token-abc123"

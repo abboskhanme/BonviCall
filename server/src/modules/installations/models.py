@@ -120,6 +120,15 @@ class InstallationModel(Base, UUIDMixin, TimestampMixin):
     refresh_token_hash: Mapped[str | None] = mapped_column(
         sa.CHAR(64), nullable=True, doc="Current refresh token; reuse means credential_replay."
     )
+    push_token: Mapped[str | None] = mapped_column(
+        sa.Text,
+        nullable=True,
+        doc=(
+            "FCM registration token — how a phone with a dead socket is woken "
+            "(SPEC §4.6). A credential (N26): never logged, never on a panel "
+            "DTO. NULL means we have no address for this phone."
+        ),
+    )
     app_version: Mapped[str | None] = mapped_column(
         sa.String(20),
         nullable=True,

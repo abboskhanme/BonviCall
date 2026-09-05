@@ -335,8 +335,67 @@ def message_for(code: str) -> str:
     return MESSAGES.get(code, DEFAULT_MESSAGE)
 
 
-def alert_text(kind: str) -> tuple[str, str]:
+#: Wording for the same kinds when this is the **first** observation of the
+#: capability, not a change to it.
+#:
+#: An alert kind names a cause; some of those causes are phrased as history —
+#: "yo'qolgan" (was lost), "qayta yoqilgan" (re-enabled), "ishlamay qoldi"
+#: (stopped working). A phone that arrives already broken must still raise, or
+#: it is the one phone nobody ever notices (R3). But it did not *lose* a
+#: permission it was never granted, and an alert that is true in substance and
+#: false in wording is how people learn to distrust alert text.
+#:
+#: Only the six kinds a capability report can produce need an entry. The other
+#: 21 are either present-tense ("aloqada emas") or describe an event that
+#: cannot happen without a prior state (``auth_expired`` had a session,
+#: ``capture_rate_regression`` is computed against a baseline), so their
+#: wording is honest on a first sighting already.
+#: ``test_first_report_wording_never_asserts_a_history`` checks that claim.
+ALERT_TEXT_FIRST_REPORT: dict[str, tuple[str, str]] = {
+    "permission_lost_microphone": (
+        "Mikrofon ruxsati berilmagan",
+        "Ilova hech qachon mikrofon ruxsatini ololmagan — bu telefonda "
+        "qo'ng'iroqlar yozilmaydi. Xodimdan ilova sozlamalarida ruxsat berishni "
+        "so'rang.",
+    ),
+    "permission_lost_phone_state": (
+        "Qo'ng'iroq holati ruxsati berilmagan",
+        "Ilova hech qachon qo'ng'iroq holati ruxsatini ololmagan — u qo'ng'iroq "
+        "boshlanganini sezmaydi. Xodimdan ruxsat berishni so'rang.",
+    ),
+    "permission_lost_call_log": (
+        "Qo'ng'iroqlar jurnali ruxsati berilmagan",
+        "Ilova hech qachon jurnal ruxsatini ololmagan — qo'ng'iroq davomiyligi "
+        "aniqlanmaydi. Xodimdan ruxsat berishni so'rang.",
+    ),
+    "battery_optimisation_reenabled": (
+        "Batareya cheklovi olib tashlanmagan",
+        "Telefon batareyani tejash uchun ilovani to'xtatadi va bu cheklov hech "
+        "qachon olib tashlanmagan. Sozlamalardan ilovani cheklovdan chiqaring — "
+        "bu eng ko'p uchraydigan sabab.",
+    ),
+    "recording_route_lost": (
+        "Yozib olish usuli hech qachon ishlamagan",
+        "Bu telefonda yozib olish yo'li birinchi tekshiruvdanoq ishlamadi. "
+        "Qurilma kartasidagi ruxsatlar jadvalini tekshiring.",
+    ),
+    "capture_disabled": (
+        "Yozib olish hech qachon yoqilmagan",
+        "Ilova birinchi tekshiruvdanoq yozib ola olmadi. Qurilma kartasidagi "
+        "ruxsatlar jadvalini tekshiring.",
+    ),
+}
+
+
+def alert_text(kind: str, *, first_report: bool = False) -> tuple[str, str]:
     """``(title_uz, body_uz)`` for an alert kind.
+
+    ``first_report`` is for a capability seen broken the *first* time it was
+    ever checked: same cause, same severity, same thing to do about it — but
+    "hech qachon ishlamagan" rather than "ishlamay qoldi", because nothing was
+    lost. It is a wording branch, deliberately **not** a new ``AlertKind``: a
+    migration and a wider enum for both clients would be a large answer to a
+    small question, and the panel already reads ``detail``.
 
     The fallback should be unreachable — a test covers every ``AlertKind`` —
     and it is **Uzbek** rather than the enum name, because the old fallback
@@ -344,11 +403,14 @@ def alert_text(kind: str) -> tuple[str, str]:
     end user reads (§14). If a kind ever slips through, a vague Uzbek sentence
     is a smaller failure than an English one.
     """
+    if first_report and kind in ALERT_TEXT_FIRST_REPORT:
+        return ALERT_TEXT_FIRST_REPORT[kind]
     return ALERT_TEXT.get(kind, (UNKNOWN_ALERT_TITLE, DEFAULT_MESSAGE))
 
 
 __all__ = [
     "ALERT_TEXT",
+    "ALERT_TEXT_FIRST_REPORT",
     "DEFAULT_MESSAGE",
     "DEVICE_PROTOCOL_CODES",
     "INSTALL_PAGE",

@@ -122,6 +122,16 @@ class DeviceHeartbeatIn(BaseModel):
     """``POST /api/device/v1/heartbeat`` — every 120 s while the service lives."""
 
     device_epoch_ms: Int64 = Field(description="Raw device clock; the skew evidence (N36).")
+    push_token: str | None = Field(
+        default=None,
+        max_length=512,
+        description=(
+            "FCM registration token, sent **only when it changes** — on the "
+            "first heartbeat after `onNewToken`. Omitting it leaves the stored "
+            "one alone; sending it on every heartbeat would spend part of the "
+            "cellular budget (N15) on a value that changes twice a year."
+        ),
+    )
     device_timezone: str = Field(max_length=64)
     device_rtt_ms: int | None = Field(default=None, ge=0)
     app_version: str | None = Field(default=None, max_length=20)

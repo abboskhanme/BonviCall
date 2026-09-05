@@ -1064,7 +1064,10 @@ export interface components {
             acknowledged_by: string | null;
             /** Agent Id */
             agent_id: string | null;
-            /** Body Uz */
+            /**
+             * Body Uz
+             * @description What to do about it. Derived from `kind`, not stored.
+             */
             body_uz: string | null;
             /** Detail */
             detail: Record<string, unknown> | null;
@@ -1098,7 +1101,10 @@ export interface components {
             /** Resolved At */
             resolved_at: string | null;
             severity: components["schemas"]["AlertSeverity"];
-            /** Title Uz */
+            /**
+             * Title Uz
+             * @description What happened, in Uzbek. Derived from `kind`, not stored.
+             */
             title_uz: string;
         };
         /**
@@ -1406,7 +1412,10 @@ export interface components {
             remote_number_key: string | null;
             /** Ring Sec */
             ring_sec: number | null;
-            /** Seq */
+            /**
+             * Seq
+             * Format: int64
+             */
             seq: number;
             source: components["schemas"]["CallSource"];
             /**
@@ -1720,7 +1729,10 @@ export interface components {
         };
         /** DataUsageResponse */
         DataUsageResponse: {
-            /** Cap Bytes Month */
+            /**
+             * Cap Bytes Month
+             * Format: int64
+             */
             cap_bytes_month: number;
             /** Items */
             items: components["schemas"]["DataUsageRowOut"][];
@@ -1734,9 +1746,15 @@ export interface components {
         DataUsageRowOut: {
             /** Agent Name */
             agent_name: string;
-            /** Cap Bytes Month */
+            /**
+             * Cap Bytes Month
+             * Format: int64
+             */
             cap_bytes_month: number;
-            /** Cellular Bytes Month */
+            /**
+             * Cellular Bytes Month
+             * Format: int64
+             */
             cellular_bytes_month: number;
             /**
              * Installation Id
@@ -1750,7 +1768,10 @@ export interface components {
             over_cap: boolean;
             /** Requests Month */
             requests_month: number;
-            /** Wifi Bytes Month */
+            /**
+             * Wifi Bytes Month
+             * Format: int64
+             */
             wifi_bytes_month: number;
         };
         /**
@@ -2595,13 +2616,22 @@ export interface components {
          * @description One day of the growth curve.
          */
         StoragePointOut: {
-            /** Audio Bytes Total */
+            /**
+             * Audio Bytes Total
+             * Format: int64
+             */
             audio_bytes_total: number;
             /** Audio Files */
             audio_files: number;
-            /** Bytes Added */
+            /**
+             * Bytes Added
+             * Format: int64
+             */
             bytes_added: number;
-            /** Bytes Deleted */
+            /**
+             * Bytes Deleted
+             * Format: int64
+             */
             bytes_deleted: number;
             /**
              * Period Date
@@ -2614,16 +2644,23 @@ export interface components {
          * @description N18: current usage, 30-day growth, and the projection it implies.
          */
         StorageReportResponse: {
-            /** Audio Bytes Total */
+            /**
+             * Audio Bytes Total
+             * Format: int64
+             */
             audio_bytes_total: number;
             /** Audio Files */
             audio_files: number;
-            /** Bytes Added 30D */
+            /**
+             * Bytes Added 30D
+             * Format: int64
+             */
             bytes_added_30d: number;
             /** History */
             history: components["schemas"]["StoragePointOut"][];
             /**
              * Projected Bytes 12M
+             * Format: int64
              * @description Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.
              */
             projected_bytes_12m: number;

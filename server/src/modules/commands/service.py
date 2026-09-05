@@ -168,12 +168,17 @@ class CommandService:
             command.installation_id, frame.model_dump(mode="json")
         )
         if not on_socket:
-            # No registration token is stored anywhere yet, so this reports
-            # "cannot wake" today rather than pretending. See
-            # docs/PENDING_WIRING.md — the column and the wire field are the
-            # missing halves, not this call site.
+            # The phone's own registration token, or None if it has never sent
+            # one. None is "we have no address for this phone", which the
+            # sender reports honestly rather than treating as a delivery.
+            installation = await self.session.get(
+                InstallationModel, command.installation_id
+            )
             try:
-                await push.get_sender().wake(command.installation_id, push_token=None)
+                await push.get_sender().wake(
+                    command.installation_id,
+                    push_token=installation.push_token if installation else None,
+                )
             except Exception:  # noqa: BLE001 — a future FCM sender calls a network
                 # The command is already recorded, and a phone we failed to wake
                 # is one that does not answer, which ``expire_stale`` already
