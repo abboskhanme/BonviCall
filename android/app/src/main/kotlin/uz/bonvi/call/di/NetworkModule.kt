@@ -13,6 +13,8 @@ import uz.bonvi.call.data.remote.BaseUrlInterceptor
 import uz.bonvi.call.data.remote.BearerAuthInterceptor
 import uz.bonvi.call.data.remote.DeviceHeadersInterceptor
 import uz.bonvi.call.data.remote.OffsetDateTimeAdapter
+import uz.bonvi.call.data.remote.LocalDateAdapter
+import uz.bonvi.call.data.remote.UuidAdapter
 import uz.bonvi.call.data.remote.TokenAuthenticator
 import uz.bonvi.call.data.remote.api.AppUpdateApi
 import uz.bonvi.call.data.remote.api.DeviceAudioApi
@@ -41,6 +43,11 @@ object NetworkModule {
     @Singleton
     fun moshi(): Moshi = Moshi.Builder()
         .add(OffsetDateTimeAdapter())
+        // Moshi refuses java.util.* without an explicit adapter, and the
+        // generated DTOs are full of UUID ids. Missing, every device call dies
+        // building its converter — before a single byte leaves the phone.
+        .add(UuidAdapter)
+        .add(LocalDateAdapter)
         // Reflection LAST: the generated DTOs carry codegen adapters and are
         // matched first; the reflective factory only catches the handful of
         // hand-written wire types (the error envelope).

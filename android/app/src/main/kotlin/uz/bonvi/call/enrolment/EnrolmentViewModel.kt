@@ -47,6 +47,15 @@ class EnrolmentViewModel @Inject constructor(
         val registeredNumber: String? = null,
         val agentName: String? = null,
 
+        /** The exception behind an "offline" message, for a debug build only.
+         *  Every failure before a response is reported to the user as "no
+         *  internet", which on the first real handset was wrong and cost
+         *  hours: the phone had 4G, the browser reached the server, and the
+         *  real cause was invisible because it was swallowed into one
+         *  reassuring sentence. A user-facing message must stay simple; a
+         *  tester needs the truth. */
+        val debugDetail: String? = null,
+
         val capabilities: Map<Capability, CapabilityResult> = emptyMap(),
         val currentPermissionIndex: Int = 0,
         /** A check is running. The microphone probe is a real one-second
@@ -104,6 +113,16 @@ class EnrolmentViewModel @Inject constructor(
         enum class Action { RETRY, REQUEST_NEW_CODE, MOVE_TO_THIS_PHONE, CONTACT_ADMIN, OPEN_SETTINGS }
     }
 
+    /** Debug builds only: the exception class and message, plus its cause.
+     *  `UnknownHostException` and `SSLHandshakeException` and
+     *  `SecurityException` send somebody to three different places, and
+     *  "check your connection" sends them nowhere. */
+    private fun debugDetailOf(error: Throwable?): String? {
+        if (!uz.bonvi.call.BuildConfig.DEBUG || error == null) return null
+        val cause = error.cause?.let { " ← ${it.javaClass.simpleName}: ${it.message}" }.orEmpty()
+        return "${error.javaClass.simpleName}: ${error.message}$cause"
+    }
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -145,7 +164,11 @@ class EnrolmentViewModel @Inject constructor(
                     _state.value = _state.value.copy(busy = false, message = redeemMessage(result.failure.code))
 
                 is EnrolmentRepository.Result.Offline ->
-                    _state.value = _state.value.copy(busy = false, message = UiMessage(R_OFFLINE, R_RETRY, UiMessage.Action.RETRY))
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        message = UiMessage(R_OFFLINE, R_RETRY, UiMessage.Action.RETRY),
+                        debugDetail = debugDetailOf(result.cause),
+                    )
             }
         }
     }

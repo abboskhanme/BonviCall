@@ -52,6 +52,24 @@ fun EnrolCodeScreen(
         state.agentName?.let { Text(stringResource(R.string.enrol_hello, it)) }
         Text(stringResource(R.string.enrol_code_explain))
 
+        // The server this build talks to, on the screen where enrolment fails.
+        // The first handset this app was ever installed on reported "no
+        // internet" while its browser reached the server fine, and nothing on
+        // the device could say which address it was even using.
+        Text(
+            text = "${uz.bonvi.call.BuildConfig.DEFAULT_BASE_URL}  ·  ${uz.bonvi.call.BuildConfig.BUILD_STAMP}",
+            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+        )
+
+        // Debug builds only. The user-facing message stays one calm sentence;
+        // a tester gets the exception that produced it.
+        state.debugDetail?.let {
+            Text(
+                text = it,
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+            )
+        }
+
         OutlinedTextField(
             value = code,
             onValueChange = { code = it },

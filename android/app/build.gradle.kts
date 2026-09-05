@@ -1,3 +1,5 @@
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
 
 plugins {
@@ -16,6 +18,27 @@ plugins {
  * never sees it. Unset, it falls back to the emulator loopback, so the default
  * behaviour is unchanged and nobody's home IP is ever committed.
  */
+/**
+ * A FULL base URL for a debug build — `https://xyz.trycloudflare.com`, say.
+ *
+ * `devHost` covers the LAN case and bakes in `http://…:8020`. A tunnel is
+ * neither: it is https, on 443, on a name that changes every time the tunnel
+ * restarts. Testing on a handset that is on mobile data rather than the
+ * office wifi needs this, and that is the realistic case — a salesperson's
+ * phone is not on our network.
+ */
+/** When this APK was built, shown in the app. A tester holding a handset
+ *  cannot otherwise tell one debug build from the next, and "did you install
+ *  the new one?" is a question neither side can answer. */
+val buildStamp: String = SimpleDateFormat("HH:mm:ss").format(Date())
+
+val devBaseUrl: String? = (project.findProperty("bonvicall.devBaseUrl") as String?)
+    ?: runCatching {
+        Properties().apply {
+            rootProject.file("local.properties").inputStream().use(::load)
+        }.getProperty("bonvicall.devBaseUrl")
+    }.getOrNull()
+
 val devHost: String? = (project.findProperty("bonvicall.devHost") as String?)
     ?: runCatching {
         Properties().apply {
@@ -163,6 +186,7 @@ android {
         release {
             // The production host. A release build never learns a LAN address.
             buildConfigField("String", "DEFAULT_BASE_URL", "\"https://bonvicall.uz\"")
+            buildConfigField("String", "BUILD_STAMP", "\"release\"")
 
             // Absent when there is no keystore, which yields -unsigned.apk
             // rather than a build failure: CI and a developer without the key
@@ -185,7 +209,13 @@ android {
             // production domain there produces "no internet" on a phone that
             // is on perfectly good wifi.
             val debugHost = devHost?.trim()?.takeIf { it.isNotEmpty() } ?: "10.0.2.2"
-            buildConfigField("String", "DEFAULT_BASE_URL", "\"http://$debugHost:8020\"")
+            val debugBase = devBaseUrl?.trim()?.takeIf { it.isNotEmpty() }
+                ?: "http://$debugHost:8020"
+            buildConfigField("String", "DEFAULT_BASE_URL", "\"$debugBase\"")
+            // Which build is on the phone. A tester holding a handset cannot
+            // otherwise tell one debug APK from the next, and "did you install
+            // the new one?" is not a question either side can answer.
+            buildConfigField("String", "BUILD_STAMP", "\"$buildStamp\"")
         }
     }
 

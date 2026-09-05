@@ -31,7 +31,10 @@ private val DarkColors = darkColorScheme(
  */
 @Composable
 fun BonviCallTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // TEMPORARY, for on-device testing: forced light so a tester can see at a
+    // glance that the build on the phone is the new one. Restore
+    // `isSystemInDarkTheme()` once the install path is proven.
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
