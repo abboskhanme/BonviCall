@@ -161,6 +161,9 @@ android {
 
     buildTypes {
         release {
+            // The production host. A release build never learns a LAN address.
+            buildConfigField("String", "DEFAULT_BASE_URL", "\"https://bonvicall.uz\"")
+
             // Absent when there is no keystore, which yields -unsigned.apk
             // rather than a build failure: CI and a developer without the key
             // must still be able to prove the release variant compiles.
@@ -173,6 +176,16 @@ android {
         }
         debug {
             isMinifyEnabled = false
+
+            // Where a debug build looks for the server when nothing else has
+            // told it. The enrolment DEEP LINK carries the host, so a phone
+            // that opens the admin's link is fine either way — but a code
+            // typed BY HAND leaves the app with no address at all, which is
+            // exactly what the first real handset hit. Falling back to the
+            // production domain there produces "no internet" on a phone that
+            // is on perfectly good wifi.
+            val debugHost = devHost?.trim()?.takeIf { it.isNotEmpty() } ?: "10.0.2.2"
+            buildConfigField("String", "DEFAULT_BASE_URL", "\"http://$debugHost:8020\"")
         }
     }
 

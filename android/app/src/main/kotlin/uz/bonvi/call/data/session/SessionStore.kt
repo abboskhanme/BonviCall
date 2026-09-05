@@ -161,10 +161,13 @@ class SessionStore @Inject constructor(
     }
 
     companion object {
-        /** Overridden at enrolment: the code carries the server it belongs to.
-         *  A hard-coded production host would make T29's local testing
-         *  impossible and is not a decision this file should own. */
-        const val DEFAULT_BASE_URL = "https://bonvicall.uz"
+        /** Overridden at enrolment: the deep link carries the server it
+         *  belongs to. The build supplies the fallback — production for a
+         *  release, the configured `bonvicall.devHost` for a debug build —
+         *  because a code typed by hand rather than opened from a link leaves
+         *  this value in charge, and a wrong one reports itself to the user as
+         *  "no internet" on a phone with perfectly good wifi. */
+        val DEFAULT_BASE_URL: String = uz.bonvi.call.BuildConfig.DEFAULT_BASE_URL
 
         private val KEY_INSTALLATION_ID = stringPreferencesKey("installation_id")
         private val KEY_ACCESS_TOKEN = stringPreferencesKey("access_token")
