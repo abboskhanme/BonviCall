@@ -8,23 +8,35 @@ import java.io.File
 /**
  * A generated DTO must actually carry its fields.
  *
- * ═══ The bug this exists for ═══════════════════════════════════════════════
- * `DeviceEventDetailIn`'s thirteen fields each generated as a **named, empty
- * Kotlin class** — `Attempts`, `ByUser`, `QueueBytes` — instead of `Int?`,
- * `Boolean?`, `Long?`. Pydantic puts a `title` on every inline
- * `anyOf: [T, null]` property, and openapi-generator treats a titled inline
- * schema as a type worth minting. The result compiles, so nothing errors: the
- * server is correct Python, the contract is valid OpenAPI, and the client
- * simply cannot set any of those fields.
+ * ═══ The bug this exists for, and its actual cause ═════════════════════════
+ * `DeviceEventDetailIn`'s optional fields generate as **named, empty Kotlin
+ * classes** instead of `Int?`, `Boolean?`, `Long?`. The result compiles, so
+ * nothing errors: the server is correct Python, the contract is valid OpenAPI,
+ * and the client simply cannot set any of those fields.
  *
- * Same family as the `int64` and `uuid5` bugs — a defect that exists only in
- * the gap between two systems that are each right on their own, and invisible
- * from either side.
+ * **Stripping the derived `title` was necessary and not sufficient.** With the
+ * titles gone the generator stopped naming them `Attempts` and started naming
+ * them `DeviceEventDetailInAttempts` — same defect, different name. The real
+ * trigger is `additionalProperties: false` on the parent schema:
  *
- * **The server-side fix** is to drop the auto-generated `title` from inline
- * property schemas in `src/contract_export.py` before writing, or to give those
- * fields a named `Annotated` alias. Either way this test goes quiet on its own,
- * and until it does the list below names exactly what is broken.
+ *   `DeviceHeartbeatIn.queue_bytes` and `DeviceEventDetailIn.queue_bytes` have
+ *   BYTE-IDENTICAL schemas. The first generates as `kotlin.Long?`. The second
+ *   generates as a minted empty class. The only difference between the two
+ *   parents is that `DeviceEventDetailIn` declares
+ *   `additionalProperties: false`.
+ *
+ * Which means **the fix for one finding caused this one**: `extra="forbid"` was
+ * added to close the §8.5 free-form-map hole — correctly, and it should stay —
+ * and openapi-generator responds to it by minting a model for every `anyOf`
+ * property of that schema. Both decisions are right on their own; the defect is
+ * only where they meet, which is the fifth time that has been true here.
+ *
+ * **Options for the server**, in the order I would try them: emit the closed
+ * shape without `additionalProperties: false` in the exported document while
+ * keeping `extra="forbid"` in Pydantic (the runtime still rejects extras, and
+ * `DeviceContractPrivacyTest` checks for free-form MAPS rather than for the
+ * keyword); or upgrade openapi-generator, which may simply not have this quirk
+ * any more. Either way this test goes quiet on its own.
  */
 class GeneratedDtoShapeTest {
 
@@ -40,16 +52,26 @@ class GeneratedDtoShapeTest {
      * cannot carry any detail today: `step_timing` and `enrolment_stuck` still
      * fire with `kind` and `at`, which is what N40's measurement and the
      * assisted-install signal need, and the numeric detail is lost until the
-     * contract stops minting a type per field.
+     * generator stops minting a type per field.
      *
-     * `ValidationErrorLocInner` is FastAPI's own `anyOf: [str, int]` and is not
-     * ours to fix; it is never constructed by this app.
+     * It was nineteen entries before `make android-dto` learned to CLEAN the
+     * output directory. openapi-generator does not delete files for schemas the
+     * contract has dropped, so a stale DTO from a previous shape survived,
+     * still compiled, and was indistinguishable from a current one. Seven is
+     * the real number.
+     *
+     * `ValidationErrorLocInner` and `HTTPValidationError` are gone: the 422
+     * shape is the N35 envelope now, generated as `ErrorResponse`/`ErrorBody`,
+     * and this app parses the response it can actually receive.
      */
     private val knownEmpty = setOf(
-        "Attempts", "ByUser", "ClientCallId", "DeletedBytes", "DeletedRecords",
-        "DeviceEventDetailInAudioMissingReason", "DeviceEventDetailInCaptureRoute",
-        "DiscardedCount", "FreeStorageBytes", "FromVersion", "QueueBytes",
-        "QueueRecords", "ToVersion", "ValidationErrorLocInner",
+        "DeviceEventDetailInAttempts",
+        "DeviceEventDetailInAudioMissingReason",
+        "DeviceEventDetailInByUser",
+        "DeviceEventDetailInCaptureRoute",
+        "DeviceEventDetailInClientCallId",
+        "DeviceEventDetailInDeletedBytes",
+        "DeviceEventDetailInFromVersion",
     )
 
     private fun emptyGeneratedTypes(): List<String> = dtoDir.listFiles()
@@ -91,6 +113,9 @@ class GeneratedDtoShapeTest {
         for (name in listOf(
             "DeviceCallIn", "DeviceCallOut", "DeviceHeartbeatIn", "DeviceRedeemIn",
             "OpenUploadIn", "DeviceCapabilityIn", "DeviceCallListOut",
+            // The 422 body every screen branches on. Generated, not
+            // hand-written, and it is now the shape the server actually sends.
+            "ErrorResponse", "ErrorBody",
         )) {
             val file = File(dtoDir, "$name.kt")
             assertThat(file.isFile).isTrue()

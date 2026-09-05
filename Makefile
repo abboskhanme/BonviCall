@@ -139,6 +139,12 @@ android-release:
 # compile error on 15 phones we cannot force-update, not a runtime null.
 # CI runs: make contract android-dto && git diff --exit-code contract/ android/
 android-dto:
+	@# Generated output is REPLACED, not merged. openapi-generator does not
+	@# delete files for schemas the contract has dropped, so a stale DTO from a
+	@# previous shape survives, still compiles, and is indistinguishable from a
+	@# current one. Cleaning first is what makes the directory a mirror of the
+	@# contract rather than an accumulation of it.
+	rm -rf android/app/src/main/kotlin/uz/bonvi/call/data/remote/dto
 	docker run --rm -u $$(id -u):$$(id -g) \
 	  -v $(PWD)/contract:/contract:ro \
 	  -v $(PWD)/android/app/src/main/kotlin:/out \

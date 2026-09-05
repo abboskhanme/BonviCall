@@ -152,7 +152,15 @@ class ArchitectureRulesTest {
     @Test
     fun `no device DTO carries a free-form map`() {
         // CONVENTIONS.md §8.5: the wire schema is the allow-list. A field the
-        // contract does not name must not be able to leave the phone.
+        // contract does not name must not be able to LEAVE the phone.
+        //
+        // Scoped to the REQUEST DTOs (`...In`), and that is the rule's own
+        // wording rather than a convenience: §8.5 is about data leaving the
+        // handset. `ErrorBody.detail` is `Any?` and inbound — it is the
+        // machine-readable part of the §9 envelope the server sends back
+        // (SPEC §4.0), so nothing of the employee's can travel through it. The
+        // same distinction `DeviceContractPrivacyTest` already makes one level
+        // up, where it checks `...In` schemas only.
         //
         // The check is on PROPERTY DECLARATIONS, not on the whole file:
         // openapi-generator emits `encode(data: kotlin.Any?)` helpers on every
@@ -160,7 +168,9 @@ class ArchitectureRulesTest {
         // somebody turns off. `DeviceContractPrivacyTest` enforces the same
         // rule one level up, on the contract itself, where it can name the
         // offending server schema.
-        val dtoSources = sources.filter { it.pkg.startsWith("uz.bonvi.call.data.remote.dto") }
+        val dtoSources = sources
+            .filter { it.pkg.startsWith("uz.bonvi.call.data.remote.dto") }
+            .filter { it.file.nameWithoutExtension.endsWith("In") }
         val property = Regex("""^\s*(?:val|var)\s+\w+\s*:\s*([^=,)]+)""", RegexOption.MULTILINE)
         val offenders = dtoSources.flatMap { source ->
             property.findAll(source.code)

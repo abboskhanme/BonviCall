@@ -25,7 +25,7 @@ import com.squareup.moshi.JsonClass
  */
 
 
-class Attempts (
+class DeviceEventDetailInDeletedBytes (
 
 ) {
 

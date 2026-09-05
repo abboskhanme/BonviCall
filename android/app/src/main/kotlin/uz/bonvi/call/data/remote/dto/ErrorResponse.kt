@@ -15,17 +15,22 @@
 
 package uz.bonvi.call.data.remote.dto
 
+import uz.bonvi.call.data.remote.dto.ErrorBody
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * 
+ * ``{\"error\": {...}}`` — the envelope itself, and the only error shape.
  *
+ * @param error 
  */
 
 
-class QueueRecords (
+data class ErrorResponse (
+
+    @Json(name = "error")
+    val error: ErrorBody
 
 ) {
 

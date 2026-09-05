@@ -20,12 +20,12 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * Which queued record was parked.
+ * 
  *
  */
 
 
-class ClientCallId (
+class DeviceEventDetailInAttempts (
 
 ) {
 

@@ -20,12 +20,12 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * 
+ * Whether the employee did it, or the OS did.
  *
  */
 
 
-class FromVersion (
+class DeviceEventDetailInByUser (
 
 ) {
 

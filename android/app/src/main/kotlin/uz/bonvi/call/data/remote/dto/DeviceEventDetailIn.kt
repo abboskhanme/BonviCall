@@ -15,19 +15,13 @@
 
 package uz.bonvi.call.data.remote.dto
 
-import uz.bonvi.call.data.remote.dto.Attempts
-import uz.bonvi.call.data.remote.dto.ByUser
-import uz.bonvi.call.data.remote.dto.ClientCallId
-import uz.bonvi.call.data.remote.dto.DeletedBytes
-import uz.bonvi.call.data.remote.dto.DeletedRecords
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInAttempts
 import uz.bonvi.call.data.remote.dto.DeviceEventDetailInAudioMissingReason
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInByUser
 import uz.bonvi.call.data.remote.dto.DeviceEventDetailInCaptureRoute
-import uz.bonvi.call.data.remote.dto.DiscardedCount
-import uz.bonvi.call.data.remote.dto.FreeStorageBytes
-import uz.bonvi.call.data.remote.dto.FromVersion
-import uz.bonvi.call.data.remote.dto.QueueBytes
-import uz.bonvi.call.data.remote.dto.QueueRecords
-import uz.bonvi.call.data.remote.dto.ToVersion
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInClientCallId
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInDeletedBytes
+import uz.bonvi.call.data.remote.dto.DeviceEventDetailInFromVersion
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -54,43 +48,43 @@ import com.squareup.moshi.JsonClass
 data class DeviceEventDetailIn (
 
     @Json(name = "attempts")
-    val attempts: Attempts? = null,
+    val attempts: DeviceEventDetailInAttempts? = null,
 
     @Json(name = "audio_missing_reason")
     val audioMissingReason: DeviceEventDetailInAudioMissingReason? = null,
 
     @Json(name = "by_user")
-    val byUser: ByUser? = null,
+    val byUser: DeviceEventDetailInByUser? = null,
 
     @Json(name = "capture_route")
     val captureRoute: DeviceEventDetailInCaptureRoute? = null,
 
     @Json(name = "client_call_id")
-    val clientCallId: ClientCallId? = null,
+    val clientCallId: DeviceEventDetailInClientCallId? = null,
 
     @Json(name = "deleted_bytes")
-    val deletedBytes: DeletedBytes? = null,
+    val deletedBytes: DeviceEventDetailInDeletedBytes? = null,
 
     @Json(name = "deleted_records")
-    val deletedRecords: DeletedRecords? = null,
+    val deletedRecords: DeviceEventDetailInAttempts? = null,
 
     @Json(name = "discarded_count")
-    val discardedCount: DiscardedCount? = null,
+    val discardedCount: DeviceEventDetailInAttempts? = null,
 
     @Json(name = "free_storage_bytes")
-    val freeStorageBytes: FreeStorageBytes? = null,
+    val freeStorageBytes: DeviceEventDetailInDeletedBytes? = null,
 
     @Json(name = "from_version")
-    val fromVersion: FromVersion? = null,
+    val fromVersion: DeviceEventDetailInFromVersion? = null,
 
     @Json(name = "queue_bytes")
-    val queueBytes: QueueBytes? = null,
+    val queueBytes: DeviceEventDetailInDeletedBytes? = null,
 
     @Json(name = "queue_records")
-    val queueRecords: QueueRecords? = null,
+    val queueRecords: DeviceEventDetailInAttempts? = null,
 
     @Json(name = "to_version")
-    val toVersion: ToVersion? = null
+    val toVersion: DeviceEventDetailInFromVersion? = null
 
 ) : kotlin.collections.HashMap<String, kotlin.Any>() {
 
