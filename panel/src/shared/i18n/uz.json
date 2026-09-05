@@ -755,5 +755,20 @@
   "agents.stepCodeFailed": "Kod berilmadi",
   "agents.partialHint": "Xodim kartasini oching va qolgan qadamlarni shu yerda yakunlang.",
   "enrol.codeCardTitle": "Ilovaga kiritiladigan kod",
-  "enrol.codeShape": "8 ta belgi: harflar va raqamlar. Xodim kodi (masalan BV-001) emas."
+  "enrol.codeShape": "8 ta belgi: harflar va raqamlar. Xodim kodi (masalan BV-001) emas.",
+  "attest.title": "Raqamni qo'lda tasdiqlash",
+  "attest.action": "Qo'lda tasdiqlash",
+  "attest.offerTitle": "Raqamni avtomatik tasdiqlab bo'lmayapti",
+  "attest.becauseMsisdn": "SIM karta o'z raqamini bermadi, shuning uchun avtomatik tekshiruv o'tmadi.",
+  "attest.becauseReceiver": "Qayta qo'ng'iroq orqali tasdiqlash xizmati ishlamayapti, shuning uchun bu yo'l hozir mavjud emas.",
+  "attest.becauseBoth": "Ikkala avtomatik yo'l ham ishlamadi: SIM raqamni bermadi va tasdiqlash xizmati javob bermayapti.",
+  "attest.asserting": "Siz {name} ning telefoni {number} raqamida ekanini o'z javobgarligingiz ostida tasdiqlayapsiz.",
+  "attest.explain": "Telefon buni o'zi isbotlamaydi. Shundan keyin bu telefondan kelgan barcha qo'ng'iroqlar shu raqamga va shu xodimga yoziladi.",
+  "attest.reason": "Nima uchun qo'lda tasdiqlanmoqda",
+  "attest.reasonHint": "Masalan: telefonni o'z qo'limda tekshirdim, raqam to'g'ri",
+  "attest.reasonRequired": "Sababni kamida {n} ta belgi bilan yozing.",
+  "attest.reasonAudited": "Sabab audit jurnaliga yoziladi va keyinchalik shu tasdiqning yagona izohi bo'ladi.",
+  "attest.needsAdmin": "Qo'lda tasdiqlash uchun administrator huquqi kerak.",
+  "attest.attestedBecause": "Qo'lda tasdiqlangan. Sababi: {reason}",
+  "attest.stepAttested": "Avtomatik emas, administrator tomonidan qo'lda tasdiqlangan."
 }

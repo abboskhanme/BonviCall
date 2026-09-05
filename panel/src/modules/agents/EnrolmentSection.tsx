@@ -21,7 +21,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { useState } from 'react'
-import { AlertTriangle, Copy, KeyRound, Check } from 'lucide-react'
+import { AlertTriangle, Copy, KeyRound, Check, ShieldQuestion } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import {
@@ -42,6 +42,8 @@ import { relativeText } from '@/shared/lib/relativeText'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { Section } from '@/shared/ui/detail'
 
+import { AttestModal } from './AttestModal'
+import { attestStance, stanceReasonKey } from './attestation'
 import { installUrl } from '@/modules/numbers/installUrl'
 import {
   isCodeLive,
@@ -78,21 +80,29 @@ function StageProgress({ stage }: { stage: Installation['funnel_stage'] }) {
   // `verified_by_admin` is real progress but is not on the nominal path; it
   // sits where `number_verified` does, because that is what it substitutes for.
   const position = stage === 'verified_by_admin' ? FUNNEL_PATH.indexOf('number_verified') : index
+  // ...and it is drawn differently there. A proven binding is a fact the
+  // system established; an attested one is a person's word. Filling the same
+  // cell the same way would quietly erase the difference (SPEC §9.3).
+  const attestedAt = stage === 'verified_by_admin' ? FUNNEL_PATH.indexOf('number_verified') : -1
 
   return (
     <ol className="flex flex-wrap items-center gap-1" aria-label={t('enrol.progress')}>
       {FUNNEL_PATH.map((step, stepIndex) => {
         const done = position >= 0 && stepIndex <= position
+        const attested = stepIndex === attestedAt
         return (
           <li key={step} className="flex items-center gap-1">
             <span
+              title={attested ? t('attest.stepAttested') : undefined}
               className={
-                done
-                  ? 'rounded-sm bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent'
-                  : 'rounded-sm bg-surface-2 px-2 py-0.5 text-2xs text-muted'
+                attested
+                  ? 'rounded-sm border border-dashed border-warn bg-warn/10 px-2 py-0.5 text-2xs font-medium text-warn'
+                  : done
+                    ? 'rounded-sm bg-accent-soft px-2 py-0.5 text-2xs font-medium text-accent'
+                    : 'rounded-sm bg-surface-2 px-2 py-0.5 text-2xs text-muted'
               }
             >
-              {t(FUNNEL_STAGE_LABEL[step])}
+              {attested ? t('funnel.verified_by_admin') : t(FUNNEL_STAGE_LABEL[step])}
             </span>
             {stepIndex < FUNNEL_PATH.length - 1 ? (
               <span className="text-2xs text-muted" aria-hidden>
@@ -172,15 +182,22 @@ function CodeRow({ code, mayWrite }: { code: EnrolmentCode; mayWrite: boolean })
 export function EnrolmentSection({
   number,
   installation,
+  agentName,
 }: {
   number: RegisteredNumber | null
   installation: Installation | null
+  /** Named in the attestation dialog: the admin is asserting something about
+   *  a person, not about a row. */
+  agentName: string
 }) {
   const can = useAuth((state) => state.can)
   const mayWrite = can(Perm.ENROLMENT_WRITE)
+  const mayAttest = can(Perm.ENROLMENT_ATTEST)
+  const [attesting, setAttesting] = useState(false)
 
   const codesQuery = useEnrolmentCodes(number?.id)
   const attemptsQuery = useEnrolmentAttempts(number?.id)
+  const receiverQuery = useReceiverStatus(can(Perm.ENROLMENT_READ))
   const issue = useIssueEnrolmentCode(number?.id ?? '')
 
   const codes = [...(codesQuery.data?.items ?? [])].sort((a, b) =>
@@ -205,6 +222,14 @@ export function EnrolmentSection({
 
   const stage = installation?.funnel_stage ?? 'invited'
   const stuck = isStuckStage(stage)
+  // Whether the escape hatch is open, and why. Computed rather than assumed:
+  // offering it first every time would turn every binding into the weaker kind.
+  const stance = attestStance({
+    stage,
+    verifiedAt: installation?.verified_at ?? null,
+    attempts,
+    receiver: receiverQuery.data,
+  })
 
   return (
     <div className="space-y-3">
@@ -252,6 +277,33 @@ export function EnrolmentSection({
             <p className="text-xs text-bad">{messageForError(issue.error)}</p>
           ) : null}
 
+          {/* The escape hatch, open only when the automatic routes cannot
+              finish — and saying which one failed, so it never reads as a
+              shortcut somebody took because it was quicker. */}
+          {installation && stance.kind === 'offered' ? (
+            <div className="space-y-2 rounded-md border border-warn/40 bg-warn/5 p-3">
+              <p className="text-sm font-medium text-text">{t('attest.offerTitle')}</p>
+              <p className="text-xs text-muted">{t(stanceReasonKey(stance))}</p>
+              {mayAttest ? (
+                <Button variant="secondary" size="sm" onClick={() => setAttesting(true)}>
+                  <ShieldQuestion className="size-3.5" aria-hidden />
+                  {t('attest.action')}
+                </Button>
+              ) : (
+                <p className="text-xs text-muted">{t('attest.needsAdmin')}</p>
+              )}
+            </div>
+          ) : null}
+
+          {installation?.attest_reason ? (
+            /* An attested binding carries its reason wherever it shows: six
+               months on, "why is this installation trusted" must have an
+               answer that is not "somebody clicked". */
+            <p className="text-xs text-warn">
+              {t('attest.attestedBecause', { reason: installation.attest_reason })}
+            </p>
+          ) : null}
+
           {codes.length > 0 ? (
             <div className="space-y-2">
               {codes.slice(0, 3).map((code) => (
@@ -283,6 +335,19 @@ export function EnrolmentSection({
           ) : null}
         </div>
       </Section>
+
+      {mayAttest && installation ? (
+        <AttestModal
+          open={attesting}
+          onOpenChange={setAttesting}
+          installationId={installation.id}
+          agentName={agentName}
+          e164={number.e164}
+          reasonHintKey={
+            stance.kind === 'offered' ? stanceReasonKey(stance) : 'attest.becauseBoth'
+          }
+        />
+      ) : null}
     </div>
   )
 }

@@ -112,14 +112,17 @@ function DeviceSection({ agentId }: { agentId: string }) {
                     }
                   />
                   <Field label={t('devices.colAppVersion')} value={health.app_version} />
-                  <Field
-                    label={t('agentDetail.verification')}
-                    value={
-                      installation?.verification_method
-                        ? t(VERIFICATION_METHOD_LABEL[installation.verification_method])
-                        : null
-                    }
-                  />
+                  <Field label={t('agentDetail.verification')}>
+                    {installation?.verification_method ? (
+                      <Badge
+                        tone={
+                          installation.verification_method === 'admin_attested' ? 'warn' : 'good'
+                        }
+                      >
+                        {t(VERIFICATION_METHOD_LABEL[installation.verification_method])}
+                      </Badge>
+                    ) : null}
+                  </Field>
                 </FieldGrid>
 
                 {problems.length > 0 ? (
@@ -209,7 +212,11 @@ function AgentCard({ agent }: { agent: Agent }) {
       {/* Enrolment first: an admin opening this page is usually chasing
           somebody who has not finished. */}
       {mayReadEnrolment ? (
-        <EnrolmentSection number={openRow?.number ?? null} installation={installation} />
+        <EnrolmentSection
+          number={openRow?.number ?? null}
+          installation={installation}
+          agentName={agent.full_name}
+        />
       ) : null}
 
       {mayReadNumbers ? (

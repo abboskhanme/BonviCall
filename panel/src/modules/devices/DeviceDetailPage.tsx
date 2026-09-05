@@ -381,14 +381,27 @@ function DeviceBody({
                 }
               />
               <Field label={t('devices.timezone')} value={health.device_timezone} />
-              <Field
-                label={t('agentDetail.verification')}
-                value={
-                  installation?.verification_method
-                    ? t(VERIFICATION_METHOD_LABEL[installation.verification_method])
-                    : null
-                }
-              />
+              <Field label={t('agentDetail.verification')}>
+                {installation?.verification_method ? (
+                  installation.verification_method === 'admin_attested' ? (
+                    /* A person's word, not a fact the system established
+                       (SPEC §9.3). It carries its own tone and its reason so
+                       the difference survives being read months later. */
+                    <span className="inline-flex flex-col gap-0.5">
+                      <Badge tone="warn">
+                        {t(VERIFICATION_METHOD_LABEL[installation.verification_method])}
+                      </Badge>
+                      {installation.attest_reason ? (
+                        <span className="text-2xs text-muted">{installation.attest_reason}</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <Badge tone="good">
+                      {t(VERIFICATION_METHOD_LABEL[installation.verification_method])}
+                    </Badge>
+                  )
+                ) : null}
+              </Field>
             </FieldGrid>
           </Section>
         </>
