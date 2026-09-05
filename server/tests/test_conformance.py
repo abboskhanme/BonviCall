@@ -143,13 +143,55 @@ async def test_no_property_carries_a_title_that_is_just_its_own_name() -> None:
 
 
 async def test_a_deliberate_title_is_left_alone() -> None:
-    """The rule discriminates, rather than stripping every title.
+    """The rule discriminates rather than stripping every title.
 
-    FastAPI's own ``ValidationError.loc`` is titled "Location" — not the field
-    name restated — and it survives. A title somebody wrote carries
-    information; one Pydantic derived does not.
+    Tested against the function with a made-up document, because after the 422
+    fix there is no deliberate title left in the real one — FastAPI's
+    ``ValidationError.loc`` was the only example and its schema is gone. A
+    title somebody writes carries information; one Pydantic derives from the
+    field name does not.
     """
-    document = build_documents()["openapi-device-v1"]
-    validation = document["components"]["schemas"].get("ValidationError")
-    assert validation, "FastAPI's ValidationError is expected in the document"
-    assert validation["properties"]["loc"]["title"] == "Location"
+    from src.contract_export import _strip_generated_property_titles
+
+    document = {
+        "components": {
+            "schemas": {
+                "Thing": {
+                    "properties": {
+                        "attempts": {"type": "integer", "title": "Attempts"},
+                        "free_storage_bytes": {"title": "Free Storage Bytes"},
+                        "loc": {"type": "array", "title": "Location"},
+                        "msg": {"type": "string", "title": "A sentence, deliberately"},
+                    }
+                }
+            }
+        }
+    }
+    _strip_generated_property_titles(document)
+    properties = document["components"]["schemas"]["Thing"]["properties"]
+    assert "title" not in properties["attempts"]
+    assert "title" not in properties["free_storage_bytes"]
+    assert properties["loc"]["title"] == "Location"
+    assert properties["msg"]["title"] == "A sentence, deliberately"
+
+
+async def test_the_422_is_documented_as_the_envelope_the_server_sends() -> None:
+    """FastAPI documents its own ``HTTPValidationError`` on every route with a
+    body. This server never sends it — ``validation_error_handler`` answers with
+    the N35 envelope like everything else — so a client generated against the
+    document would fail to parse the one response telling it what it got wrong.
+    """
+    for stem, document in build_documents().items():
+        if not stem.startswith("openapi-"):
+            continue
+        schemas = document.get("components", {}).get("schemas", {})
+        assert "HTTPValidationError" not in schemas, stem
+        assert set(schemas["ErrorBody"]["properties"]) >= ENVELOPE_KEYS, stem
+
+        for path, operations in document.get("paths", {}).items():
+            for method, operation in operations.items():
+                response = (operation.get("responses") or {}).get("422")
+                if response is None:
+                    continue
+                schema = response["content"]["application/json"]["schema"]
+                assert schema["$ref"].endswith("/ErrorResponse"), f"{method} {path}"

@@ -16,6 +16,32 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel, Field
+
+
+class ErrorBody(BaseModel):
+    """The body of every non-2xx answer (N35, SPEC §4.0).
+
+    A model rather than a fragment hand-written in the exporter, so the shape
+    clients generate against is the shape ``main.error_envelope`` builds.
+    ``tests/test_conformance.py`` drives real requests through both.
+    """
+
+    code: str = Field(description="The stable machine value. Clients branch on this.")
+    message: str = Field(description="Uzbek, for a person. Never branched on (§4.0).")
+    request_id: str = Field(
+        description="Echoed from X-Request-Id; quote it in a bug report."
+    )
+    detail: Any = Field(
+        default=None, description="Machine-readable context; its shape follows `code`."
+    )
+
+
+class ErrorResponse(BaseModel):
+    """``{"error": {...}}`` — the envelope itself, and the only error shape."""
+
+    error: ErrorBody
+
 
 class ErrorCode:
     """Every error code the server can emit.

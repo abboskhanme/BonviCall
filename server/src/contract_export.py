@@ -48,7 +48,7 @@ from fastapi.routing import APIRoute
 from pydantic.json_schema import models_json_schema
 
 from src.api import DEVICE_API_PREFIX, PANEL_API_PREFIX, SERVICE_API_PREFIX
-from src.core.errors import ErrorCode
+from src.core.errors import ErrorCode, ErrorResponse
 from src.main import API_VERSION, create_app
 from src.modules.commands.schemas import (
     AckFrameIn,
@@ -92,6 +92,42 @@ def _routes_for(app: FastAPI, prefix: str) -> list[APIRoute]:
             if isinstance(route, APIRoute) and route.path in UNPREFIXED_PATHS
         ]
     return sorted(routes, key=lambda route: (route.path, sorted(route.methods)))
+
+
+def _replace_validation_error_schema(document: dict[str, Any]) -> None:
+    """Document the 422 the server actually sends. Mutates in place.
+
+    FastAPI adds a ``HTTPValidationError`` response to every route that takes a
+    body or a parameter — ``{"detail": [{"loc": …, "msg": …}]}``. This server
+    never sends that: ``validation_error_handler`` answers with the N35
+    envelope like every other error, so the documented shape was one no client
+    would ever receive, on every route.
+
+    Same family as the empty Kotlin classes above and for the same reason: the
+    server was right, the document was valid, the client compiled. A client
+    generated against ``HTTPValidationError`` and handed ``{"error": {…}}``
+    fails at parse time on the one response that was trying to tell it what it
+    got wrong.
+    """
+    schemas = document.get("components", {}).get("schemas", {})
+    schemas.pop("HTTPValidationError", None)
+    schemas.pop("ValidationError", None)
+    envelope = ErrorResponse.model_json_schema(
+        ref_template="#/components/schemas/{model}"
+    )
+    schemas.update(envelope.pop("$defs", {}))
+    schemas["ErrorResponse"] = envelope
+
+    reference = {"$ref": "#/components/schemas/ErrorResponse"}
+    for operations in document.get("paths", {}).values():
+        for operation in operations.values():
+            if not isinstance(operation, dict):
+                continue
+            response = (operation.get("responses") or {}).get("422")
+            if response is None:
+                continue
+            response["description"] = "Validation error, in the standard envelope"
+            response["content"] = {"application/json": {"schema": reference}}
 
 
 def _strip_generated_property_titles(document: dict[str, Any]) -> None:
@@ -145,6 +181,7 @@ def build_documents(app: FastAPI | None = None) -> dict[str, dict[str, Any]]:
         for stem, title, prefix in SURFACES
     }
     for document in documents.values():
+        _replace_validation_error_schema(document)
         _strip_generated_property_titles(document)
     documents["device-ws-frames"] = _ws_frames_document()
     documents["error-codes"] = {

@@ -1832,16 +1832,45 @@
         "title": "EnrolmentOutcome",
         "type": "string"
       },
-      "HTTPValidationError": {
+      "ErrorBody": {
+        "description": "The body of every non-2xx answer (N35, SPEC §4.0).\n\nA model rather than a fragment hand-written in the exporter, so the shape\nclients generate against is the shape ``main.error_envelope`` builds.\n``tests/test_conformance.py`` drives real requests through both.",
         "properties": {
+          "code": {
+            "description": "The stable machine value. Clients branch on this.",
+            "type": "string"
+          },
           "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array"
+            "default": null,
+            "description": "Machine-readable context; its shape follows `code`."
+          },
+          "message": {
+            "description": "Uzbek, for a person. Never branched on (§4.0).",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "Echoed from X-Request-Id; quote it in a bug report.",
+            "type": "string"
           }
         },
-        "title": "HTTPValidationError",
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "description": "``{\"error\": {...}}`` — the envelope itself, and the only error shape.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
         "type": "object"
       },
       "InstallationStatus": {
@@ -2196,39 +2225,6 @@
         "title": "UploadStatusOut",
         "type": "object"
       },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
-        "type": "object"
-      },
       "VerificationMethod": {
         "description": "How we proved the phone holds the registered number (UC-04, T142).",
         "enum": [
@@ -2291,11 +2287,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Probe",
@@ -2361,11 +2357,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Put Chunk",
@@ -2405,11 +2401,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Commit",
@@ -2447,11 +2443,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Refresh",
@@ -2489,11 +2485,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Report Call Log Delta",
@@ -2566,11 +2562,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "My Calls",
@@ -2606,11 +2602,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Ingest Calls",
@@ -2664,11 +2660,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "My Call Audio",
@@ -2718,11 +2714,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Open Session",
@@ -2760,11 +2756,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Report Capabilities",
@@ -2836,11 +2832,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Acknowledge",
@@ -2878,11 +2874,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Redeem",
@@ -2944,11 +2940,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Callback Status",
@@ -2986,11 +2982,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Verify Msisdn",
@@ -3028,11 +3024,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Report Events",
@@ -3070,11 +3066,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error, in the standard envelope"
           }
         },
         "summary": "Heartbeat",
