@@ -25,8 +25,9 @@ Stack up with `make up` · panel **5190** · api **8020** (`/docs`) · postgres 
 |---|---|
 | **Docs** | REQUIREMENTS, SPEC (2.8k lines), TASKS, RISKS, CONVENTIONS ×2, ESTIMATE, STACK, S1-RECORDING, BUILD-VS-ADOPT, ASSUMPTIONS |
 | **Server** | 30 tables in one migration; device/panel/service APIs; enrolment chain end to end; audio pipeline (resumable upload, attribution gate, Range playback, retention); calls, reports, export, audit, settings, alerts; scheduler with 12 jobs; WebSocket hub |
-| **Panel** | Shell, RBAC in two places, generated types, type-level Uzbek catalogue; calls list + detail + audio player (Service Worker bridge); agents (rollout page), devices, alerts, gap report, audit |
-| **Android** | Scaffold, both flavours, capture seam, call lifecycle, durable queue, privacy boundary as a type, enrolment E1–E6 |
+| **Panel** | Shell, RBAC in two places, generated types, type-level Uzbek catalogue; calls + audio player (Service Worker bridge); agents as the rollout page; devices, alerts, gap report, audit, users, settings, app versions, dashboard |
+| **Android** | Both flavours; enrolment E1–E6 with real capability checks; call detection from two sources; `client_call_id` as a server-matching UUIDv5; durable queue and upload; call-log recovery; transcode to mono 16 kHz Opus; resumable audio upload; revocation; token refresh; click-to-call; heartbeat; APK signing and in-app updater |
+| **Field docs** | `ON-DEVICE-TESTING.md`, `APK-SIGNING.md`, and `QOLLANMA.md` — the Uzbek page for the person carrying the phone |
 
 **Milestone M1 is met**: a call placed on a device appears in the panel, exactly
 once, with its audio or a reason there is none.
@@ -66,13 +67,14 @@ log. `ON-DEVICE-TESTING.md` deliberately promises the pessimistic case.
 
 ## Still unbuilt
 
-- **`AN-HARVEST` (T71b)** — the real OEM capture strategies. Genuinely blocked
-  on S1 + M0; the fail-closed `NoOpOemRecordingLocator` is the correct
-  placeholder until then.
-- Panel Wave C (users, settings, app versions, dashboard tiles).
-- Android waves D–E (device UX, distribution, in-app update).
-- Phases 7–11: the N40 enrolment gate, survivability, production, the 7-day
-  acceptance run, the Uzbek `QOLLANMA.md`.
+- **`AN-HARVEST` (T71b / T72)** — the real OEM capture strategies. Blocked on
+  S1 + M0; the fail-closed `NoOpOemRecordingLocator` is the correct placeholder.
+  Note this does **not** mean the app cannot record: `MediaRecorderStrategy` is
+  functional and wins on some handsets. Only the preferred route is missing.
+- `StorageReportPage`, the last panel stub.
+- **Phases 7–11**: the N40 enrolment gate (3 unaided salespeople, stopwatch),
+  survivability on real hardware, production deployment, the 7-day acceptance
+  run. All of it needs handsets.
 
 ---
 
@@ -101,6 +103,16 @@ Each one *passed* while testing nothing.
 inner join that hid a never-reporting phone was in three places, and the two the
 report did not mention were the ones that mattered — the sweeps that were
 supposed to raise the alarm.
+
+**A finished component with no caller passes every test it has.** This happened
+three times: the WebSocket router complete and unreachable because nothing
+included it; `DeviceCallsApi.heartbeat` with no caller, so no handset ever
+reported anything after enrolment; a version-code field the server read from a
+header nothing sent. Each component's own tests were green throughout, because
+each test supplied the caller the product did not. The guards that now catch
+this — `test_every_router_module_is_registered`, and a contract test asserting
+enrolment and heartbeat read the same constant — were written after the fact.
+Ask of any finished piece: *who calls this in production?*
 
 **Make the demo data non-uniform.** Two handsets that cannot record, one that
 never sends a heartbeat, one recording already past retention. Both of the
