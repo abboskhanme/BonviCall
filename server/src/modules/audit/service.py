@@ -39,6 +39,7 @@ class AuditService:
         actor_user_id: uuid.UUID | None,
         object_id: uuid.UUID | None,
         within_seconds: int,
+        actor_type: ActorType | None = None,
     ) -> bool:
         """Whether this actor already logged this action for this object.
 
@@ -47,7 +48,7 @@ class AuditService:
         exactly one row per playback start, and scrubbing a twenty-minute
         recording must not produce forty.
         """
-        found = await self.session.scalar(
+        statement = (
             select(AuditLogModel.id)
             .where(
                 AuditLogModel.action == action,
@@ -57,6 +58,13 @@ class AuditService:
             )
             .limit(1)
         )
+        if actor_type is not None:
+            # A device actor has no id column to match on, so the kind of actor
+            # is the narrowing. Without it, a manager playing a call from the
+            # panel would suppress the employee's own play a moment later, and
+            # UC-24's answer to "who listened" would quietly lose a row.
+            statement = statement.where(AuditLogModel.actor_type == actor_type)
+        found = await self.session.scalar(statement)
         return found is not None
 
     async def list(

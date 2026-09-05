@@ -50,6 +50,7 @@ from src.modules.calls.rules import (
     LineDirectory,
     classify_call_type,
     clock_skew_seconds,
+    device_audio_state,
     resolve_audio_reason,
 )
 from src.modules.calls.schemas import (
@@ -57,6 +58,7 @@ from src.modules.calls.schemas import (
     CallFilters,
     CallResponse,
     DeviceCallIn,
+    DeviceCallOut,
     DeviceCallResultOut,
 )
 from src.modules.catalog.service import CatalogService
@@ -637,3 +639,121 @@ def _audio_upload_state(item: DeviceCallIn, has_audio: bool) -> str:
     if item.disposition is not CallDisposition.ANSWERED or not item.audio_expected:
         return "not_expected"
     return "required"
+
+
+class DeviceCallReadService:
+    """The employee's own calls, read from their own phone (T59, UC-15).
+
+    The device API was write-only until this: the phone sent and never asked.
+    This is the first thing it reads back, and the scope is the whole design.
+
+    **Narrowed by the installation's binding, not by a permission.** A device
+    token's reach is the agent it is bound to — a property of the binding that
+    nobody can widen with a grant. That is why a lost handset stays "one
+    agent's calls" and does not become "whatever that token can reach"
+    (docs/DEVICE-READ-API.md, CONVENTIONS.md §4).
+
+    ``docs/DEVICE-READ-API.md`` asked for an empty page when the installation
+    has no agent. That state does not exist: ``installations.agent_id`` is
+    ``NOT NULL`` — a code is issued *for* an agent and redeeming it is what
+    creates the installation — so there is no branch for it here. A guard for an
+    unrepresentable state reads as if the state were possible.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    def _scope(self, statement: Select, installation: InstallationModel) -> Select:
+        """Every query here goes through this. There is no second path."""
+        return statement.where(CallModel.agent_id == installation.agent_id)
+
+    async def list(
+        self,
+        installation: InstallationModel,
+        limit: int,
+        cursor: Cursor | None,
+        since: datetime | None,
+    ) -> tuple[list[DeviceCallOut], str | None, bool]:
+        """A page of this agent's calls, newest conversation first.
+
+        **Ordered by ``started_at``, filtered by ``received_at``** — two clocks,
+        deliberately, because the two questions are different. The employee
+        reads a diary, so the order is when the call *happened*; a refresh asks
+        "what has arrived since I last looked", which only the server's
+        ``received_at`` can answer (D-08, N36). Ordering a person's own diary by
+        arrival would put a call recovered from the call log three days late
+        above calls that happened after it.
+        """
+        statement = self._scope(select(CallModel), installation)
+        if since is not None:
+            statement = statement.where(CallModel.received_at > since)
+        statement = apply_keyset(statement, CallModel.started_at, CallModel.id, cursor)
+
+        # One row more than asked for, so "is there another page" is answered
+        # without a COUNT over the agent's whole history.
+        rows = list((await self.session.scalars(statement.limit(limit + 1))).all())
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        next_cursor = (
+            Cursor(sort_value=rows[-1].started_at, row_id=rows[-1].id).encode()
+            if has_more and rows
+            else None
+        )
+        return await self.as_dtos(rows), next_cursor, has_more
+
+    async def as_dtos(self, rows: list[CallModel]) -> list[DeviceCallOut]:
+        """Rows to what the screen renders, with the audio state derived here.
+
+        ``audio_state`` is computed server-side rather than left to the app:
+        deriving it needs ``call_audio.deleted_at``, which the call row does not
+        carry, and every client that tried would eventually offer a play control
+        for a recording retention had already removed.
+        """
+        # One query for the page. ``summaries_for`` already answers both
+        # questions this needs — is the recording still there, and which
+        # strategy produced it — and returns a value rather than an entity, so
+        # this module never holds a ``CallAudioModel`` (§2).
+        summaries = await AudioService(self.session).summaries_for(
+            [row.id for row in rows]
+        )
+        return [
+            DeviceCallOut(
+                id=row.id,
+                client_call_id=row.client_call_id,
+                direction=row.direction,
+                disposition=row.disposition,
+                remote_number=row.remote_number,
+                contact_name=row.contact_name,
+                started_at=row.started_at,
+                duration_sec=row.duration_sec,
+                has_audio=row.has_audio,
+                audio_missing_reason=row.audio_missing_reason,
+                audio_state=device_audio_state(
+                    row.has_audio,
+                    row.audio_missing_reason.value if row.audio_missing_reason else None,
+                    audio_deleted=(
+                        row.id in summaries and not summaries[row.id].available
+                    ),
+                ),
+                capture_route=(
+                    summaries[row.id].capture_route if row.id in summaries else None
+                ),
+            )
+            for row in rows
+        ]
+
+    async def get(
+        self, installation: InstallationModel, call_id: uuid.UUID
+    ) -> CallModel:
+        """One call of this agent's. **Another agent's is 404, never 403.**
+
+        §4.1 rule 2, and it matters more here than on the panel: a 403 would
+        tell whoever is holding this phone that the call exists and belongs to
+        somebody else.
+        """
+        call = await self.session.scalar(
+            self._scope(select(CallModel), installation).where(CallModel.id == call_id)
+        )
+        if call is None:
+            raise NotFoundError(ErrorCode.CALL_NOT_FOUND)
+        return call

@@ -67,6 +67,13 @@ test-server:
 test-panel:
 	docker compose run --rm panel npm run test
 
+# Endpoints the contract declares and no client calls. Six things in this
+# project were built, tested and unreachable — see the script's docstring.
+# Runs on the host, not in a container: only the repository root can see the
+# server, the panel and the app at once.
+check-endpoints:   ## Report endpoints no client calls
+	python3 scripts/find_unused_endpoints.py
+
 lint:
 	docker compose run --rm backend ruff check src tests conftest.py migrations scripts
 	docker compose run --rm panel npm run lint

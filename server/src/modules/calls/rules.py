@@ -140,3 +140,31 @@ def clock_skew_seconds(
     """
     transit_ms = (device_rtt_ms or 0) // 2
     return int((received_at_epoch_ms - device_epoch_ms - transit_ms) / 1000)
+
+
+def device_audio_state(
+    has_audio: bool,
+    audio_missing_reason: str | None,
+    audio_deleted: bool,
+) -> str:
+    """What the employee's own-calls screen says about one recording.
+
+    Derived rather than stored, from the two facts that already answer it.
+    The order matters: **expired is checked before recorded**, because a call
+    whose audio retention removed still has ``has_audio = true`` — the row is
+    kept so that "there was a recording and it expired" stays answerable
+    (UC-26), and telling the employee it can be played would be a control that
+    does nothing.
+
+    Returns the value of ``DeviceAudioState``; typed as ``str`` because a
+    ``rules`` module imports nothing from the project (§2).
+    """
+    if audio_deleted:
+        return "expired"
+    if has_audio:
+        return "recorded"
+    if audio_missing_reason == "pending_upload":
+        return "queued"
+    if audio_missing_reason == "not_expected":
+        return "not_expected"
+    return "missing"

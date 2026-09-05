@@ -369,6 +369,24 @@ class AudioService:
         from src.modules.calls.service import CallService
 
         call = await CallService(self.session).get(principal, call_id)
+        return await self._source_for(call)
+
+    async def playback_source_for_device(
+        self, installation, call_id: uuid.UUID
+    ) -> PlaybackSource:
+        """The same recording, located for the employee's own phone (T59).
+
+        Scoped by the installation's binding rather than by a principal's
+        permissions — see ``DeviceCallReadService``. A call belonging to another
+        agent is 404 from that lookup, so this method never has to decide it.
+        """
+        from src.modules.calls.service import DeviceCallReadService
+
+        call = await DeviceCallReadService(self.session).get(installation, call_id)
+        return await self._source_for(call)
+
+    async def _source_for(self, call) -> PlaybackSource:
+        """Shared by both playback paths, so the 404/410 rules cannot diverge."""
         audio = await self.session.scalar(
             select(CallAudioModel).where(CallAudioModel.call_id == call.id)
         )
@@ -387,6 +405,40 @@ class AudioService:
             content_type=content_type,
             filename=f"{stamp}.{extension}",
         )
+
+    async def record_device_playback(
+        self, installation, call_id: uuid.UUID, range_start: int | None, ip: str | None
+    ) -> bool:
+        """UC-24 applies to the employee's own listening too.
+
+        An employee playing their own recording is not a privacy event, but the
+        audit log's value is that it is complete: "who listened to this call"
+        has to include the person who made it, or the answer is a half-truth.
+        Actor is the **device**, so the two are told apart at a glance.
+        """
+        if (range_start or 0) > 0:
+            return False  # a seek, not a play — same rule as the panel
+        if await self.audit.recorded_recently(
+            AuditAction.AUDIO_PLAY,
+            actor_user_id=None,
+            object_id=call_id,
+            within_seconds=PLAYBACK_AUDIT_DEDUPE_SECONDS,
+            actor_type=ActorType.DEVICE,
+        ):
+            return False
+        await self.audit.record(
+            action=AuditAction.AUDIO_PLAY,
+            object_type="calls",
+            object_id=call_id,
+            actor_type=ActorType.DEVICE,
+            ip=ip,
+            # ``audit_log`` has no installation actor column and this does not
+            # warrant one: the object is the call, and which phone played it is
+            # context. It is the same place the rebind audit puts its context.
+            detail={"installation_id": str(installation.id)},
+        )
+        await self.session.commit()
+        return True
 
     def open_range(self, audio: CallAudioModel, start: int, end: int | None):
         """The byte stream itself. Only this module opens an audio file."""

@@ -114,6 +114,35 @@ class AudioMissingReason(StrEnum):
     ATTRIBUTION_FAILED = "attribution_failed"
 
 
+class DeviceAudioState(StrEnum):
+    """What the employee's own-calls screen says about one call's recording.
+
+    A **derived** value, not a column: ``has_audio`` and ``audio_missing_reason``
+    together answer it, and the app needs one non-null thing to switch on.
+
+    It is deliberately not a value added to :class:`AudioMissingReason`. Every
+    member of that enum means audio is *absent* — its own docstring says
+    "NOT NULL whenever audio is absent" — so a ``recorded`` member would make
+    the name a lie and would arrive as an unparseable value in every client
+    already generated against it.
+    """
+
+    RECORDED = "recorded"
+    """The server holds the recording and it can be played."""
+
+    EXPIRED = "expired"
+    """It existed and retention removed it (UC-26). Not the same as never having one."""
+
+    QUEUED = "queued"
+    """On the phone, not yet uploaded. Not a failure — audio in flight."""
+
+    NOT_EXPECTED = "not_expected"
+    """An unanswered call had no conversation to record (UC-14)."""
+
+    MISSING = "missing"
+    """Expected and not captured. ``audio_missing_reason`` says why."""
+
+
 class CaptureRoute(StrEnum):
     """Which mechanism produced the recording (S1, the M0 baseline).
 

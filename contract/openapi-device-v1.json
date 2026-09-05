@@ -268,6 +268,18 @@
         "title": "DeviceAckIn",
         "type": "object"
       },
+      "DeviceAudioState": {
+        "description": "What the employee's own-calls screen says about one call's recording.\n\nA **derived** value, not a column: ``has_audio`` and ``audio_missing_reason``\ntogether answer it, and the app needs one non-null thing to switch on.\n\nIt is deliberately not a value added to :class:`AudioMissingReason`. Every\nmember of that enum means audio is *absent* — its own docstring says\n\"NOT NULL whenever audio is absent\" — so a ``recorded`` member would make\nthe name a lie and would arrive as an unparseable value in every client\nalready generated against it.",
+        "enum": [
+          "recorded",
+          "expired",
+          "queued",
+          "not_expected",
+          "missing"
+        ],
+        "title": "DeviceAudioState",
+        "type": "string"
+      },
       "DeviceCallBatchIn": {
         "description": "``POST /api/device/v1/calls``.",
         "properties": {
@@ -555,6 +567,51 @@
         "title": "DeviceCallIn",
         "type": "object"
       },
+      "DeviceCallListOut": {
+        "description": "A page of the employee's own calls.\n\nSame shape as the panel's list (``items``/``next_cursor``/``has_more``) so\nthere is one pagination convention in the product. ``total`` is left unset:\na phone scrolls, and a COUNT per page is cellular data spent on a number\nnobody reads.",
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceCallOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "DeviceCallListOut",
+        "type": "object"
+      },
       "DeviceCallLogDeltaIn": {
         "description": "``POST /api/device/v1/call-log-delta`` — the production rig (§4.1 B).\n\nWithout this, capture rate becomes unverifiable the day the acceptance\nwindow ends: there is no adb on a phone Bonvi does not own.",
         "properties": {
@@ -636,6 +693,106 @@
           "server_time"
         ],
         "title": "DeviceCallLogDeltaOut",
+        "type": "object"
+      },
+      "DeviceCallOut": {
+        "description": "One call, as the employee sees it in the app.\n\nEvery field here is also a field a lost handset carries, so the list is the\nclient's request and nothing more: no note, no colleague, no search. It is\nthe promise in ``docs/QOLLANMA.md`` becoming a screen — N41 one step\nfurther, from *which number is recorded* to *what was recorded*.",
+        "properties": {
+          "audio_missing_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioMissingReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why there is no recording, or null when there is one. Null is not the app's cue to say nothing — `audio_state` is what it renders."
+          },
+          "audio_state": {
+            "$ref": "#/components/schemas/DeviceAudioState",
+            "description": "**Never null.** One value the app switches on to produce one Uzbek sentence. This screen is where an employee learns that *qayd etish* and *yozib olish* are different promises, so it must always have something to say."
+          },
+          "capture_route": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureRoute"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which strategy produced the recording. Null when there is none — the route is a property of the file, not of the call."
+          },
+          "client_call_id": {
+            "description": "So the app can match the row it queued itself.",
+            "format": "uuid",
+            "title": "Client Call Id",
+            "type": "string"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "title": "Duration Sec",
+            "type": "integer"
+          },
+          "has_audio": {
+            "description": "What the **server holds**, never what the device believes it sent. A list built locally would show calls that never uploaded and hide calls recovered from the call log.",
+            "title": "Has Audio",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Server id; the audio route takes this.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "remote_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Number"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "client_call_id",
+          "direction",
+          "disposition",
+          "remote_number",
+          "contact_name",
+          "started_at",
+          "duration_sec",
+          "has_audio",
+          "audio_missing_reason",
+          "audio_state"
+        ],
+        "title": "DeviceCallOut",
         "type": "object"
       },
       "DeviceCallResultOut": {
@@ -2525,6 +2682,81 @@
       }
     },
     "/api/device/v1/calls": {
+      "get": {
+        "description": "The employee's own calls, in the app, without a panel login (T59, UC-15).\n\nThe client asked for this in one sentence: *\"telefonda o'rnatiladigan appda\nham shu xodim o'zining callarini ko'rishi va eshitishi mumkin bo'lsin —\nbizni tizimga kirib o'tirmaydi.\"*\n\n**Scoped by the installation's binding, not by a permission.** The device\nsurface has been write-only until now and this is the first thing it hands\nback, so the scope is the design: a token's reach is the agent it is bound\nto, which is a property of the binding and not a grant anybody can widen.\nNarrowed in the query — never a filter the client applies to a wider\nresponse, because the client is the thing we cannot trust.\n\nNo search, no filters, no notes. Every field here is also a field a lost\nhandset carries.",
+        "operationId": "my_calls_api_device_v1_calls_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCallListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Calls",
+        "tags": [
+          "Device calls"
+        ]
+      },
       "post": {
         "description": "Batch upsert, at most 50 items.\n\n``number_id`` and ``agent_id`` are resolved from the installation and the\ntime-boxed assignment — never from the payload. The device does not get to\nsay which number it is, and it does not get to move a call to another agent\nby re-sending it.",
         "operationId": "ingest_calls_api_device_v1_calls_post",
@@ -2561,6 +2793,64 @@
           }
         },
         "summary": "Ingest Calls",
+        "tags": [
+          "Device calls"
+        ]
+      }
+    },
+    "/api/device/v1/calls/{call_id}/audio": {
+      "get": {
+        "description": "Play one of the employee's own recordings. Same rules as the panel.\n\n``206`` with ``Content-Range`` for a ``Range`` request (N43): the player\nseeks, and seeking in a twenty-minute file must not mean downloading it over\ncellular. ``410`` once retention has taken it; ``404`` when there was never\na recording — the list already told the app *why*, so it shows that instead\nof a dead control.\n\nA call belonging to another agent is **404**, from the scoped lookup. It is\nnever 403: a 403 would tell whoever is holding this phone that the call\nexists and is somebody else's.",
+        "operationId": "my_call_audio_api_device_v1_calls__call_id__audio_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Range",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Call Audio",
         "tags": [
           "Device calls"
         ]

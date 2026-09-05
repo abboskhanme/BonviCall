@@ -24,6 +24,7 @@ from src.core.enums import (
     CallSource,
     CallType,
     CaptureRoute,
+    DeviceAudioState,
 )
 from src.core.wire import Int64
 from src.modules.calls.rules import is_valid_combination
@@ -290,3 +291,72 @@ class UpdateCallNoteRequest(BaseModel):
     """``PATCH /api/v1/calls/{id}`` — the note and nothing else."""
 
     note: str | None = Field(default=None, max_length=4000)
+
+
+# --- The employee's own calls, on their phone (docs/DEVICE-READ-API.md) -----
+
+
+class DeviceCallOut(BaseModel):
+    """One call, as the employee sees it in the app.
+
+    Every field here is also a field a lost handset carries, so the list is the
+    client's request and nothing more: no note, no colleague, no search. It is
+    the promise in ``docs/QOLLANMA.md`` becoming a screen — N41 one step
+    further, from *which number is recorded* to *what was recorded*.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(description="Server id; the audio route takes this.")
+    client_call_id: uuid.UUID = Field(
+        description="So the app can match the row it queued itself."
+    )
+    direction: CallDirection
+    disposition: CallDisposition
+    remote_number: str | None
+    contact_name: str | None
+    started_at: datetime
+    duration_sec: int
+    has_audio: bool = Field(
+        description=(
+            "What the **server holds**, never what the device believes it "
+            "sent. A list built locally would show calls that never uploaded "
+            "and hide calls recovered from the call log."
+        )
+    )
+    audio_missing_reason: AudioMissingReason | None = Field(
+        description=(
+            "Why there is no recording, or null when there is one. Null is not "
+            "the app's cue to say nothing — `audio_state` is what it renders."
+        )
+    )
+    audio_state: DeviceAudioState = Field(
+        description=(
+            "**Never null.** One value the app switches on to produce one "
+            "Uzbek sentence. This screen is where an employee learns that "
+            "*qayd etish* and *yozib olish* are different promises, so it must "
+            "always have something to say."
+        )
+    )
+    capture_route: CaptureRoute | None = Field(
+        default=None,
+        description=(
+            "Which strategy produced the recording. Null when there is none — "
+            "the route is a property of the file, not of the call."
+        ),
+    )
+
+
+class DeviceCallListOut(BaseModel):
+    """A page of the employee's own calls.
+
+    Same shape as the panel's list (``items``/``next_cursor``/``has_more``) so
+    there is one pagination convention in the product. ``total`` is left unset:
+    a phone scrolls, and a COUNT per page is cellular data spent on a number
+    nobody reads.
+    """
+
+    items: list[DeviceCallOut]
+    next_cursor: str | None
+    has_more: bool
+    total: int | None = None
