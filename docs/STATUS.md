@@ -1,11 +1,15 @@
 # BonviCall — where the build stands
 
-**2026-09-05.** Paused at the client's request. Everything below is committed,
-verified, and running. Start here when work resumes.
+**2026-09-05, revision 2.** Everything below is committed, verified and running.
 
 ```
-server   580 tests    panel  120 tests    android  133 tests × 2 flavours
+server   647 tests    panel  171 tests    android  220 tests × 2 flavours
 ```
+
+**68 % of the plan by effort — and 91 % of the code.** Of the 325 hours left,
+**263 are field work** (M0, the enrolment gate, survivability, the acceptance
+run), 27 are ops, 8 are docs, and **28 are code**. The build phase is
+effectively over; what remains needs handsets and people, not more agents.
 
 Stack up with `make up` · panel **5190** · api **8020** (`/docs`) · postgres **5443**
 
@@ -31,50 +35,32 @@ once, with its audio or a reason there is none.
 
 ## Start here when resuming
 
-### 1. `int64` on the wire — the one real correctness bug outstanding
+### The only thing that matters now: put it on a phone
 
-Pydantic's `int` is unbounded, so nine 64-bit fields reach the contract as a
-formatless `integer`, and **openapi-generator maps that to Kotlin's 32-bit
-`Int`**. `System.currentTimeMillis()` is ~1.77e12 against `Int.MAX_VALUE` of
-2.1e9. The server stores them as BIGINT — the data model is right and only the
-wire schema is under-specified, which is why neither side looks wrong on its own.
+`docs/ON-DEVICE-TESTING.md` — eight steps from a laptop to a captured call.
+`docs/QOLLANMA.md` is the Uzbek page to hand the person carrying the phone.
 
-Fix in `server/src/api/device/schemas.py`:
+Everything in this system has been verified by `scripts/demo_data.py` or a
+script driving the API. **No part of it has ever run on a handset.** That is not
+a gap in the plan; it *is* the plan's next 263 hours, and the first hour of it
+answers five questions at once — does the app install, is the enrolment flow
+followable unaided, does detection fire, does the call arrive, and the one that
+decides the project's shape: **is there audio.**
 
-```python
-Int64 = Annotated[int, Field(json_schema_extra={"format": "int64"})]
-device_epoch_ms: Int64
-```
+The audio chain is complete and covered end to end — record → transcode to mono
+16 kHz Opus → resumable upload → server-verified checksum → local delete — and
+`MediaRecorderStrategy` already works. Only `OemHarvestStrategy`'s locator is
+`NoOp`. So on a Samsung the first tester may get a recording, not just a call
+log. `ON-DEVICE-TESTING.md` deliberately promises the pessimistic case.
 
-Affects `device_epoch_ms` on `DeviceRedeemIn` / `DeviceCallIn` /
-`DeviceHeartbeatIn`, plus the byte counters on `DeviceHeartbeatIn` and
-`DeviceEventDetailIn`. Android has a machine-applied stopgap
-(`android/scripts/widen_int64.py`) and `Int64WireContractTest` fails the moment
-a listed field *gains* the format — that is the signal to delete the entry and,
-with the last one, the script.
+### The 28 hours of code that remain
 
-### 2. Phase 6 — wiring
-
-Deliberately deferred while three agents worked in parallel. `docs/PENDING_WIRING.md`
-lists what is waiting; the WebSocket router needs one `include_router` line in
-`src/api/device/__init__.py`. Shared files (`main.py`, `core/permissions.py`,
-alembic head, panel `router.tsx`) have been frozen throughout and are safe to
-touch once nothing is running.
-
-### 3. Smaller items, each with a note where it lives
-
-- `IssuedTokensOut` carries no `verification_method`, so an admin-attested
-  binding cannot be told from a proven one after a token refresh without the
-  client's persisted copy (SPEC §9.3).
-- Alert `title_uz` is English (`"Device offline"`) and `body_uz` is the same
-  generic sentence for every kind. The panel routes around it with its own
-  `AlertKind` maps; the device API and any notification path would carry the
-  English straight through.
-- `capability_states` is empty in the demo fleet — a seeder gap, not an
-  endpoint bug; the device page's capability matrix renders empty everywhere.
-- `backup_verify` is written but deliberately unregistered: there is no backup
-  mechanism until T124, and an alert nobody can act on trains people to ignore
-  alerts.
+- **T71b / T72 — the OEM harvest locators.** Genuinely blocked on M0: writing
+  them before knowing which route wins on Bonvi's actual handsets is building on
+  a guess. This is the only remaining task whose shape depends on field data.
+- `StorageReportPage` — the last panel stub; `/reports/storage` and
+  `/reports/data-usage` both answer correctly and have data behind them.
+- T103, T145 and the Phase 4/5 wiring tasks.
 
 ---
 
