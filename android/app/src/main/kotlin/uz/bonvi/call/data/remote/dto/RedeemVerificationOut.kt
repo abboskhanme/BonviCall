@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -25,7 +33,7 @@ import com.squareup.moshi.JsonClass
  *
  * @param required 
  * @param windowSeconds 
- * @param callbackMsisdn 
+ * @param callbackMsisdn NULL when no receiver is available.
  * @param receiverStatus 
  */
 
@@ -38,6 +46,7 @@ data class RedeemVerificationOut (
     @Json(name = "window_seconds")
     val windowSeconds: kotlin.Int,
 
+    /* NULL when no receiver is available. */
     @Json(name = "callback_msisdn")
     val callbackMsisdn: kotlin.String? = null,
 

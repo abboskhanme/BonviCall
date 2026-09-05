@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -34,22 +42,22 @@ import com.squareup.moshi.JsonClass
  * @param direction 
  * @param disposition 
  * @param startedAt ISO-8601 with an explicit offset (N36).
- * @param answeredAt 
+ * @param answeredAt NULL means there was never a conversation (UC-09).
  * @param appVariant 
  * @param appVersion 
  * @param audioExpected Whether the device will follow up with audio.
- * @param audioMissingReason 
- * @param captureRoute 
- * @param commandId 
- * @param contactName 
- * @param deviceRttMs 
+ * @param audioMissingReason From the closed enum, never free text (N5). NULL lets the server decide.
+ * @param captureRoute Which strategy produced (or failed to produce) audio.
+ * @param commandId Set when this call answered a click-to-call command.
+ * @param contactName Resolved on-device. Decoration, never identity (L3).
+ * @param deviceRttMs The client's round-trip estimate, for skew.
  * @param durationSec Whole seconds, truncated not rounded.
  * @param endedAt 
  * @param reconciledWithCallLog 
- * @param remoteNumber 
+ * @param remoteNumber As the device saw it. NULL when the caller withheld it.
  * @param ringSec 
  * @param simSlot 
- * @param simSubscriptionId 
+ * @param simSubscriptionId The registered subscription only — Guard 1 refused the rest.
  * @param source 
  */
 
@@ -78,6 +86,7 @@ data class DeviceCallIn (
     @Json(name = "started_at")
     val startedAt: java.time.OffsetDateTime,
 
+    /* NULL means there was never a conversation (UC-09). */
     @Json(name = "answered_at")
     val answeredAt: java.time.OffsetDateTime? = null,
 
@@ -91,18 +100,23 @@ data class DeviceCallIn (
     @Json(name = "audio_expected")
     val audioExpected: kotlin.Boolean? = false,
 
+    /* From the closed enum, never free text (N5). NULL lets the server decide. */
     @Json(name = "audio_missing_reason")
     val audioMissingReason: AudioMissingReason? = null,
 
+    /* Which strategy produced (or failed to produce) audio. */
     @Json(name = "capture_route")
     val captureRoute: CaptureRoute? = null,
 
+    /* Set when this call answered a click-to-call command. */
     @Json(name = "command_id")
     val commandId: java.util.UUID? = null,
 
+    /* Resolved on-device. Decoration, never identity (L3). */
     @Json(name = "contact_name")
     val contactName: kotlin.String? = null,
 
+    /* The client's round-trip estimate, for skew. */
     @Json(name = "device_rtt_ms")
     val deviceRttMs: kotlin.Int? = null,
 
@@ -116,6 +130,7 @@ data class DeviceCallIn (
     @Json(name = "reconciled_with_call_log")
     val reconciledWithCallLog: kotlin.Boolean? = false,
 
+    /* As the device saw it. NULL when the caller withheld it. */
     @Json(name = "remote_number")
     val remoteNumber: kotlin.String? = null,
 
@@ -125,6 +140,7 @@ data class DeviceCallIn (
     @Json(name = "sim_slot")
     val simSlot: kotlin.Int? = null,
 
+    /* The registered subscription only — Guard 1 refused the rest. */
     @Json(name = "sim_subscription_id")
     val simSubscriptionId: kotlin.Int? = null,
 

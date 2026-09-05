@@ -8,20 +8,23 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
 
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInAttempts
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInAudioMissingReason
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInByUser
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInCaptureRoute
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInClientCallId
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInDeletedBytes
-import uz.bonvi.call.data.remote.dto.DeviceEventDetailInFromVersion
+import uz.bonvi.call.data.remote.dto.AudioMissingReason
+import uz.bonvi.call.data.remote.dto.CaptureRoute
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -31,9 +34,9 @@ import com.squareup.moshi.JsonClass
  *
  * @param attempts 
  * @param audioMissingReason 
- * @param byUser 
+ * @param byUser Whether the employee did it, or the OS did.
  * @param captureRoute 
- * @param clientCallId 
+ * @param clientCallId Which queued record was parked.
  * @param deletedBytes 
  * @param deletedRecords 
  * @param discardedCount 
@@ -48,45 +51,47 @@ import com.squareup.moshi.JsonClass
 data class DeviceEventDetailIn (
 
     @Json(name = "attempts")
-    val attempts: DeviceEventDetailInAttempts? = null,
+    val attempts: kotlin.Int? = null,
 
     @Json(name = "audio_missing_reason")
-    val audioMissingReason: DeviceEventDetailInAudioMissingReason? = null,
+    val audioMissingReason: AudioMissingReason? = null,
 
+    /* Whether the employee did it, or the OS did. */
     @Json(name = "by_user")
-    val byUser: DeviceEventDetailInByUser? = null,
+    val byUser: kotlin.Boolean? = null,
 
     @Json(name = "capture_route")
-    val captureRoute: DeviceEventDetailInCaptureRoute? = null,
+    val captureRoute: CaptureRoute? = null,
 
+    /* Which queued record was parked. */
     @Json(name = "client_call_id")
-    val clientCallId: DeviceEventDetailInClientCallId? = null,
+    val clientCallId: java.util.UUID? = null,
 
     @Json(name = "deleted_bytes")
-    val deletedBytes: DeviceEventDetailInDeletedBytes? = null,
+    val deletedBytes: kotlin.Long? = null,
 
     @Json(name = "deleted_records")
-    val deletedRecords: DeviceEventDetailInAttempts? = null,
+    val deletedRecords: kotlin.Int? = null,
 
     @Json(name = "discarded_count")
-    val discardedCount: DeviceEventDetailInAttempts? = null,
+    val discardedCount: kotlin.Int? = null,
 
     @Json(name = "free_storage_bytes")
-    val freeStorageBytes: DeviceEventDetailInDeletedBytes? = null,
+    val freeStorageBytes: kotlin.Long? = null,
 
     @Json(name = "from_version")
-    val fromVersion: DeviceEventDetailInFromVersion? = null,
+    val fromVersion: kotlin.String? = null,
 
     @Json(name = "queue_bytes")
-    val queueBytes: DeviceEventDetailInDeletedBytes? = null,
+    val queueBytes: kotlin.Long? = null,
 
     @Json(name = "queue_records")
-    val queueRecords: DeviceEventDetailInAttempts? = null,
+    val queueRecords: kotlin.Int? = null,
 
     @Json(name = "to_version")
-    val toVersion: DeviceEventDetailInFromVersion? = null
+    val toVersion: kotlin.String? = null
 
-) : kotlin.collections.HashMap<String, kotlin.Any>() {
+) {
 
 
 }

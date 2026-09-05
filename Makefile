@@ -138,6 +138,13 @@ android-release:
 # (CONVENTIONS.md §1, CONVENTIONS-CLIENT.md §5). A renamed field must be a
 # compile error on 15 phones we cannot force-update, not a runtime null.
 # CI runs: make contract android-dto && git diff --exit-code contract/ android/
+#
+# PINNED to v7.25.0, not `latest`. v7.10-v7.16 minted a named empty model for
+# every anyOf property of a schema declaring additionalProperties: false — so
+# `extra="forbid"`, added to close a privacy hole, made those fields unsettable
+# from the client. Fixed upstream somewhere in v7.17-v7.20; v7.25.0 is the
+# newest release verified clean here. A moving tag would make the generated
+# directory depend on when it was last built.
 android-dto:
 	@# Generated output is REPLACED, not merged. openapi-generator does not
 	@# delete files for schemas the contract has dropped, so a stale DTO from a
@@ -148,7 +155,7 @@ android-dto:
 	docker run --rm -u $$(id -u):$$(id -g) \
 	  -v $(PWD)/contract:/contract:ro \
 	  -v $(PWD)/android/app/src/main/kotlin:/out \
-	  openapitools/openapi-generator-cli:v7.10.0 generate \
+	  openapitools/openapi-generator-cli:v7.25.0 generate \
 	  -i /contract/openapi-device-v1.json \
 	  -g kotlin -o /out \
 	  --global-property models,modelDocs=false,modelTests=false \

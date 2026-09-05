@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -25,7 +33,7 @@ import com.squareup.moshi.JsonClass
  * @param code The stable machine value. Clients branch on this.
  * @param message Uzbek, for a person. Never branched on (§4.0).
  * @param requestId Echoed from X-Request-Id; quote it in a bug report.
- * @param detail 
+ * @param detail Machine-readable context; its shape follows `code`.
  */
 
 
@@ -43,6 +51,7 @@ data class ErrorBody (
     @Json(name = "request_id")
     val requestId: kotlin.String,
 
+    /* Machine-readable context; its shape follows `code`. */
     @Json(name = "detail")
     val detail: kotlin.Any? = null
 

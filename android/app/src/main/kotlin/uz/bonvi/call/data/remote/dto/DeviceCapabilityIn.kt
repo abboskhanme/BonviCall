@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -27,7 +35,7 @@ import com.squareup.moshi.JsonClass
  * @param capability 
  * @param checkedAt 
  * @param state 
- * @param detail 
+ * @param detail What the check saw, e.g. '1s test capture 32 kB'.
  */
 
 
@@ -42,6 +50,7 @@ data class DeviceCapabilityIn (
     @Json(name = "state")
     val state: CapabilityState,
 
+    /* What the check saw, e.g. '1s test capture 32 kB'. */
     @Json(name = "detail")
     val detail: kotlin.String? = null
 

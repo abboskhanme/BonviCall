@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -23,7 +31,7 @@ import com.squareup.moshi.JsonClass
  * ``POST /api/device/v1/enrolment/verify/msisdn`` — route 1.
  *
  * @param carrierName 
- * @param line1Number 
+ * @param line1Number TelephonyManager.getLine1Number(). NULL, empty or fewer than nine digits is never a match (UC-04) — it is 'I don't know', not 'yes'.
  * @param simSlot 
  * @param subscriptionId 
  */
@@ -34,6 +42,7 @@ data class DeviceMsisdnVerifyIn (
     @Json(name = "carrier_name")
     val carrierName: kotlin.String? = null,
 
+    /* TelephonyManager.getLine1Number(). NULL, empty or fewer than nine digits is never a match (UC-04) — it is 'I don't know', not 'yes'. */
     @Json(name = "line1_number")
     val line1Number: kotlin.String? = null,
 

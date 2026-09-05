@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -29,7 +37,7 @@ import com.squareup.moshi.JsonClass
  * @param state 
  * @param failure 
  * @param status 
- * @param tokens 
+ * @param tokens Present only on 'matched'; the full pair.
  */
 
 
@@ -44,6 +52,7 @@ data class DeviceVerificationStatusOut (
     @Json(name = "status")
     val status: InstallationStatus? = null,
 
+    /* Present only on 'matched'; the full pair. */
     @Json(name = "tokens")
     val tokens: IssuedTokensOut? = null
 

@@ -14,29 +14,20 @@ import java.io.File
  * nothing errors: the server is correct Python, the contract is valid OpenAPI,
  * and the client simply cannot set any of those fields.
  *
- * **Stripping the derived `title` was necessary and not sufficient.** With the
- * titles gone the generator stopped naming them `Attempts` and started naming
- * them `DeviceEventDetailInAttempts` — same defect, different name. The real
- * trigger is `additionalProperties: false` on the parent schema:
+ * **The cause, and how it was closed.** Stripping the derived `title` was
+ * necessary and not sufficient: with the titles gone the generator stopped
+ * naming them `Attempts` and started naming them `DeviceEventDetailInAttempts`.
+ * The real trigger was `additionalProperties: false` on the parent schema, and
+ * the proof was byte-identical — `DeviceHeartbeatIn.queue_bytes` and
+ * `DeviceEventDetailIn.queue_bytes` had the SAME schema, and only the second
+ * minted a class, because only its parent was closed.
  *
- *   `DeviceHeartbeatIn.queue_bytes` and `DeviceEventDetailIn.queue_bytes` have
- *   BYTE-IDENTICAL schemas. The first generates as `kotlin.Long?`. The second
- *   generates as a minted empty class. The only difference between the two
- *   parents is that `DeviceEventDetailIn` declares
- *   `additionalProperties: false`.
- *
- * Which means **the fix for one finding caused this one**: `extra="forbid"` was
- * added to close the §8.5 free-form-map hole — correctly, and it should stay —
- * and openapi-generator responds to it by minting a model for every `anyOf`
- * property of that schema. Both decisions are right on their own; the defect is
- * only where they meet, which is the fifth time that has been true here.
- *
- * **Options for the server**, in the order I would try them: emit the closed
- * shape without `additionalProperties: false` in the exported document while
- * keeping `extra="forbid"` in Pydantic (the runtime still rejects extras, and
- * `DeviceContractPrivacyTest` checks for free-form MAPS rather than for the
- * keyword); or upgrade openapi-generator, which may simply not have this quirk
- * any more. Either way this test goes quiet on its own.
+ * Which meant the fix for one finding caused this one: `extra="forbid"` was
+ * added to close the §8.5 free-form-map hole. **It was fixed by upgrading the
+ * generator (v7.10.0 → v7.25.0), so `extra="forbid"` stays and the contract
+ * still says the shape is closed.** The alternative — omitting
+ * `additionalProperties: false` from the exported document — would have made
+ * the contract say less than the server enforces, and was not needed.
  */
 class GeneratedDtoShapeTest {
 
@@ -46,33 +37,18 @@ class GeneratedDtoShapeTest {
     )
 
     /**
-     * Types that currently generate empty. ⚠️ This list only SHRINKS.
+     * Types that generate empty. ⚠️ This list only SHRINKS.
      *
-     * Every one is a property of `DeviceEventDetailIn`, so `POST /events`
-     * cannot carry any detail today: `step_timing` and `enrolment_stuck` still
-     * fire with `kind` and `at`, which is what N40's measurement and the
-     * assisted-install signal need, and the numeric detail is lost until the
-     * generator stops minting a type per field.
+     * **It is empty, and it emptied itself.** It held seven entries — every
+     * optional field of `DeviceEventDetailIn`, unsettable from the client —
+     * until `make android-dto` moved from openapi-generator v7.10.0 to
+     * v7.25.0. The quirk is fixed upstream; nothing was weakened to get there,
+     * and `extra="forbid"` stays exactly as it was.
      *
-     * It was nineteen entries before `make android-dto` learned to CLEAN the
-     * output directory. openapi-generator does not delete files for schemas the
-     * contract has dropped, so a stale DTO from a previous shape survived,
-     * still compiled, and was indistinguishable from a current one. Seven is
-     * the real number.
-     *
-     * `ValidationErrorLocInner` and `HTTPValidationError` are gone: the 422
-     * shape is the N35 envelope now, generated as `ErrorResponse`/`ErrorBody`,
-     * and this app parses the response it can actually receive.
+     * The first test below is the guard that remains: a NEW empty type fails
+     * it, whatever mints it next.
      */
-    private val knownEmpty = setOf(
-        "DeviceEventDetailInAttempts",
-        "DeviceEventDetailInAudioMissingReason",
-        "DeviceEventDetailInByUser",
-        "DeviceEventDetailInCaptureRoute",
-        "DeviceEventDetailInClientCallId",
-        "DeviceEventDetailInDeletedBytes",
-        "DeviceEventDetailInFromVersion",
-    )
+    private val knownEmpty = emptySet<String>()
 
     private fun emptyGeneratedTypes(): List<String> = dtoDir.listFiles()
         .orEmpty()

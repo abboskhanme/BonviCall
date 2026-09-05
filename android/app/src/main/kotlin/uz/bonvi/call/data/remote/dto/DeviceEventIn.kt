@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -25,7 +33,7 @@ import com.squareup.moshi.JsonClass
  *
  * @param kind One of the names in SPEC §4.4. Unknown names are accepted on purpose — an event we do not understand raises 'info' rather than being dropped — but the shape is constrained to a lower-case identifier: an unbounded free-text field is itself a way off the phone.
  * @param at 
- * @param detail 
+ * @param detail Named fields only; see DeviceEventDetailIn.
  */
 
 
@@ -38,6 +46,7 @@ data class DeviceEventIn (
     @Json(name = "at")
     val at: java.time.OffsetDateTime? = null,
 
+    /* Named fields only; see DeviceEventDetailIn. */
     @Json(name = "detail")
     val detail: DeviceEventDetailIn? = null
 

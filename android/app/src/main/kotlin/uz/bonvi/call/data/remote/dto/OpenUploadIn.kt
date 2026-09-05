@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -32,7 +40,7 @@ import com.squareup.moshi.JsonClass
  * @param recordedAt When the file was written. Checked against the call's window — a recording that does not overlap is refused and never stored (N28).
  * @param sha256 
  * @param bitrateBps 
- * @param captureRouteDetail 
+ * @param captureRouteDetail The folder *name* only, never a path from the phone (§8).
  * @param channels 
  * @param durationMs 
  * @param sampleRateHz 
@@ -64,6 +72,7 @@ data class OpenUploadIn (
     @Json(name = "bitrate_bps")
     val bitrateBps: kotlin.Int? = null,
 
+    /* The folder *name* only, never a path from the phone (§8). */
     @Json(name = "capture_route_detail")
     val captureRouteDetail: kotlin.String? = null,
 

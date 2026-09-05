@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -30,10 +38,10 @@ import com.squareup.moshi.JsonClass
  * @param apiLevel 
  * @param appVariant 
  * @param appVersion 
- * @param appVersionCode 
+ * @param appVersionCode The integer the version gate compares (N34). Reported at enrolment in `AppInfoIn.version_code` and refreshed here, because the code changes when the app updates and nothing else on the wire carries it afterwards. Omitting it leaves the stored value alone.
  * @param batteryCharging 
  * @param batteryLevel 
- * @param batteryOptimisationExempt 
+ * @param batteryOptimisationExempt isIgnoringBatteryOptimizations(). False is the usual cause of a dead service.
  * @param captureEnabled 
  * @param cellularBytesMonth 
  * @param deviceRttMs 
@@ -42,10 +50,10 @@ import com.squareup.moshi.JsonClass
  * @param parkedRecords 
  * @param pendingCommandsSeen 
  * @param powerSaveMode 
- * @param pushToken 
+ * @param pushToken FCM registration token, sent **only when it changes** — on the first heartbeat after `onNewToken`. Omitting it leaves the stored one alone; sending it on every heartbeat would spend part of the cellular budget (N15) on a value that changes twice a year.
  * @param queueBytes 
  * @param queueOldestAt 
- * @param queueRecords 
+ * @param queueRecords Zero is what the stale-version gate waits for (SPEC §4.3).
  * @param recordingRoute 
  * @param recordingRouteOk 
  * @param serviceRunning 
@@ -71,6 +79,7 @@ data class DeviceHeartbeatIn (
     @Json(name = "app_version")
     val appVersion: kotlin.String? = null,
 
+    /* The integer the version gate compares (N34). Reported at enrolment in `AppInfoIn.version_code` and refreshed here, because the code changes when the app updates and nothing else on the wire carries it afterwards. Omitting it leaves the stored value alone. */
     @Json(name = "app_version_code")
     val appVersionCode: kotlin.Int? = null,
 
@@ -80,6 +89,7 @@ data class DeviceHeartbeatIn (
     @Json(name = "battery_level")
     val batteryLevel: kotlin.Int? = null,
 
+    /* isIgnoringBatteryOptimizations(). False is the usual cause of a dead service. */
     @Json(name = "battery_optimisation_exempt")
     val batteryOptimisationExempt: kotlin.Boolean? = null,
 
@@ -107,6 +117,7 @@ data class DeviceHeartbeatIn (
     @Json(name = "power_save_mode")
     val powerSaveMode: kotlin.Boolean? = null,
 
+    /* FCM registration token, sent **only when it changes** — on the first heartbeat after `onNewToken`. Omitting it leaves the stored one alone; sending it on every heartbeat would spend part of the cellular budget (N15) on a value that changes twice a year. */
     @Json(name = "push_token")
     val pushToken: kotlin.String? = null,
 
@@ -116,6 +127,7 @@ data class DeviceHeartbeatIn (
     @Json(name = "queue_oldest_at")
     val queueOldestAt: java.time.OffsetDateTime? = null,
 
+    /* Zero is what the stale-version gate waits for (SPEC §4.3). */
     @Json(name = "queue_records")
     val queueRecords: kotlin.Int? = null,
 

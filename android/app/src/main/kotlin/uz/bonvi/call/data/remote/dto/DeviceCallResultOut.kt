@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -27,7 +35,7 @@ import com.squareup.moshi.JsonClass
  * @param status 
  * @param audioUpload 
  * @param error 
- * @param id 
+ * @param id The server id. Same value on every replay.
  */
 
 
@@ -45,6 +53,7 @@ data class DeviceCallResultOut (
     @Json(name = "error")
     val error: DeviceCallErrorOut? = null,
 
+    /* The server id. Same value on every replay. */
     @Json(name = "id")
     val id: java.util.UUID? = null
 

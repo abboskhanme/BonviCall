@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -26,7 +34,7 @@ import com.squareup.moshi.JsonClass
  * @param clockSkewSec 
  * @param serverTime 
  * @param update 
- * @param configHash 
+ * @param configHash The app re-fetches config only when this changes.
  * @param pendingCommandCount 
  */
 
@@ -42,6 +50,7 @@ data class DeviceHeartbeatOut (
     @Json(name = "update")
     val update: UpdateBlockOut,
 
+    /* The app re-fetches config only when this changes. */
     @Json(name = "config_hash")
     val configHash: kotlin.String? = null,
 

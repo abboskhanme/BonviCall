@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -26,7 +34,7 @@ import com.squareup.moshi.JsonClass
  * @param status 
  * @param at 
  * @param failureReason 
- * @param resultClientCallId 
+ * @param resultClientCallId The call the dial produced, if it produced one.
  */
 
 
@@ -41,6 +49,7 @@ data class DeviceAckIn (
     @Json(name = "failure_reason")
     val failureReason: CommandFailureReason? = null,
 
+    /* The call the dial produced, if it produced one. */
     @Json(name = "result_client_call_id")
     val resultClientCallId: java.util.UUID? = null
 

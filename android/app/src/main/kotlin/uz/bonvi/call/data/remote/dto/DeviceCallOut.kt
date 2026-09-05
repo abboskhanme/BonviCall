@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package uz.bonvi.call.data.remote.dto
@@ -27,7 +35,7 @@ import com.squareup.moshi.JsonClass
 /**
  * One call, as the employee sees it in the app.  Every field here is also a field a lost handset carries, so the list is the client's request and nothing more: no note, no colleague, no search. It is the promise in ``docs/QOLLANMA.md`` becoming a screen — N41 one step further, from *which number is recorded* to *what was recorded*.
  *
- * @param audioMissingReason 
+ * @param audioMissingReason Why there is no recording, or null when there is one. Null is not the app's cue to say nothing — `audio_state` is what it renders.
  * @param audioState **Never null.** One value the app switches on to produce one Uzbek sentence. This screen is where an employee learns that *qayd etish* and *yozib olish* are different promises, so it must always have something to say.
  * @param clientCallId So the app can match the row it queued itself.
  * @param contactName 
@@ -38,12 +46,13 @@ import com.squareup.moshi.JsonClass
  * @param id Server id; the audio route takes this.
  * @param remoteNumber 
  * @param startedAt 
- * @param captureRoute 
+ * @param captureRoute Which strategy produced the recording. Null when there is none — the route is a property of the file, not of the call.
  */
 
 
 data class DeviceCallOut (
 
+    /* Why there is no recording, or null when there is one. Null is not the app's cue to say nothing — `audio_state` is what it renders. */
     @Json(name = "audio_missing_reason")
     val audioMissingReason: AudioMissingReason?,
 
@@ -81,6 +90,7 @@ data class DeviceCallOut (
     @Json(name = "started_at")
     val startedAt: java.time.OffsetDateTime,
 
+    /* Which strategy produced the recording. Null when there is none — the route is a property of the file, not of the call. */
     @Json(name = "capture_route")
     val captureRoute: CaptureRoute? = null
 
