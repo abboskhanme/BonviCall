@@ -79,6 +79,12 @@ object Capabilities {
     fun phoneCallServiceTypeIsRestricted(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
+    /** `TelephonyCallback` replaced `PhoneStateListener` at API 31. Below it
+     *  the deprecated listener is the only option, which is a capability
+     *  question rather than a preference. */
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
+    fun supportsTelephonyCallback(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
     /** POST_NOTIFICATIONS became a runtime permission at API 33. */
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
     fun notificationPermissionRequired(): Boolean =

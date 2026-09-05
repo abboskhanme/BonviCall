@@ -18,7 +18,11 @@ import uz.bonvi.call.enrolment.DeviceFacts
 import uz.bonvi.call.enrolment.StepTimer
 import uz.bonvi.call.enrolment.StorageAccessProbe
 import uz.bonvi.call.enrolment.SubscriptionPresenceProbe
+import uz.bonvi.call.service.CallEndedListener
 import uz.bonvi.call.service.CaptureService
+import uz.bonvi.call.service.work.ReconcileWorker
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
 /**
@@ -69,6 +73,17 @@ object EnrolmentProviders {
     fun captureServiceState(): CaptureServiceState = CaptureServiceState {
         CaptureService.isRunning
     }
+
+    /**
+     * A finished call schedules the reconciliation sweep.
+     *
+     * Bound here rather than called from `CallDetector` so the detector stays
+     * free of WorkManager and its decisions stay unit-testable.
+     */
+    @Provides
+    @Singleton
+    fun callEndedListener(@ApplicationContext context: Context): CallEndedListener =
+        CallEndedListener { ReconcileWorker.enqueueAfterCall(context) }
 
     /** One timer per enrolment attempt is wrong — N40 measures the whole run,
      *  across screens, so it is a singleton for the process. */

@@ -13,6 +13,7 @@ import uz.bonvi.call.data.remote.BaseUrlInterceptor
 import uz.bonvi.call.data.remote.BearerAuthInterceptor
 import uz.bonvi.call.data.remote.DeviceHeadersInterceptor
 import uz.bonvi.call.data.remote.OffsetDateTimeAdapter
+import uz.bonvi.call.data.remote.api.DeviceCallsApi
 import uz.bonvi.call.data.remote.api.DeviceEnrolmentApi
 import uz.bonvi.call.data.session.SessionStore
 import java.util.concurrent.TimeUnit
@@ -73,6 +74,10 @@ object NetworkModule {
     @Singleton
     fun enrolmentApi(retrofit: Retrofit): DeviceEnrolmentApi =
         retrofit.create(DeviceEnrolmentApi::class.java)
+
+    @Provides
+    @Singleton
+    fun callsApi(retrofit: Retrofit): DeviceCallsApi = retrofit.create(DeviceCallsApi::class.java)
 
     /** Path versioning, never a header (CONVENTIONS.md §4.1). */
     const val DEVICE_API_PREFIX = "/api/device/v1/"

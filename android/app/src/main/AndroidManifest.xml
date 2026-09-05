@@ -140,6 +140,20 @@
             </intent-filter>
         </receiver>
 
+        <!-- UC-09, T69: the call detector's ears.
+             A MANIFEST-registered receiver on purpose: it arrives even when
+             the app is not running, and the first thing that happens after a
+             reboot is often a call. A listener registered only from a live
+             service would miss it. The live source (TelephonyCallback) is
+             registered by CaptureService and covers the running case. -->
+        <receiver
+            android:name=".service.PhoneStateReceiver"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
         <!-- WorkManager is initialised by Hilt, not by the default initialiser
              (androidx.hilt.work). Removing this provider is required, or the
              default one runs first and the workers have no injected

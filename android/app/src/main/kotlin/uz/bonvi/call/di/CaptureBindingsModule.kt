@@ -6,7 +6,11 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import uz.bonvi.call.capture.CaptureCapabilityChecker
 import uz.bonvi.call.capture.PermissionCaptureCapabilityChecker
+import uz.bonvi.call.capture.SubscriptionPrivacyBoundary
 import uz.bonvi.call.data.repository.RoomCallSessionStore
+import uz.bonvi.call.data.repository.RoomPendingCallStore
+import uz.bonvi.call.domain.PrivacyBoundary
+import uz.bonvi.call.service.PendingCallStore
 import uz.bonvi.call.service.CallSessionStore
 import javax.inject.Singleton
 
@@ -31,4 +35,14 @@ abstract class CaptureBindingsModule {
     @Binds
     @Singleton
     abstract fun callSessionStore(impl: RoomCallSessionStore): CallSessionStore
+
+    @Binds
+    @Singleton
+    abstract fun pendingCallStore(impl: RoomPendingCallStore): PendingCallStore
+
+    /** Guard 1's one implementation. Bound here so nothing can construct a
+     *  second boundary with different rules (CONVENTIONS.md §8). */
+    @Binds
+    @Singleton
+    abstract fun privacyBoundary(impl: SubscriptionPrivacyBoundary): PrivacyBoundary
 }

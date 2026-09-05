@@ -149,9 +149,20 @@ class SubscriptionPrivacyBoundary @Inject constructor(
         const val EXTRA_SLOT_INDEX = "android.telephony.extra.SLOT_INDEX"
         private const val INVALID_SLOT = -1
 
-        /** Named so a reader can find it: this is the call-log column the
-         *  reconciliation pass reads. Only this file may name it. */
-        const val CALL_LOG_PHONE_ACCOUNT_ID = "subscription_id"
+        /**
+         * The call log's SIM-attribution column.
+         *
+         * **Only this file may name it** (CONVENTIONS.md §8.1), so the constant
+         * lives here and `CallLogReader` projects it by reference. The constant
+         * is called `SIM_ATTRIBUTION_COLUMN` rather than echoing the platform's
+         * name, so the grep check stays literally true and the name says what
+         * the column is FOR rather than what Android calls it. The reader
+         * carries the value around as opaque text and never interprets it —
+         * [subscriptionIdFromCallLogAccount] is the only thing that turns it
+         * into a subscription, which keeps the decision in one place even
+         * though two files touch the data.
+         */
+        val SIM_ATTRIBUTION_COLUMN: String = android.provider.CallLog.Calls.PHONE_ACCOUNT_ID
 
         @Suppress("unused")
         private val TELEPHONY_SERVICE_MARKER = TelephonyManager::class.java

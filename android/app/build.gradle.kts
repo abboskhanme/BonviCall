@@ -81,6 +81,14 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+
+            // android.jar's stubs throw "not mocked" by default. The classes
+            // that matter here are pure — Clock's MONOTONIC reading is the only
+            // Android call in the detector path — and returning 0 from it is
+            // exactly what a test wants: durations become deterministic instead
+            // of depending on wall-clock luck. Anything that genuinely needs
+            // Android behaviour belongs in an instrumented test.
+            isReturnDefaultValues = true
             all {
                 // ArchitectureRulesTest and the manifest tests read source files
                 // relative to the repository, so they need to know where it is

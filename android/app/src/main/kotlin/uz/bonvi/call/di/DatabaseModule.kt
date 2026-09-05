@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import uz.bonvi.call.data.local.BonviCallDatabase
 import uz.bonvi.call.data.local.CallSessionDao
+import uz.bonvi.call.data.local.PendingCallDao
 import uz.bonvi.call.data.local.QueuedCallDao
 import javax.inject.Singleton
 
@@ -30,4 +31,7 @@ object DatabaseModule {
 
     @Provides
     fun callSessionDao(database: BonviCallDatabase): CallSessionDao = database.callSessionDao()
+
+    @Provides
+    fun pendingCallDao(database: BonviCallDatabase): PendingCallDao = database.pendingCallDao()
 }

@@ -16,7 +16,12 @@ import uz.bonvi.call.domain.CallState
  * migration in `di/DatabaseModule.kt`.
  */
 @Database(
-    entities = [QueuedCallEntity::class, CallSessionEntity::class],
+    entities = [
+        QueuedCallEntity::class,
+        CallSessionEntity::class,
+        PendingCallEntity::class,
+        DiscardCounterEntity::class,
+    ],
     version = BonviCallDatabase.VERSION,
     exportSchema = true,
 )
@@ -26,6 +31,8 @@ abstract class BonviCallDatabase : RoomDatabase() {
     abstract fun queuedCallDao(): QueuedCallDao
 
     abstract fun callSessionDao(): CallSessionDao
+
+    abstract fun pendingCallDao(): PendingCallDao
 
     companion object {
         const val VERSION: Int = 1

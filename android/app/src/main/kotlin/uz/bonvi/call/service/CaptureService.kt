@@ -16,7 +16,13 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import uz.bonvi.call.R
 import uz.bonvi.call.core.Capabilities
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.os.SystemClock
 import uz.bonvi.call.data.repository.CallQueueRepository
+import uz.bonvi.call.service.work.CallUploadWorker
+import uz.bonvi.call.service.work.ReconcileWorker
+import uz.bonvi.call.service.work.WatchdogWorker
 import uz.bonvi.call.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import javax.inject.Inject
@@ -41,6 +47,8 @@ class CaptureService : Service() {
 
     @Inject @IoDispatcher lateinit var io: CoroutineDispatcher
 
+    @Inject lateinit var callStateSource: TelephonyCallbackSource
+
     /** Tied to the service, not to a call. Cancelled in onDestroy, which is why
      *  it is a scope and not GlobalScope (CONVENTIONS-CLIENT.md §8). */
     private val scope by lazy { CoroutineScope(SupervisorJob() + io) }
@@ -53,6 +61,25 @@ class CaptureService : Service() {
         startInForeground()
         isRunning = true
         Timber.i("CaptureService started, variant=%s sdk=%d", BUILD_VARIANT, Capabilities.sdkInt)
+
+        // The LIVE call-state source. The manifest receiver covers the cold
+        // case where this process is not running; both are needed, because a
+        // phone that has not been opened since a reboot still takes calls.
+        callStateSource.register(scope)
+
+        // Four survival mechanisms, and the fleet needs all four (UC-05):
+        // START_STICKY, BOOT_COMPLETED, onTaskRemoved below, and this watchdog
+        // for "the OS stopped it and told nobody".
+        WatchdogWorker.schedule(this)
+        CallUploadWorker.schedulePeriodic(this)
+        ReconcileWorker.schedulePeriodic(this)
+
+        // A start is also a recovery point: calls made while this service was
+        // dead exist only in the OS call log until the sweep finds them
+        // (UC-13). Running it on every start is what makes an overnight kill
+        // cost minutes rather than a night of calls.
+        ReconcileWorker.enqueueAfterCall(this)
+
         resumeInFlightCalls()
     }
 
@@ -80,6 +107,7 @@ class CaptureService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        callStateSource.unregister()
         scope.cancel()
         super.onDestroy()
     }
@@ -91,10 +119,32 @@ class CaptureService : Service() {
         return START_STICKY
     }
 
+    /**
+     * The user swiped the app out of recents.
+     *
+     * The service must survive it: the employee is not opting out of call
+     * capture by tidying their recents, and on several OEMs a swipe kills the
+     * whole process including a foreground service. An `AlarmManager` one-shot
+     * a second out is the only mechanism that runs after the process is gone.
+     *
+     * `setExactAndAllowWhileIdle` because doze would otherwise defer it to the
+     * next maintenance window, which can be hours — and the calls made in those
+     * hours are the ones this exists to keep.
+     */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // The user swiped the app away. The service must survive it — the
-        // employee is not opting out of call capture by tidying their recents.
-        // T26 schedules the AlarmManager restart here.
+        val restart = PendingIntent.getService(
+            this,
+            RESTART_REQUEST,
+            Intent(this, CaptureService::class.java),
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val alarms = getSystemService(AlarmManager::class.java)
+        alarms?.setExactAndAllowWhileIdle(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            SystemClock.elapsedRealtime() + RESTART_DELAY_MS,
+            restart,
+        )
+        Timber.i("Task removed; capture service will restart in %d ms", RESTART_DELAY_MS)
         super.onTaskRemoved(rootIntent)
     }
 
@@ -144,6 +194,11 @@ class CaptureService : Service() {
 
         private const val CHANNEL_ID = "bonvicall.capture"
         private const val NOTIFICATION_ID = 1001
+        private const val RESTART_REQUEST = 2001
+
+        /** Long enough for the process to finish dying, short enough that a
+         *  call placed straight after a swipe is still captured. */
+        private const val RESTART_DELAY_MS = 1_000L
 
         /** Sent on every request and stored on every call and heartbeat, so
          *  per-variant capture rate is a query (SPEC §7.2). */
