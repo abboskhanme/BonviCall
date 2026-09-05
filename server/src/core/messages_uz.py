@@ -131,21 +131,149 @@ MESSAGES: dict[str, str] = {
 #: has to be composed somewhere — it is composed here, because this is the one
 #: ``.py`` allowed to contain Uzbek (§14). A service names the kind; it never
 #: writes the sentence.
+#: ``(title_uz, body_uz)`` for every ``AlertKind``. **All 27, no fallback in
+#: practice** — ``test_every_alert_kind_has_uzbek_text`` fails on a new kind
+#: with no entry.
+#:
+#: Two rules the wording follows, and they are the point of the table:
+#:
+#: 1. **The title says what happened, the body says what to do.** "Qurilma
+#:    aloqada emas" is a noun; an admin reading it at 19:00 needs "telefon
+#:    o'chirilgan yoki internetsiz bo'lishi mumkin — xodim bilan bog'laning".
+#:    A body identical for 27 kinds is a shrug with a timestamp.
+#: 2. **It is the same text the panel shows.** The panel derived its own
+#:    wording from ``kind`` while these fields read "Device offline" and the
+#:    generic error body, so it had to. Now the server carries it and the
+#:    device API, e-mail and any future notification path get the same
+#:    sentence — one place, which is the rule everywhere else in this file.
+#: Used only if a kind has no entry, which the test says cannot happen.
+UNKNOWN_ALERT_TITLE = "Tekshirilishi kerak bo'lgan hodisa"
+
 ALERT_TEXT: dict[str, tuple[str, str]] = {
+    "capture_disabled": (
+        "Yozib olish o'chirilgan",
+        "Xodim ilovada yozib olishni o'chirgan. Uning telefonini oching va qaytadan yoqing.",
+    ),
+    "permission_lost_microphone": (
+        "Mikrofon ruxsati yo'qolgan",
+        "Mikrofon ruxsati olib qo'yilgan. Xodimdan ilova sozlamalarida ruxsatni "
+        "qaytarishni so'rang.",
+    ),
+    "permission_lost_phone_state": (
+        "Qo'ng'iroq holati ruxsati yo'qolgan",
+        "Qo'ng'iroq holati ruxsati olib qo'yilgan — ilova endi qo'ng'iroqni "
+        "sezmaydi. Ruxsatni qaytaring.",
+    ),
+    "permission_lost_call_log": (
+        "Qo'ng'iroqlar jurnali ruxsati yo'qolgan",
+        "Jurnal ruxsati olib qo'yilgan — qo'ng'iroq davomiyligi aniqlanmaydi. "
+        "Ruxsatni qaytaring.",
+    ),
+    "battery_optimisation_reenabled": (
+        "Batareya cheklovi qayta yoqilgan",
+        "Telefon batareyani tejash uchun ilovani to'xtatmoqda. Sozlamalardan "
+        "ilovani cheklovdan chiqaring — bu eng ko'p uchraydigan sabab.",
+    ),
+    "app_force_stopped": (
+        "Ilova majburan to'xtatilgan",
+        "Ilova qo'lda to'xtatilgan va o'zi qayta ishga tushmaydi. Xodimdan "
+        "ilovani ochishni so'rang.",
+    ),
+    "install_disappeared": (
+        "Ilova telefondan yo'qolgan",
+        "Ilova o'chirilgan yoki telefon almashtirilgan. Xodimga yangi kod "
+        "berib, qaytadan o'rnating.",
+    ),
+    "recording_route_lost": (
+        "Yozib olish usuli ishlamay qoldi",
+        "Bu telefonda yozib olish yo'li ishlamay qoldi. Qurilma kartasidagi "
+        "ruxsatlar jadvalini tekshiring.",
+    ),
+    "service_not_running": (
+        "Fondagi xizmat ishlamayapti",
+        "Fondagi xizmat to'xtagan. Telefonni qayta ishga tushiring va ilovani oching.",
+    ),
+    "device_offline": (
+        "Qurilma aloqada emas",
+        "Telefon uzoq vaqt aloqaga chiqmadi. O'chirilgan yoki internetsiz "
+        "bo'lishi mumkin — xodim bilan bog'laning.",
+    ),
+    "device_silent": (
+        "Qurilmadan qo'ng'iroq kelmayapti",
+        "Telefon aloqada, lekin ish vaqtida qo'ng'iroq yubormayapti. Xodim "
+        "boshqa telefondan qo'ng'iroq qilayotgan bo'lishi mumkin.",
+    ),
+    "fleet_silent": (
+        "Butun park jim qoldi",
+        "Hech bir qurilmadan ma'lumot kelmayapti. Bu server yoki tarmoq "
+        "muammosi — administratorga darhol xabar bering.",
+    ),
+    "capture_rate_regression": (
+        "Yozib olish darajasi pasaydi",
+        "Bu model uchun yozib olish darajasi belgilangan darajadan pastga "
+        "tushdi. Yozuvsiz qo'ng'iroqlar hisobotini oching.",
+    ),
+    "queue_full": (
+        "Telefondagi navbat to'lgan",
+        "Telefondagi navbat bo'shamayapti. Qurilmani Wi-Fi ga ulang va ilovani oching.",
+    ),
+    "storage_low": (
+        "Telefonda joy qolmadi",
+        "Telefon xotirasi to'lgani uchun yangi yozuvlar saqlanmayapti. Xodimdan "
+        "joy bo'shatishni so'rang.",
+    ),
+    "poisoned_record": (
+        "Yuborib bo'lmaydigan yozuv",
+        "Bitta yozuvni yuborib bo'lmadi va u to'xtatildi. Yozuv o'chirilmaydi — "
+        "administrator tekshirishi kerak.",
+    ),
+    "auth_expired": (
+        "Qurilma sessiyasi tugagan",
+        "Qurilma sessiyasi tugagan va yangilana olmadi. Xodimdan ilovani ochishni so'rang.",
+    ),
     "credential_replay": (
-        "Qo'ng'iroq boshqa qurilmada qayd etilgan",
-        "Bir xil qo'ng'iroq ikki xil raqamdan yuborildi. Qurilma ma'lumotlari "
-        "tekshirilishi kerak.",
+        "Token qayta ishlatilgan",
+        "Bir token ikki marta ishlatildi. Bu jiddiy — qurilmani ro'yxatdan "
+        "chiqarib, qaytadan ulang.",
+    ),
+    "installation_rebound": (
+        "Raqam boshqa telefonga ulandi",
+        "Ish raqami boshqa telefonga ulandi. Bu rejalashtirilgan bo'lmasa, darhol tekshiring.",
+    ),
+    "callback_receiver_down": (
+        "Tasdiqlash xizmati ishlamayapti",
+        "Tasdiqlash xizmati javob bermayapti — hozir hech kimni ro'yxatga olib "
+        "bo'lmaydi. Administratorga xabar bering.",
+    ),
+    "enrolment_stalled": (
+        "Ro'yxatga olish to'xtab qoldi",
+        "Xodim ro'yxatga olishni boshlagan, lekin tugatmagan. Xodim kartasini "
+        "oching va qaysi bosqichda to'xtaganini ko'ring.",
     ),
     "attribution_out_of_range": (
         "Qo'ng'iroq biriktirish muddatidan tashqarida",
-        "Qo'ng'iroq vaqti hech qaysi raqam biriktiruviga to'g'ri kelmadi. "
-        "Biriktirish tarixini tekshiring.",
+        "Qo'ng'iroq raqam biriktirilmagan davrda qilingan. Biriktirish sanalarini tekshiring.",
     ),
-    "installation_rebound": (
-        "Raqam boshqa telefonga ko'chirildi",
-        "Ish raqami yangi qurilmaga bog'landi. Agar bu kutilmagan bo'lsa, xodim "
-        "bilan bog'laning.",
+    "attribution_discarded_spike": (
+        "Ko'p qo'ng'iroq biriktirilmadi",
+        "Ko'p qo'ng'iroq hech kimga biriktirilmadi. Raqam biriktiruvlari "
+        "to'g'ri kiritilganini tekshiring.",
+    ),
+    "retention_job_failed": (
+        "Saqlash muddati vazifasi bajarilmadi",
+        "Eski yozuvlarni o'chirish vazifasi bajarilmadi. Server jurnalini tekshirish kerak.",
+    ),
+    "backup_failed": (
+        "Zaxira nusxa olinmadi",
+        "Zaxira nusxa olinmadi. Administrator serverni tekshirishi kerak.",
+    ),
+    "storage_capacity_low": (
+        "Serverda joy kamaymoqda",
+        "Serverda joy tugab qolmoqda. Saqlash muddatini yoki disk hajmini ko'rib chiqing.",
+    ),
+    "min_version_refusals": (
+        "Eski ilova versiyalari rad etilmoqda",
+        "Eski ilovali telefonlar rad etilmoqda. Ularga yangi versiyani o'rnating.",
     ),
 }
 
@@ -208,8 +336,15 @@ def message_for(code: str) -> str:
 
 
 def alert_text(kind: str) -> tuple[str, str]:
-    """``(title_uz, body_uz)`` for an alert kind, or a safe generic pair."""
-    return ALERT_TEXT.get(kind, (kind.replace("_", " ").capitalize(), DEFAULT_MESSAGE))
+    """``(title_uz, body_uz)`` for an alert kind.
+
+    The fallback should be unreachable — a test covers every ``AlertKind`` —
+    and it is **Uzbek** rather than the enum name, because the old fallback
+    rendered ``device_offline`` as the English "Device offline" into a field an
+    end user reads (§14). If a kind ever slips through, a vague Uzbek sentence
+    is a smaller failure than an English one.
+    """
+    return ALERT_TEXT.get(kind, (UNKNOWN_ALERT_TITLE, DEFAULT_MESSAGE))
 
 
 __all__ = [
@@ -218,6 +353,7 @@ __all__ = [
     "DEVICE_PROTOCOL_CODES",
     "INSTALL_PAGE",
     "MESSAGES",
+    "UNKNOWN_ALERT_TITLE",
     "alert_text",
     "message_for",
 ]

@@ -227,6 +227,7 @@
                 "type": "null"
               }
             ],
+            "description": "What to do about it. Derived from `kind`, not stored.",
             "title": "Body Uz"
           },
           "detail": {
@@ -314,6 +315,7 @@
             "$ref": "#/components/schemas/AlertSeverity"
           },
           "title_uz": {
+            "description": "What happened, in Uzbek. Derived from `kind`, not stored.",
             "title": "Title Uz",
             "type": "string"
           }

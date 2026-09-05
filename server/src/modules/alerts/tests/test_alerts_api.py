@@ -147,3 +147,90 @@ async def test_reading_alerts_needs_a_permission(sales, service_token, client) -
     assert (await client.get("/api/v1/alerts")).status_code == 401
     assert (await sales.get("/api/v1/alerts")).status_code == 403
     assert (await service_token.get("/api/v1/alerts")).status_code == 403
+
+
+def test_every_alert_kind_has_uzbek_text() -> None:
+    """§14: every string an end user reads is Uzbek, including the new kinds.
+
+    ``alert_text`` used to fall back to ``kind.replace("_", " ").capitalize()``,
+    which put the English "Device offline" into ``title_uz`` — a field whose
+    name promises otherwise — and the generic error body into ``body_uz`` for
+    all 27 kinds. The panel had to route around both.
+    """
+    from src.core.enums import AlertKind
+    from src.core.messages_uz import ALERT_TEXT, DEFAULT_MESSAGE, UNKNOWN_ALERT_TITLE
+
+    missing = sorted(kind.value for kind in AlertKind if kind.value not in ALERT_TEXT)
+    assert missing == [], (
+        f"no Uzbek text for: {missing}. Add it to ALERT_TEXT in "
+        "core/messages_uz.py — the fallback is deliberately vague and a new "
+        "alert nobody can act on is an alert nobody acts on."
+    )
+
+    generic = sorted(
+        kind
+        for kind, (title, body) in ALERT_TEXT.items()
+        if body == DEFAULT_MESSAGE or title == UNKNOWN_ALERT_TITLE
+    )
+    assert generic == [], f"these say nothing about what happened: {generic}"
+
+
+def test_no_alert_text_is_english() -> None:
+    """A cheap check that catches the failure that actually happened.
+
+    Not a language detector: it looks for the words that were literally there,
+    plus the give-away that a title is just the enum name with the underscores
+    taken out.
+    """
+    from src.core.enums import AlertKind
+    from src.core.messages_uz import ALERT_TEXT
+
+    offenders = [
+        kind
+        for kind in AlertKind
+        if ALERT_TEXT[kind.value][0].lower() == kind.value.replace("_", " ")
+    ]
+    assert offenders == [], (
+        f"the title is the enum name in English: {offenders}"
+    )
+
+
+def test_the_alert_body_says_something_different_per_kind() -> None:
+    """27 identical bodies is a shrug with a timestamp."""
+    from src.core.messages_uz import ALERT_TEXT
+
+    bodies = [body for _, body in ALERT_TEXT.values()]
+    assert len(set(bodies)) == len(bodies), "two alert kinds share a body"
+
+
+async def test_the_api_serves_current_wording_not_the_stored_copy(
+    db, admin, installation_factory
+) -> None:
+    """An alert open since before a wording fix still reads correctly.
+
+    The stored copy is the record of what the alert said when it was raised.
+    Serving it is why every alert on the running server still read the English
+    "Device offline" after the text had been written in Uzbek.
+    """
+    from src.core.enums import AlertKind, AlertSeverity
+    from src.core.messages_uz import alert_text
+    from src.modules.alerts.service import AlertService
+
+    installation = await installation_factory()
+    alert = await AlertService(db).raise_alert(
+        kind=AlertKind.DEVICE_OFFLINE,
+        severity=AlertSeverity.WARNING,
+        scope=installation.id,
+        installation_id=installation.id,
+    )
+    # Whatever shipped when it was raised — here, the old English title.
+    alert.title_uz = "Device offline"
+    alert.body_uz = "Xatolik yuz berdi. Administratorga murojaat qiling."
+    await db.flush()
+
+    body = (await admin.get("/api/v1/alerts")).json()
+    served = next(item for item in body["items"] if item["id"] == str(alert.id))
+    expected_title, expected_body = alert_text("device_offline")
+    assert served["title_uz"] == expected_title
+    assert served["body_uz"] == expected_body
+    assert served["title_uz"] != "Device offline"

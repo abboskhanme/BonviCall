@@ -76,6 +76,74 @@ EXPIRED_CALL_AGE_DAYS = 400
 #: the panel would look broken instead of informative.
 MISMATCHED_CLIP_MS = 4_000
 
+# Every capability the app exercises at enrolment, in the state a healthy
+# handset reports. `detail` is what the *check saw* — the app never reads a
+# permission flag, it exercises the capability, which is what makes
+# `granted_not_working` expressible at all (UC-03).
+HEALTHY_CAPABILITIES: dict[str, tuple[str, str | None]] = {
+    "phone_state": ("granted_working", "SIM 1 resolved, subscription id 1"),
+    "call_log": ("granted_working", "read 20 entries in 40 ms"),
+    "microphone": ("granted_working", "1s test capture, 32 kB"),
+    # The permission is never requested: §8.1 promises in writing that the
+    # contact book is never uploaded. Reported so the panel can show the
+    # promise being kept rather than merely stated.
+    "contacts": ("not_applicable", "never requested"),
+    "notifications": ("granted_working", "foreground notification visible"),
+    "call_phone": ("granted_working", "required for click-to-call"),
+    "battery_exemption": ("granted_working", "exempt from optimisation"),
+    "storage_access": ("granted_working", "recordings folder readable"),
+    "oem_autostart": ("not_applicable", "no autostart manager on this OEM"),
+    "foreground_service": ("granted_working", "service alive 4h12m"),
+    "oem_recorder": ("granted_working", "call recording enabled in Phone app"),
+    "subscription_resolution": ("granted_working", "PHONE_ACCOUNT_ID matched SIM 1"),
+}
+
+# What each handset actually reports, on top of the healthy baseline. The fleet
+# already mixes capture routes; the capability matrix has to mix too, or the
+# device page shows twelve green rows and the drift alert has no example.
+CAPABILITY_OVERRIDES: dict[str, dict[str, tuple[str, str | None]]] = {
+    # The Samsungs harvest the handset's own recorder and are fully healthy.
+    "SM-A546E": {},
+    "SM-A245F": {},
+    # MIUI has an autostart manager, and this one was granted.
+    "Redmi Note 12": {
+        "oem_autostart": ("granted_working", "MIUI autostart allowed"),
+        # `not_applicable`, not `denied`: this ROM has no call recorder to deny.
+        # `denied` would be a transition into a broken state and would raise
+        # `recording_route_lost` — "the recording method stopped working" — on a
+        # phone that never had that method and is capturing perfectly well via
+        # app_voice_recognition. Same reasoning as `contacts` above.
+        "oem_recorder": ("not_applicable", "no call recorder in this ROM"),
+    },
+    "Redmi 10C": {
+        "oem_autostart": ("granted_working", "MIUI autostart allowed"),
+        "oem_recorder": ("granted_working", "call recording enabled in Phone app"),
+    },
+    "V2111": {
+        "oem_autostart": ("granted_working", "iManager autostart allowed"),
+        "oem_recorder": ("not_applicable", "no call recorder in this ROM"),
+    },
+}
+
+# ...and then the OEM took something away. Posted as a *second* report so the
+# server sees a transition and raises the drift alert (UC-06, UC-18) — which is
+# the whole reason capability_states is a time series and not a snapshot. A
+# demo where every capability has only ever been green cannot show the one
+# screen this subsystem exists for.
+CAPABILITY_DRIFT: dict[str, dict[str, tuple[str, str | None]]] = {
+    "Redmi 10C": {
+        # The reason its calls carry `oem_recorder_off`.
+        "oem_recorder": ("denied", "call recording switched off in Phone app"),
+        "battery_exemption": ("denied", "MIUI battery saver re-enabled"),
+    },
+    "V2111": {
+        # The reason its calls carry `no_permission`. Permanently denied means
+        # the OS will not ask again — the agent has to go into Settings.
+        "microphone": ("denied_permanently", "SecurityException on test capture"),
+        "call_log": ("denied", "permission revoked by the permission manager"),
+    },
+}
+
 CONTACTS = [
     ("Oybek aka", "+998901234567"),
     ("Nodira opa", "+998977654321"),
@@ -196,6 +264,38 @@ def make_call(
         call["capture_route"] = "none"
         call["audio_missing_reason"] = "not_expected"
     return call
+
+
+def capability_report(model: str, drift: bool = False) -> list[dict]:
+    """What one handset reports, as the app reports it (SPEC §4.3).
+
+    ``drift=True`` returns only what *changed*, because that is what the phone
+    sends: a re-check posts the capabilities it re-exercised, and the server
+    turns a changed state into a transition and an alert.
+    """
+    if drift:
+        changed = CAPABILITY_DRIFT.get(model, {})
+        return [
+            {
+                "capability": name,
+                "state": state,
+                "checked_at": iso(datetime.now(UTC)),
+                "detail": detail,
+            }
+            for name, (state, detail) in changed.items()
+        ]
+
+    states = dict(HEALTHY_CAPABILITIES)
+    states.update(CAPABILITY_OVERRIDES.get(model, {}))
+    return [
+        {
+            "capability": name,
+            "state": state,
+            "checked_at": iso(datetime.now(UTC) - timedelta(hours=6)),
+            "detail": detail,
+        }
+        for name, (state, detail) in states.items()
+    ]
 
 
 def upload_audio(api: Api, device, call: dict, clip_ms: int) -> int:
@@ -355,6 +455,34 @@ def main() -> int:
             }
             installations.append((agent, number, device_token, device_headers, model, variant))
             print(f"    {model:16} {variant:9} tasdiqlandi")
+
+        print("\n  qurilma imkoniyatlari tekshirilmoqda…")
+        drifted = 0
+        for _agent, _number, device_token, device_headers, model, _variant in installations:
+            api.post(
+                "/api/device/v1/capabilities",
+                json={"capabilities": capability_report(model)},
+                token=device_token,
+                headers=device_headers,
+            )
+            # A second report, some hours later, for the handsets the OEM broke.
+            # Two reports rather than one denied state: the alert is raised on
+            # the *transition*, so a phone that was never healthy raises nothing
+            # and the demo would show the failure without the story.
+            changes = capability_report(model, drift=True)
+            if changes:
+                result = api.post(
+                    "/api/device/v1/capabilities",
+                    json={"capabilities": changes},
+                    token=device_token,
+                    headers=device_headers,
+                )
+                drifted += result["alerts_raised"]
+                lost = ", ".join(c["capability"] for c in changes)
+                print(f"    {model:16} ✗ {lost}")
+            else:
+                print(f"    {model:16} ✓ hammasi ishlayapti")
+        print(f"    {drifted} ta ruxsat yo'qolishi signali")
 
         print("\n  qo'ng'iroqlar yuborilmoqda…")
         total = 0
