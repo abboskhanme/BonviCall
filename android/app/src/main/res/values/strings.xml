@@ -125,7 +125,12 @@
 
     <!-- E6. Reached only when everything works AND the number is proven. -->
     <string name="enrol_done_ready">Hammasi tayyor. Ish qo\'ng\'iroqlaringiz qayd etilmoqda.</string>
-    <string name="enrol_done_blocked">Hali tayyor emas: %1$s</string>
+    <!-- E6 in the BLOCKED state. The install is real and the panel can see it;
+         what is missing is named in Uzbek, never as a wire identifier. -->
+    <string name="enrol_done_blocked">Ilova o\'rnatildi, lekin qo\'ng\'iroqlar hali qayd etilmaydi.</string>
+    <string name="enrol_done_blocked_what">Yetishmayapti: %1$s</string>
+    <string name="enrol_done_blocked_next">Administrator buni ko\'rib turibdi va siz bilan bog\'lanadi. Sozlamalardan ruxsat bersangiz, ilova o\'zi ishlab ketadi.</string>
+    <string name="enrol_done_audio_only">Qo\'ng\'iroqlar qayd etilmoqda, lekin suhbat ovozi yozilmaydi.</string>
     <string name="enrol_done_attested">Raqamni administrator tasdiqlagan.</string>
     <string name="enrol_done_diagnostics">Ilova holatini ko\'rish</string>
     <string name="enrol_not_finished">Ro\'yxatdan o\'tish tugamagan — qo\'ng\'iroqlar hali yuborilmaydi.</string>
@@ -192,6 +197,18 @@
     <string name="reason_upload_expired">Yuborish muddati o\'tib ketdi</string>
     <string name="reason_queue_space_exhausted">Telefon xotirasi to\'lgan edi</string>
     <string name="reason_attribution_failed">Yozuv bu qo\'ng\'iroqqa mos kelmadi</string>
+
+
+    <!-- ══ E2: continuing without a capability (UC-14) ══════════════════════
+         A phone whose microphone the OEM blocks is a WORKING installation that
+         logs calls without audio. Refusing to enrol it turns a
+         degraded-but-useful install into no install at all. So every step can
+         be passed — and what changes is what the person is told they give up.
+         Never a hidden escape hatch. -->
+    <string name="perm_continue_without">Bu ruxsatsiz davom etish</string>
+    <string name="perm_cost_audio">Davom etsangiz: qo\'ng\'iroqlar baribir qayd etiladi — kim bilan, qachon, qancha vaqt. Faqat suhbat ovozi yozilmaydi.</string>
+    <string name="perm_cost_blocked">Davom etsangiz: qo\'ng\'iroqlar qayd etilmaydi. Ilova o\'rnatiladi va administrator nima yetishmayotganini ko\'radi — keyinroq tuzatish mumkin.</string>
+    <string name="perm_cost_none">Bu qadam majburiy emas.</string>
 
     <string name="common_not_ready">Bu ekran hali tayyor emas.</string>
 </resources>

@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import uz.bonvi.call.R
+import uz.bonvi.call.domain.CaptureReadiness
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 
 /**
@@ -42,16 +43,41 @@ fun EnrolDoneScreen(viewModel: EnrolmentViewModel, onOpenDiagnostics: () -> Unit
                 text = stringResource(R.string.enrol_done_ready),
                 style = MaterialTheme.typography.titleMedium,
             )
-        } else {
+            // A phone that captures but cannot record is CAPTURING, not
+            // blocked — and saying so stops somebody chasing a fault that is
+            // not there (UC-14).
+            if (!state.audioAvailable) {
+                Text(stringResource(R.string.enrol_done_audio_only))
+            }
+        } else if (state.readiness.state == CaptureReadiness.CaptureState.NOT_VERIFIED ||
+            state.readiness.state == CaptureReadiness.CaptureState.NOT_ENROLLED
+        ) {
+            // A DIFFERENT problem from a missing capability, and it needs its
+            // own sentence: the number is not proven, so the server accepts
+            // nothing at all — the provisional token gets the phone through
+            // verification and no further. Telling somebody to check their
+            // permissions here would send them to the wrong screen.
             Text(
-                text = stringResource(
-                    R.string.enrol_done_blocked,
-                    state.readiness.blocking.joinToString { it.wire },
-                ),
+                text = stringResource(R.string.enrol_not_finished),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(stringResource(R.string.enrol_not_finished))
+        } else {
+            // The install is REAL: the panel can see this handset and knows
+            // exactly what is missing. That is the funnel doing its job, and it
+            // is why E2 let them get here.
+            Text(
+                text = stringResource(R.string.enrol_done_blocked),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            // Uzbek names, never the wire identifiers — `phone_state` on a
+            // salesperson's screen is an English leak (§14) and tells them
+            // nothing. Resolved outside the joinToString because
+            // stringResource is @Composable and cannot be called in a lambda.
+            val missing = state.readiness.blocking.map { stringResource(it.titleRes()) }
+            Text(stringResource(R.string.enrol_done_blocked_what, missing.joinToString()))
+            Text(stringResource(R.string.enrol_done_blocked_next))
         }
 
         if (state.isAttestedRatherThanProven) {

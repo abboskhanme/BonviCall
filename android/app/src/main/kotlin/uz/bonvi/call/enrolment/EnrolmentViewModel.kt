@@ -88,6 +88,18 @@ class EnrolmentViewModel @Inject constructor(
 
         val isFullyEnrolled: Boolean get() = readiness.isCapturing
 
+        /**
+         * Can this handset record audio at all?
+         *
+         * A phone with no working microphone and no reachable OEM recorder is
+         * `CAPTURING` — it logs every call with `recording_route_unavailable`,
+         * which the gap report counts and the panel renders. Saying so at E6
+         * stops somebody chasing a fault that is not there (UC-14).
+         */
+        val audioAvailable: Boolean
+            get() = capabilities[Capability.MICROPHONE]?.isWorking == true ||
+                capabilities[Capability.OEM_RECORDER]?.isWorking == true
+
         /** SPEC §9.3: attested is weaker evidence than proven and is rendered
          *  differently everywhere, so the identity anchor cannot silently
          *  degrade. */
@@ -212,17 +224,41 @@ class EnrolmentViewModel @Inject constructor(
             // Immediately, so the panel shows where the agent is stuck within
             // two minutes (UC-03 AC).
             repository.reportCapabilities(listOf(result))
-            if (result.isWorking || capability in CaptureReadiness.OPTIONAL) advancePermission()
+            // Advance on success only. A failure does NOT strand the agent —
+            // the screen offers `onContinueWithout` with the consequence named
+            // (UC-14: a phone that logs calls without audio is a supported
+            // state, and refusing to enrol it is strictly worse).
+            if (result.isWorking) advancePermission()
         }
     }
 
-    fun skipOptional(capability: Capability) {
+    /**
+     * Continue past a capability that will not work.
+     *
+     * **Not a hidden escape hatch**: the screen has already named what it costs
+     * (`CapabilityConsequence`), and the state is reported either way — so the
+     * panel knows exactly which capability is missing on which phone. An
+     * enrolled handset reporting `BLOCKED` is visible to an admin; an
+     * unenrolled one is not, which is why this exists at all.
+     *
+     * The last CHECKED result is kept rather than overwritten: `denied` and
+     * `granted_not_working` are different problems and the funnel needs to know
+     * which. Only a capability never checked is recorded as skipped.
+     */
+    fun onContinueWithout(capability: Capability) {
         viewModelScope.launch {
-            val skipped = CapabilityResult(capability, CapabilityState.NOT_APPLICABLE, "skipped by the agent")
-            _state.value = _state.value.copy(
-                capabilities = _state.value.capabilities + (capability to skipped),
-            )
-            repository.reportCapabilities(listOf(skipped))
+            val existing = _state.value.capabilities[capability]
+            if (existing == null) {
+                val skipped = CapabilityResult(
+                    capability,
+                    CapabilityState.NOT_APPLICABLE,
+                    "skipped by the agent",
+                )
+                _state.value = _state.value.copy(
+                    capabilities = _state.value.capabilities + (capability to skipped),
+                )
+                repository.reportCapabilities(listOf(skipped))
+            }
             advancePermission()
         }
     }

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.api.device.deps import ActiveInstallationDep
+from src.api.device.deps import ActiveInstallationDep, SelfReportingInstallationDep
 from src.core import clock
 from src.core.deps import SessionDep
 from src.modules.devices.schemas import (
@@ -56,7 +56,7 @@ async def heartbeat(
 @router.post("/capabilities", response_model=DeviceCapabilityBatchOut)
 async def report_capabilities(
     payload: DeviceCapabilityBatchIn,
-    installation: ActiveInstallationDep,
+    installation: SelfReportingInstallationDep,
     session: SessionDep,
 ) -> DeviceCapabilityBatchOut:
     """Capability drift (UC-06, UC-18, R3).
@@ -102,7 +102,7 @@ async def report_call_log_delta(
 @router.post("/events", response_model=DeviceEventBatchOut)
 async def report_events(
     payload: DeviceEventBatchIn,
-    installation: ActiveInstallationDep,
+    installation: SelfReportingInstallationDep,
     session: SessionDep,
 ) -> DeviceEventBatchOut:
     """Device events that are not calls (SPEC §4.4).

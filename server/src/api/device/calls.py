@@ -104,14 +104,14 @@ async def my_calls(
     No search, no filters, no notes. Every field here is also a field a lost
     handset carries.
     """
-    items, next_cursor, has_more = await DeviceCallReadService(session).list(
+    items, next_cursor, has_more, total = await DeviceCallReadService(session).list(
         installation,
         clamp_limit(limit, maximum=MAX_DEVICE_PAGE),
         Cursor.decode(cursor) if cursor else None,
         since,
     )
     return DeviceCallListOut(
-        items=items, next_cursor=next_cursor, has_more=has_more
+        items=items, next_cursor=next_cursor, has_more=has_more, total=total
     )
 
 

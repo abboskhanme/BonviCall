@@ -636,3 +636,144 @@ async def test_a_phone_that_never_reported_still_raises_device_offline(
     )
     assert alert.installation_id == silent.id
     assert alert.detail["never_reported"] is True
+
+
+# --- what an unverified phone may report about itself (R17, UC-06) ---------
+
+
+async def _pending(installation_factory, device_client_factory):
+    """A phone mid-enrolment: redeemed, not yet verified — the E2 state."""
+    from src.core.enums import InstallationStatus
+
+    installation = await installation_factory()
+    client = await device_client_factory(installation)
+    installation.status = InstallationStatus.PENDING
+    return installation, client
+
+
+async def test_a_phone_reports_permissions_before_it_is_verified(
+    db, installation_factory, device_client_factory
+) -> None:
+    """R17's whole purpose.
+
+    Capabilities are posted during E2, one per permission as each check
+    completes, which is **before** E4/E5 verifies the number. Gating them threw
+    every one away — and threw them away most reliably for the phone that never
+    finishes verifying, which is the phone an admin most needs to see. Knowing
+    which permission a salesperson is stuck on, within two minutes, without
+    telephoning them, is the point.
+    """
+    from datetime import UTC, datetime
+
+    _, client = await _pending(installation_factory, device_client_factory)
+    response = await client.post(
+        "/api/device/v1/capabilities",
+        json={
+            "capabilities": [
+                {
+                    "capability": "microphone",
+                    "state": "denied",
+                    "checked_at": datetime.now(UTC).isoformat(),
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["accepted"] == 1
+
+
+async def test_an_unverified_phone_can_say_it_is_stuck(
+    db, installation_factory, device_client_factory
+) -> None:
+    """``enrolment_stuck`` and ``step_timing`` are *about* enrolment, so
+    requiring a finished enrolment to report them is a circle."""
+    from datetime import UTC, datetime
+
+    _, client = await _pending(installation_factory, device_client_factory)
+    response = await client.post(
+        "/api/device/v1/events",
+        json={
+            "events": [
+                {"kind": "enrolment_stuck", "at": datetime.now(UTC).isoformat()}
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_an_unverified_phone_still_cannot_touch_an_agents_data(
+    db, installation_factory, device_client_factory
+) -> None:
+    """The boundary moved for self-reporting writes and **nowhere else**.
+
+    Verification protects the number binding — "is this handset really on this
+    line" — so everything about a specific agent's calls stays behind it. This
+    is the test that says the change was narrow.
+    """
+    from datetime import UTC, datetime
+
+    _, client = await _pending(installation_factory, device_client_factory)
+    started = datetime.now(UTC)
+
+    refused = {
+        "ingest": await client.post(
+            "/api/device/v1/calls",
+            json={
+                "calls": [
+                    {
+                        "client_call_id": "11111111-1111-1111-1111-111111111111",
+                        "started_at": started.isoformat(),
+                        "ended_at": started.isoformat(),
+                        "direction": "outgoing",
+                        "disposition": "no_answer",
+                        "duration_sec": 0,
+                        "device_epoch_ms": int(started.timestamp() * 1000),
+                        "device_timezone": "Asia/Tashkent",
+                        "app_variant": "modern34",
+                        "app_version": "1.1.0",
+                        "audio_expected": False,
+                        "capture_route": "none",
+                        "audio_missing_reason": "not_expected",
+                    }
+                ]
+            },
+        ),
+        "own calls": await client.get("/api/device/v1/calls"),
+        "audio": await client.get(
+            "/api/device/v1/calls/11111111-1111-1111-1111-111111111111/audio"
+        ),
+        "heartbeat": await client.post(
+            "/api/device/v1/heartbeat",
+            json={
+                "device_epoch_ms": int(started.timestamp() * 1000),
+                "device_timezone": "Asia/Tashkent",
+            },
+        ),
+    }
+    for label, response in refused.items():
+        assert response.status_code == 403, f"{label} let an unverified phone through"
+        assert response.json()["error"]["code"] == "verification_required", label
+
+
+async def test_a_self_report_from_an_unverified_phone_is_still_metered(
+    db, installation_factory, device_client_factory
+) -> None:
+    """N14/N15: the employee pays for this data. A request we chose not to gate
+    is not a request we chose not to meter."""
+    from datetime import UTC, datetime
+
+    import sqlalchemy as sa
+
+    from src.modules.devices.models import DataUsageDailyModel
+
+    installation, client = await _pending(installation_factory, device_client_factory)
+    await client.post(
+        "/api/device/v1/events",
+        json={"events": [{"kind": "step_timing", "at": datetime.now(UTC).isoformat()}]},
+    )
+    counted = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(DataUsageDailyModel)
+        .where(DataUsageDailyModel.installation_id == installation.id)
+    )
+    assert counted == 1, "an ungated write went unmetered"

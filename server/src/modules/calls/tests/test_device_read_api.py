@@ -391,3 +391,25 @@ async def test_a_replacement_handset_still_shows_the_agents_earlier_calls(
     client = await device_client_factory(new_phone)
     items = (await client.get("/api/device/v1/calls")).json()["items"]
     assert {item["id"] for item in items} == {str(old_call.id), str(new_call.id)}
+
+
+async def test_the_first_page_carries_a_count_and_later_pages_do_not(
+    db, call_factory, installation_factory, device_client_factory
+) -> None:
+    """The screen's header asks once; a COUNT per scroll re-answers it over
+    cellular. A field that was *always* null would be worse than none — a
+    client cannot tell "not counted" from "zero"."""
+    installation = await installation_factory()
+    for _ in range(5):
+        await call_factory(installation=installation)
+
+    client = await device_client_factory(installation)
+    first = (await client.get("/api/device/v1/calls?limit=2")).json()
+    assert first["total"] == 5
+    assert first["has_more"] is True
+
+    later = (
+        await client.get(f"/api/device/v1/calls?limit=2&cursor={first['next_cursor']}")
+    ).json()
+    assert later["total"] is None
+    assert len(later["items"]) == 2

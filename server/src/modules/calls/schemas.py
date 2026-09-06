@@ -351,12 +351,17 @@ class DeviceCallListOut(BaseModel):
     """A page of the employee's own calls.
 
     Same shape as the panel's list (``items``/``next_cursor``/``has_more``) so
-    there is one pagination convention in the product. ``total`` is left unset:
-    a phone scrolls, and a COUNT per page is cellular data spent on a number
-    nobody reads.
+    there is one pagination convention in the product.
     """
 
     items: list[DeviceCallOut]
     next_cursor: str | None
     has_more: bool
-    total: int | None = None
+    total: int | None = Field(
+        default=None,
+        description=(
+            "How many calls this agent has, **on the first page only**; null "
+            "on later pages. The screen's header asks once and a COUNT per "
+            "scroll would be cellular data spent re-answering it."
+        ),
+    )

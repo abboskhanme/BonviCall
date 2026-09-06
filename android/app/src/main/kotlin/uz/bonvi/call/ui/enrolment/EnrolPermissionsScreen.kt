@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import uz.bonvi.call.R
 import uz.bonvi.call.domain.Capability
 import uz.bonvi.call.domain.CapabilityState
+import uz.bonvi.call.domain.CapabilityConsequence
 import uz.bonvi.call.domain.CaptureReadiness
 import uz.bonvi.call.domain.runtimePermission
 import uz.bonvi.call.enrolment.EnrolmentViewModel
@@ -142,9 +143,27 @@ fun EnrolPermissionsScreen(viewModel: EnrolmentViewModel) {
                         )
                     }
 
-                    if (capability in CaptureReadiness.OPTIONAL) {
-                        TextButton(onClick = { viewModel.skipOptional(capability) }) {
-                            Text(stringResource(R.string.common_skip))
+                    // ⚠️ ALWAYS available, for every capability. A step whose
+                    // own text says "retrying will not fix this" must not also
+                    // be the end of the road (UC-14). The cost is named above
+                    // the control, so this is a decision rather than an escape.
+                    val consequence = CapabilityConsequence.of(capability)
+                    val alreadyWorking = result?.isWorking == true
+                    if (!alreadyWorking) {
+                        Text(
+                            text = stringResource(consequence.costRes()),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        TextButton(onClick = { viewModel.onContinueWithout(capability) }) {
+                            Text(
+                                stringResource(
+                                    if (consequence == CapabilityConsequence.NONE) {
+                                        R.string.common_skip
+                                    } else {
+                                        R.string.perm_continue_without
+                                    },
+                                ),
+                            )
                         }
                     }
                 }
@@ -153,7 +172,14 @@ fun EnrolPermissionsScreen(viewModel: EnrolmentViewModel) {
     }
 }
 
-private fun Capability.titleRes(): Int = when (this) {
+/** What continuing without this capability costs, in one Uzbek sentence. */
+private fun CapabilityConsequence.costRes(): Int = when (this) {
+    CapabilityConsequence.NONE -> R.string.perm_cost_none
+    CapabilityConsequence.AUDIO_ONLY -> R.string.perm_cost_audio
+    CapabilityConsequence.CAPTURE_BLOCKED -> R.string.perm_cost_blocked
+}
+
+internal fun Capability.titleRes(): Int = when (this) {
     Capability.PHONE_STATE -> R.string.perm_phone_state_title
     Capability.CALL_LOG -> R.string.perm_call_log_title
     Capability.NOTIFICATIONS -> R.string.perm_notifications_title

@@ -673,8 +673,11 @@ class DeviceCallReadService:
         limit: int,
         cursor: Cursor | None,
         since: datetime | None,
-    ) -> tuple[list[DeviceCallOut], str | None, bool]:
+    ) -> tuple[list[DeviceCallOut], str | None, bool, int | None]:
         """A page of this agent's calls, newest conversation first.
+
+        Returns ``(items, next_cursor, has_more, total)``; ``total`` is set on
+        the first page and ``None`` afterwards.
 
         **Ordered by ``started_at``, filtered by ``received_at``** — two clocks,
         deliberately, because the two questions are different. The employee
@@ -699,7 +702,23 @@ class DeviceCallReadService:
             if has_more and rows
             else None
         )
-        return await self.as_dtos(rows), next_cursor, has_more
+        # Counted on the **first** page only. The employee's screen shows "184
+        # qo'ng'iroq" in its header once, and a COUNT on every scroll would be
+        # cellular data spent re-answering a question nobody asked again. Same
+        # rule as the panel's list, for the same reason.
+        # ``ix_calls_agent`` is (agent_id, started_at DESC), so this is an
+        # index-only count over one agent's rows.
+        total = None
+        if cursor is None:
+            total = int(
+                await self.session.scalar(
+                    self._scope(
+                        select(func.count()).select_from(CallModel), installation
+                    )
+                )
+                or 0
+            )
+        return await self.as_dtos(rows), next_cursor, has_more, total
 
     async def as_dtos(self, rows: list[CallModel]) -> list[DeviceCallOut]:
         """Rows to what the screen renders, with the audio state derived here.

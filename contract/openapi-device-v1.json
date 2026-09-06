@@ -535,7 +535,7 @@
         "type": "object"
       },
       "DeviceCallListOut": {
-        "description": "A page of the employee's own calls.\n\nSame shape as the panel's list (``items``/``next_cursor``/``has_more``) so\nthere is one pagination convention in the product. ``total`` is left unset:\na phone scrolls, and a COUNT per page is cellular data spent on a number\nnobody reads.",
+        "description": "A page of the employee's own calls.\n\nSame shape as the panel's list (``items``/``next_cursor``/``has_more``) so\nthere is one pagination convention in the product.",
         "properties": {
           "has_more": {
             "type": "boolean"
@@ -564,7 +564,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How many calls this agent has, **on the first page only**; null on later pages. The screen's header asks once and a COUNT per scroll would be cellular data spent re-answering it."
           }
         },
         "required": [

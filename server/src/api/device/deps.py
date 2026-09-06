@@ -104,16 +104,55 @@ async def require_active_installation(
     :func:`_assert_verified`, shared with the socket gate.
     """
     _assert_verified(installation)
+    await _count_request(request, session, installation)
+    return installation
 
-    # N14/N15's accounting happens here because this is the one place every
-    # ingest request passes through and the request size is already known.
-    # The approximation is documented in modules/devices/usage.py.
+
+async def _count_request(
+    request: Request, session: SessionDep, installation: InstallationModel
+) -> None:
+    """N14/N15's accounting, on every device write.
+
+    Kept out of the verification gate so that the routes which do **not**
+    require verification are still counted: the employee pays for this data,
+    and a request we chose not to gate is not a request we chose not to meter.
+    The approximation is documented in modules/devices/usage.py.
+    """
     health = await session.get(DeviceHealthModel, installation.id)
     await DataUsageService(session).record(
         installation.id,
         health.network_type if health else None,
         int(request.headers.get("Content-Length") or 0),
     )
+
+
+async def require_self_reporting_installation(
+    request: Request,
+    session: SessionDep,
+    installation: Annotated[InstallationModel, Depends(require_installation)],
+) -> InstallationModel:
+    """A phone reporting facts **about itself**, verified or not (R17, UC-06).
+
+    Capability states and enrolment events are posted during E2 — one per
+    permission, as each check completes — which is *before* E4/E5 where the
+    number is verified. Gating them on verification threw away every one of
+    them, and threw away most reliably for the phone that never finishes
+    verifying, which is the phone an admin most needs to see.
+
+    That is exactly R17's purpose: knowing **which permission** a stuck
+    salesperson is stuck on, within two minutes, without telephoning them.
+
+    Safe because of what these routes are, not because of who is asking:
+    a device writes facts about the installation its own token is bound to. It
+    reads nothing, returns nothing about anybody else, and cannot reach another
+    agent's data. Verification protects the *number binding* — "is this handset
+    really on this line" — and a permission state is not a claim about a line.
+
+    Everything about a specific agent's data stays behind
+    :func:`require_active_installation`: ``/calls`` in both directions, the
+    audio routes, and the heartbeat.
+    """
+    await _count_request(request, session, installation)
     return installation
 
 
@@ -138,6 +177,9 @@ ActiveInstallationDep = Annotated[
     InstallationModel, Depends(require_active_installation)
 ]
 WsInstallationDep = Annotated[InstallationModel, Depends(require_ws_installation)]
+SelfReportingInstallationDep = Annotated[
+    InstallationModel, Depends(require_self_reporting_installation)
+]
 
 __all__ = [
     "REQUIRED_DEVICE_HEADERS",
@@ -145,10 +187,12 @@ __all__ = [
     "DeviceHeadersDep",
     "DevicePrincipalDep",
     "InstallationDep",
+    "SelfReportingInstallationDep",
     "WsInstallationDep",
     "require_active_installation",
     "require_device",
     "require_device_headers",
     "require_installation",
+    "require_self_reporting_installation",
     "require_ws_installation",
 ]
