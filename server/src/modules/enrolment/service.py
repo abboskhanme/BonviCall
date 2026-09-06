@@ -373,6 +373,22 @@ class EnrolmentService:
             window_seconds=window,
         )
 
+    async def numbers_with_a_live_code(self) -> set[uuid.UUID]:
+        """Numbers holding an unredeemed, unexpired, unrevoked code.
+
+        The ``invited`` end of the funnel (SPEC §10.1), asked of the module
+        that owns ``enrolment_codes`` rather than read from it: what crosses a
+        module boundary is a value, not an entity (§2).
+        """
+        rows = await self.session.scalars(
+            select(EnrolmentCodeModel.number_id).where(
+                EnrolmentCodeModel.redeemed_at.is_(None),
+                EnrolmentCodeModel.revoked_at.is_(None),
+                EnrolmentCodeModel.expires_at > clock.now(),
+            )
+        )
+        return set(rows.all())
+
     async def invitation_for(
         self, raw_code: str
     ) -> tuple[str, str, str, int | None] | None:

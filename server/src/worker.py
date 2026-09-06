@@ -52,7 +52,7 @@ from src.modules.devices.jobs import (
     silence_detection,
 )
 from src.modules.enrolment.jobs import callback_event_retention, receiver_health
-from src.modules.installations.jobs import funnel_refresh
+from src.modules.installations.jobs import collapse_abandoned_enrolments, funnel_refresh
 
 log = get_logger(__name__)
 
@@ -73,6 +73,12 @@ SCHEDULE: dict[str, tuple[JobCallable, object]] = {
     # Hourly, not nightly: an admin looking at the inbox an hour after a phone
     # was replaced should not be reading work that no longer exists.
     "close_superseded_alerts": (close_superseded_alerts, IntervalTrigger(hours=1)),
+    # Nightly, not hourly: an abandoned attempt is not urgent, and the grace
+    # period inside the job already keeps a live retry burst out of its reach.
+    "collapse_abandoned_enrolments": (
+        collapse_abandoned_enrolments,
+        CronTrigger(hour=3, minute=20, timezone=TASHKENT),
+    ),
     "offline_sweep": (offline_sweep, IntervalTrigger(minutes=1)),
     "silence_detection": (silence_detection, IntervalTrigger(minutes=5)),
     "funnel_refresh": (funnel_refresh, IntervalTrigger(minutes=5)),

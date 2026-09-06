@@ -63,6 +63,26 @@ class AlertService:
         )
         return status in (None, InstallationStatus.ACTIVE, InstallationStatus.PENDING)
 
+    async def open_for(self, kind: AlertKind, installation_ids) -> set[uuid.UUID]:
+        """Which of these installations currently have an open alert of ``kind``.
+
+        Exists so another module can ask without holding an ``AlertModel``:
+        what crosses a module boundary is a value, not an entity the other side
+        could then write to (§2). ``installations`` needs this to know whether
+        an agent is waiting for help.
+        """
+        wanted = {value for value in installation_ids if value is not None}
+        if not wanted:
+            return set()
+        rows = await self.session.scalars(
+            select(AlertModel.installation_id).where(
+                AlertModel.kind == kind,
+                AlertModel.installation_id.in_(wanted),
+                AlertModel.resolved_at.is_(None),
+            )
+        )
+        return set(rows.all())
+
     async def resolve_all_for(self, installation_id: uuid.UUID) -> int:
         """Close every open alert for an installation that has been superseded.
 
