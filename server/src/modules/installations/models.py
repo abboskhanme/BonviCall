@@ -120,6 +120,15 @@ class InstallationModel(Base, UUIDMixin, TimestampMixin):
     refresh_token_hash: Mapped[str | None] = mapped_column(
         sa.CHAR(64), nullable=True, doc="Current refresh token; reuse means credential_replay."
     )
+    previous_refresh_token_hash: Mapped[str | None] = mapped_column(
+        sa.CHAR(64),
+        nullable=True,
+        doc=(
+            "The refresh token this one replaced. Kept so that presenting a "
+            "spent token is attributable to an installation — without it a "
+            "reuse can only be refused, never acted on (N24)."
+        ),
+    )
     push_token: Mapped[str | None] = mapped_column(
         sa.Text,
         nullable=True,
@@ -185,6 +194,11 @@ class InstallationModel(Base, UUIDMixin, TimestampMixin):
         # The version-gate impact query scans the whole fleet on this column,
         # and it is the query an admin runs immediately before stranding people.
         sa.Index("ix_installations_app_version_code", "app_version_code"),
+        sa.Index(
+            "ix_installations_previous_refresh",
+            "previous_refresh_token_hash",
+            postgresql_where=sa.text("previous_refresh_token_hash IS NOT NULL"),
+        ),
         sa.CheckConstraint(
             "verification_method <> 'admin_attested' OR attest_reason IS NOT NULL",
             name="attestation_needs_reason",

@@ -83,6 +83,20 @@ async def verify_msisdn(
     A null, empty or short ``line1_number`` is **never** a match — it is
     ``msisdn_empty`` and the app moves to route 2. Treating "I don't know" as
     "yes" would attribute a phone to a number it does not hold.
+
+    **Replaying this mints a fresh token pair, and that is deliberate.** It is
+    what rescues a handset whose verification succeeded and whose response was
+    lost — the field case, on a tunnel that drops every few hours: the server
+    activated the installation, the phone has nothing to show for it, and
+    without re-minting the agent would have to start enrolment again.
+
+    The cost is that the provisional access token stays usable for the rest of
+    its ≤30 minutes and could mint a pair outside the version gate, which is
+    otherwise the sole business of ``POST /auth/refresh`` (N34). It is accepted
+    because a client that enrolled minutes ago is running a freshly installed
+    APK and so cannot be the under-version client the gate exists to stop,
+    while a lost response is ordinary. Reviewed 2026-09-06; recorded here so it
+    reads as a decision and not as an oversight somebody should close.
     """
     tokens = await EnrolmentService(session).complete_msisdn_verification(
         installation, payload.line1_number, payload.subscription_id, payload.sim_slot

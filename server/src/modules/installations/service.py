@@ -253,6 +253,9 @@ class InstallationService:
             },
         )
         raw_refresh = new_opaque_token()
+        # Keep the one being replaced, so that presenting it later is
+        # attributable rather than merely refusable (migration 005).
+        installation.previous_refresh_token_hash = installation.refresh_token_hash
         installation.refresh_token_hash = sha256_hex(raw_refresh)
         await self.session.flush()
         return DeviceTokenPair(
@@ -287,8 +290,15 @@ class InstallationService:
             )
         )
         if installation is None:
-            # Either a token from a previous rotation or one that was never
-            # ours. We cannot tell which, and only one of those is safe.
+            replayed = await self.session.scalar(
+                select(InstallationModel).where(
+                    InstallationModel.previous_refresh_token_hash
+                    == sha256_hex(raw_token)
+                )
+            )
+            if replayed is not None:
+                await self._handle_refresh_reuse(replayed)
+            # Either the token we just acted on, or one that was never ours.
             raise UnauthorizedError(ErrorCode.REFRESH_REUSED)
         if installation.status in (
             InstallationStatus.REVOKED,
@@ -314,6 +324,53 @@ class InstallationService:
         pair = await self.issue_device_pair(installation)
         await self.session.commit()
         return installation, pair
+
+    async def _handle_refresh_reuse(self, installation: InstallationModel) -> None:
+        """A spent refresh token was presented. Kill both pairs and say so.
+
+        **We know a replay happened and we do not know who did it.** The token
+        was used twice; one of those was the employee's handset and one was
+        not, and nothing in the request distinguishes them — the thief and the
+        phone send the same bytes. So both are disconnected, which is the only
+        action that is correct whichever party is which, and the alert says
+        that rather than implying the handset is compromised.
+
+        The installation stays **active** (SPEC §4.3). Refusing its queued
+        calls would destroy records over a credential problem, and re-enrolling
+        on the same number keeps that queue: the duplicate-call check is keyed
+        on ``number_id``, which does not change, so the phone can upload
+        everything it was holding once it has a new code.
+        """
+        installation.token_version += 1
+        installation.refresh_token_hash = None
+        installation.previous_refresh_token_hash = None
+        await AlertService(self.session).raise_alert(
+            kind=AlertKind.CREDENTIAL_REPLAY,
+            severity=AlertSeverity.CRITICAL,
+            scope=installation.id,
+            installation_id=installation.id,
+            agent_id=installation.agent_id,
+            detail={
+                "reason": "refresh_token_reused",
+                # Named because it is the thing an admin will want to assume
+                # away: we cannot tell which use was the real handset.
+                "attributable_to_device": False,
+                "queued_records_preserved": True,
+            },
+        )
+        await self.audit.record(
+            action=AuditAction.INSTALLATION_REVOKED,
+            object_type="installations",
+            object_id=installation.id,
+            actor_type=ActorType.SYSTEM,
+            detail={"reason": "refresh_token_reused"},
+        )
+        await self.session.commit()
+        log.warning(
+            "refresh_token_reused",
+            installation_id=str(installation.id),
+            agent_id=str(installation.agent_id),
+        )
 
     async def principal_for_claims(
         self,

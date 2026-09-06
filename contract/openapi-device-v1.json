@@ -2956,7 +2956,7 @@
     },
     "/api/device/v1/enrolment/verify/msisdn": {
       "post": {
-        "description": "Route 1: the SIM's own MSISDN (SPEC §9.1).\n\nA null, empty or short ``line1_number`` is **never** a match — it is\n``msisdn_empty`` and the app moves to route 2. Treating \"I don't know\" as\n\"yes\" would attribute a phone to a number it does not hold.",
+        "description": "Route 1: the SIM's own MSISDN (SPEC §9.1).\n\nA null, empty or short ``line1_number`` is **never** a match — it is\n``msisdn_empty`` and the app moves to route 2. Treating \"I don't know\" as\n\"yes\" would attribute a phone to a number it does not hold.\n\n**Replaying this mints a fresh token pair, and that is deliberate.** It is\nwhat rescues a handset whose verification succeeded and whose response was\nlost — the field case, on a tunnel that drops every few hours: the server\nactivated the installation, the phone has nothing to show for it, and\nwithout re-minting the agent would have to start enrolment again.\n\nThe cost is that the provisional access token stays usable for the rest of\nits ≤30 minutes and could mint a pair outside the version gate, which is\notherwise the sole business of ``POST /auth/refresh`` (N34). It is accepted\nbecause a client that enrolled minutes ago is running a freshly installed\nAPK and so cannot be the under-version client the gate exists to stop,\nwhile a lost response is ordinary. Reviewed 2026-09-06; recorded here so it\nreads as a decision and not as an oversight somebody should close.",
         "operationId": "verify_msisdn_api_device_v1_enrolment_verify_msisdn_post",
         "requestBody": {
           "content": {

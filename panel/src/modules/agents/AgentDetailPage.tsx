@@ -25,7 +25,12 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Archive, Pencil, Smartphone } from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
-import { buildFleet, useDevices, useInstallations } from '@/modules/devices/api'
+import {
+  buildFleet,
+  supersededInstallationIds,
+  useDevices,
+  useInstallations,
+} from '@/modules/devices/api'
 import {
   FLEET_PROBLEM_LABEL,
   FLEET_STATE_LABEL,
@@ -65,9 +70,12 @@ function DeviceSection({ agentId }: { agentId: string }) {
   const stageByInstallation = new Map(
     (installationsQuery.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
   )
-  const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation).filter(
-    (row) => row.health.agent_id === agentId,
-  )
+  const fleet = buildFleet(
+    devicesQuery.data?.items,
+    stageByInstallation,
+    new Date(),
+    supersededInstallationIds(installationsQuery.data?.items),
+  ).filter((row) => row.health.agent_id === agentId)
 
   return (
     <Section title={t('agentDetail.deviceTitle')} description={t('agentDetail.deviceSubtitle')}>

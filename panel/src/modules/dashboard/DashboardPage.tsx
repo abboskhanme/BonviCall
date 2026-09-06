@@ -25,7 +25,13 @@ import { BellRing, FileWarning, Phone, Smartphone } from 'lucide-react'
 import { useAlerts } from '@/modules/alerts/api'
 import { ALERT_SEVERITY_LABEL, ALERT_SEVERITY_TONE } from '@/modules/alerts/routing'
 import { useAuth } from '@/modules/auth/store'
-import { buildFleet, useDevices, useInstallations } from '@/modules/devices/api'
+import {
+  buildFleet,
+  needsAttention,
+  supersededInstallationIds,
+  useDevices,
+  useInstallations,
+} from '@/modules/devices/api'
 import { FLEET_STATE_LABEL } from '@/modules/devices/labels'
 import { useCallsPage } from '@/modules/calls/api'
 import { useGapReport } from '@/modules/reports/api'
@@ -101,8 +107,13 @@ function DevicesTile() {
   const stageByInstallation = new Map(
     (installations.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
   )
-  const fleet = buildFleet(query.data?.items, stageByInstallation)
-  const problems = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
+  const fleet = buildFleet(
+    query.data?.items,
+    stageByInstallation,
+    new Date(),
+    supersededInstallationIds(installations.data?.items),
+  )
+  const problems = fleet.filter((row) => needsAttention(row.state))
   // The two states that need a person to travel, as opposed to a phone that
   // will come back by itself.
   const silent = fleet.filter(

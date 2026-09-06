@@ -222,3 +222,104 @@ async def test_the_set_of_routes_that_hand_out_device_tokens_is_closed() -> None
         "issuer is a decision about N34, so record it in ALLOWED_ISSUERS."
     )
     assert "/api/device/v1/enrolment/token" not in issuers
+
+
+# --- a refresh token used twice (N24) --------------------------------------
+
+
+async def test_a_reused_refresh_token_is_attributed_and_both_pairs_die(
+    db, client, installation_factory, device_client_factory
+) -> None:
+    """The gap the docstring used to claim was closed, and now is.
+
+    A spent refresh token matched no row, so the server could refuse it and
+    nothing else. The worst arrangement followed: whoever used the stolen token
+    **first** kept a working pair, the real handset was refused, and no record
+    said anything had happened.
+    """
+    import sqlalchemy as sa
+
+    from src.core.enums import AlertKind
+    from src.modules.alerts.models import AlertModel
+    from src.modules.installations.service import InstallationService
+
+    installation = await installation_factory()
+    first = await InstallationService(db).issue_device_pair(installation)
+    await db.flush()
+
+    # The thief gets there first and rotates.
+    stolen = await client.post(
+        "/api/device/v1/auth/refresh", json={"refresh_token": first.refresh_token}
+    )
+    assert stolen.status_code == 200
+    thief_pair = stolen.json()
+
+    # The real handset presents the same token a moment later.
+    replayed = await client.post(
+        "/api/device/v1/auth/refresh", json={"refresh_token": first.refresh_token}
+    )
+    assert replayed.status_code == 401
+    assert replayed.json()["error"]["code"] == "refresh_reused"
+
+    await db.refresh(installation)
+    # Both are dead: the thief's fresh pair too, which is the point.
+    assert installation.refresh_token_hash is None
+    assert installation.previous_refresh_token_hash is None
+    thief_again = await client.post(
+        "/api/device/v1/auth/refresh",
+        json={"refresh_token": thief_pair["refresh_token"]},
+    )
+    assert thief_again.status_code == 401
+
+    alert = await db.scalar(
+        sa.select(AlertModel).where(AlertModel.kind == AlertKind.CREDENTIAL_REPLAY)
+    )
+    assert alert is not None
+    assert alert.detail["reason"] == "refresh_token_reused"
+    # It says what it cannot know.
+    assert alert.detail["attributable_to_device"] is False
+
+
+async def test_the_installation_stays_active_so_the_queue_is_not_lost(
+    db, client, installation_factory
+) -> None:
+    """SPEC §4.3: a credential problem is not a reason to refuse records.
+
+    Re-enrolling on the same number keeps the phone's queue, because the
+    duplicate-call check is keyed on ``number_id`` and that does not change.
+    Marking the installation revoked here would throw away calls to punish a
+    token.
+    """
+    from src.core.enums import InstallationStatus
+    from src.modules.installations.service import InstallationService
+
+    installation = await installation_factory()
+    pair = await InstallationService(db).issue_device_pair(installation)
+    await db.flush()
+    await client.post("/api/device/v1/auth/refresh", json={"refresh_token": pair.refresh_token})
+    await client.post("/api/device/v1/auth/refresh", json={"refresh_token": pair.refresh_token})
+
+    await db.refresh(installation)
+    assert installation.status is InstallationStatus.ACTIVE
+
+
+async def test_an_unknown_token_raises_no_alert(
+    db, client, installation_factory
+) -> None:
+    """Only a token we *issued* is a replay. Random bytes are noise, and an
+    alert per guess would let anyone fill an admin's inbox."""
+    import sqlalchemy as sa
+
+    from src.core.enums import AlertKind
+    from src.modules.alerts.models import AlertModel
+
+    await installation_factory()
+    response = await client.post(
+        "/api/device/v1/auth/refresh", json={"refresh_token": "not-a-token-we-issued"}
+    )
+    assert response.status_code == 401
+    assert await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(AlertModel)
+        .where(AlertModel.kind == AlertKind.CREDENTIAL_REPLAY)
+    ) == 0

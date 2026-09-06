@@ -250,6 +250,14 @@ android {
                 // whatever directory Gradle chooses to fork the JVM in.
                 it.systemProperty("bonvicall.repoRoot", rootProject.projectDir.parentFile.absolutePath)
                 it.systemProperty("bonvicall.appDir", projectDir.absolutePath)
+
+                // Forwarded so the live integration tests can be pointed at a
+                // tunnel, or at nothing. Without this they silently fell back
+                // to localhost and RAN when they were meant to skip — a test
+                // that ignores the address it was given is the same class of
+                // quiet lie as everything else this project has found.
+                providers.systemProperty("bonvicall.liveServer").orNull
+                    ?.let { url -> it.systemProperty("bonvicall.liveServer", url) }
             }
         }
     }

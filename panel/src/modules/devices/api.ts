@@ -220,18 +220,50 @@ function isRevoked(health: DeviceHealth): boolean {
  * dead rows buried the three that were actually live and the page stopped
  * being readable at exactly the moment it mattered most.
  */
-function isSuperseded(health: DeviceHealth): boolean {
-  return health.installation_status === 'replaced'
+function isSuperseded(health: DeviceHealth, supersededIds?: ReadonlySet<string>): boolean {
+  return (
+    health.installation_status === 'replaced' ||
+    supersededIds?.has(health.installation_id) === true
+  )
+}
+
+/**
+ * Installations that a later enrolment on the SAME NUMBER has overtaken.
+ *
+ * The server marks some of these `replaced`, but a phone that redeemed a code
+ * and never reported is left `pending` — and the live fleet accumulated
+ * fifty-eight of them for two people, because tapping "enrol" again is what
+ * anybody does when nothing happens. Every one was shown as a device somebody
+ * needed to chase.
+ *
+ * Keyed on `number_id` rather than the agent: an installation is bound to a
+ * line, and one agent may legitimately hold two.
+ */
+export function supersededInstallationIds(
+  installations: Installation[] | undefined,
+): Set<string> {
+  const newestByNumber = new Map<string, Installation>()
+  for (const installation of installations ?? []) {
+    const current = newestByNumber.get(installation.number_id)
+    if (!current || installation.created_at > current.created_at) {
+      newestByNumber.set(installation.number_id, installation)
+    }
+  }
+  const newest = new Set([...newestByNumber.values()].map((item) => item.id))
+  return new Set(
+    (installations ?? []).map((item) => item.id).filter((id) => !newest.has(id)),
+  )
 }
 
 export function problemsFor(
   health: DeviceHealth,
   funnelStage?: FunnelStage | null,
   now: Date = new Date(),
+  supersededIds?: ReadonlySet<string>,
 ): FleetProblem[] {
   const problems: FleetProblem[] = []
   if (isRevoked(health)) problems.push('revoked')
-  if (isSuperseded(health)) {
+  if (isSuperseded(health, supersededIds)) {
     // History. Nothing else about it is worth a line on a page about phones
     // that need somebody to do something.
     problems.push('superseded')
@@ -267,10 +299,11 @@ export function stateFor(
   health: DeviceHealth,
   funnelStage?: FunnelStage | null,
   now: Date = new Date(),
+  supersededIds?: ReadonlySet<string>,
 ): FleetState {
   // Before every other test: a superseded attempt is not a phone with a
   // problem, whatever else is true of it.
-  if (isSuperseded(health)) return 'superseded'
+  if (isSuperseded(health, supersededIds)) return 'superseded'
   if (health.never_reported) return 'never_reported'
   if (isRevoked(health)) return 'revoked'
   if (hasDisappeared(health, funnelStage, now)) return 'install_disappeared'
@@ -281,6 +314,12 @@ export function stateFor(
   // to be right.
   if (problems.length === 1 && problems[0] === 'awaiting_telemetry') return 'awaiting_telemetry'
   return problems.length > 0 ? 'degraded' : 'healthy'
+}
+
+/** States that mean "somebody has to do something". Superseded and revoked
+ *  are history and must never be counted as work. */
+export function needsAttention(state: FleetState): boolean {
+  return state !== 'healthy' && state !== 'revoked' && state !== 'superseded'
 }
 
 /** Worst first. The default order must serve the problem, not the alphabet. */
@@ -308,13 +347,15 @@ export function buildFleet(
    *  an uninstall the panel cannot infer from silence alone. */
   stageByInstallation?: ReadonlyMap<string, FunnelStage>,
   now: Date = new Date(),
+  /** Attempts overtaken by a later enrolment on the same number. */
+  supersededIds?: ReadonlySet<string>,
 ): FleetRow[] {
   const rows = (devices ?? []).map((health) => {
     const stage = stageByInstallation?.get(health.installation_id) ?? null
     return {
       health,
-      state: stateFor(health, stage, now),
-      problems: problemsFor(health, stage, now),
+      state: stateFor(health, stage, now, supersededIds),
+      problems: problemsFor(health, stage, now, supersededIds),
     }
   })
   rows.sort((a, b) => {

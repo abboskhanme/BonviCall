@@ -319,7 +319,15 @@ export function EnrolmentSection({
                       {t(CAPABILITY_STATE_LABEL[capability.state])}
                     </span>
                     {capability.detail ? (
-                      <span className="ms-1 text-2xs text-muted">({capability.detail})</span>
+                      /* The device's own words — English, because it is the
+                         OEM's diagnostic string and not a sentence anybody
+                         wrote for a reader. Muted and parenthesised so it
+                         reads as evidence rather than as instruction. */
+                      <span className="ms-1 text-2xs text-muted">
+                        {'('}
+                        {capability.detail}
+                        {')'}
+                      </span>
                     ) : null}
                   </li>
                 ))}

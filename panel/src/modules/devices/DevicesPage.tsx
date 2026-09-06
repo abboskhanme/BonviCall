@@ -44,6 +44,8 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
 import {
   buildFleet,
+  needsAttention,
+  supersededInstallationIds,
   useDevices,
   useInstallations,
   type FleetProblem,
@@ -198,9 +200,24 @@ export function DevicesPage() {
   const stageByInstallation = new Map(
     (installationsQuery.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
   )
-  const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation)
-  const visible = stateFilter ? fleet.filter((row) => row.state === stateFilter) : fleet
-  const needAttention = fleet.filter((row) => row.state !== 'healthy' && row.state !== 'revoked')
+  // Attempts a later enrolment on the same line has overtaken. The server
+  // marks some `replaced`; the ones that never reported stay `pending`, and
+  // the live fleet had fifty-eight of those for two people.
+  const superseded = supersededInstallationIds(installationsQuery.data?.items)
+  const fleet = buildFleet(devicesQuery.data?.items, stageByInstallation, new Date(), superseded)
+  /**
+   * History is not the default view.
+   *
+   * A real rollout leaves abandoned attempts behind — one salesperson's own
+   * list reached 142 rows, of which a handful were live phones. They are
+   * still reachable through the state filter; they are just not what the page
+   * opens on.
+   */
+  const hidden = stateFilter ? 0 : fleet.filter((row) => row.state === 'superseded').length
+  const visible = stateFilter
+    ? fleet.filter((row) => row.state === stateFilter)
+    : fleet.filter((row) => row.state !== 'superseded')
+  const needAttention = fleet.filter((row) => needsAttention(row.state))
   // `buildFleet` already sorts worst first, so the head of that list IS the
   // worst thing in the fleet.
   const worst = needAttention[0] ?? null
@@ -254,6 +271,7 @@ export function DevicesPage() {
         />
         <span className="pb-2 text-xs text-muted">
           {t('devices.total', { count: visible.length })}
+          {hidden > 0 ? ` · ${t('devices.hiddenSuperseded', { n: hidden })}` : ''}
         </span>
       </div>
 

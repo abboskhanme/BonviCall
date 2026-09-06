@@ -832,5 +832,6 @@
   "enrol.olderAttempts": "Bu xodimda yana {n} ta eski o'rnatma bor. Yuqorida eng oxirgisi ko'rsatilmoqda.",
   "devices.attentionMany": "{total} ta qurilmadan {n} tasi e'tibor talab qiladi: {breakdown}.",
   "fleet.superseded": "Almashtirilgan",
-  "fleetProblem.superseded": "Bu o'rnatma yangisi bilan almashtirilgan"
+  "fleetProblem.superseded": "Bu o'rnatma yangisi bilan almashtirilgan",
+  "devices.hiddenSuperseded": "{n} ta almashtirilgan o'rnatma yashirilgan"
 }

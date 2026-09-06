@@ -20,8 +20,14 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { buildFleet, CLOCK_SKEW_LIMIT_SEC, QUEUE_DEPTH_LIMIT } from '@/modules/devices/api'
-import type { DeviceHealth } from '@/modules/devices/api'
+import {
+  buildFleet,
+  needsAttention,
+  supersededInstallationIds,
+  CLOCK_SKEW_LIMIT_SEC,
+  QUEUE_DEPTH_LIMIT,
+} from '@/modules/devices/api'
+import type { DeviceHealth, Installation } from '@/modules/devices/api'
 
 function health(overrides: Partial<DeviceHealth> = {}): DeviceHealth {
   return {
@@ -300,5 +306,86 @@ describe('willing and running is not the same as able', () => {
       health({ is_online: true, capture_enabled: true, service_running: true, recording_route: 'app_mic' }),
     ])
     expect(row?.state).toBe('healthy')
+  })
+})
+
+describe('attempts overtaken by a later enrolment', () => {
+  function installation(id: string, numberId: string, createdAt: string): Installation {
+    return {
+      id,
+      agent_id: 'agent-1',
+      number_id: numberId,
+      device_id: 'device-1',
+      status: 'pending',
+      funnel_stage: 'installed',
+      funnel_changed_at: createdAt,
+      created_at: createdAt,
+      verification_method: null,
+      verified_at: null,
+      attest_reason: null,
+      attested_by: null,
+      bound_at: null,
+      replaced_at: null,
+      revoked_at: null,
+      revoke_confirmed_at: null,
+      revoke_pending_bytes: null,
+      revoke_pending_records: null,
+      app_version: null,
+      app_variant: null,
+      sim_slot: null,
+      sim_subscription_id: null,
+    } as Installation
+  }
+
+  it('keeps only the newest per NUMBER', () => {
+    // Keyed on the line, not the agent: an installation is bound to a number
+    // and one agent may legitimately hold two.
+    const superseded = supersededInstallationIds([
+      installation('old', 'number-1', '2026-09-06T08:00:00Z'),
+      installation('new', 'number-1', '2026-09-06T09:00:00Z'),
+      installation('other-line', 'number-2', '2026-09-06T07:00:00Z'),
+    ])
+    expect([...superseded]).toEqual(['old'])
+  })
+
+  it('marks a never-reported pending attempt as history once a newer one exists', () => {
+    // The server marks some `replaced`; a phone that redeemed a code and never
+    // reported stays `pending`, and the live fleet had fifty-eight of those
+    // for two people because tapping "enrol" again is what anybody does when
+    // nothing happens.
+    const superseded = new Set(['old'])
+    const [row] = buildFleet(
+      [health({ installation_id: 'old', never_reported: true, installation_status: 'pending' })],
+      undefined,
+      new Date(),
+      superseded,
+    )
+    expect(row?.state).toBe('superseded')
+  })
+
+  it('leaves the current attempt alone', () => {
+    const [row] = buildFleet(
+      [health({ installation_id: 'current', never_reported: true, installation_status: 'pending' })],
+      undefined,
+      new Date(),
+      new Set(['old']),
+    )
+    expect(row?.state).toBe('never_reported')
+  })
+})
+
+describe('what counts as work', () => {
+  it('excludes history from the attention count', () => {
+    // The banner said "129 of 129 need attention" while 67 were abandoned
+    // attempts, which is the same noise the count was meant to replace.
+    expect(needsAttention('superseded')).toBe(false)
+    expect(needsAttention('revoked')).toBe(false)
+    expect(needsAttention('healthy')).toBe(false)
+  })
+
+  it('includes every state somebody must act on', () => {
+    for (const state of ['never_reported', 'install_disappeared', 'offline', 'degraded', 'awaiting_telemetry'] as const) {
+      expect(needsAttention(state)).toBe(true)
+    }
   })
 })

@@ -239,10 +239,17 @@ ALERT_TEXT: dict[str, tuple[str, str]] = {
         "Qurilma sessiyasi tugagan",
         "Qurilma sessiyasi tugagan va yangilana olmadi. Xodimdan ilovani ochishni so'rang.",
     ),
+    # Deliberately says what is *not* known. After a reuse we know a token was
+    # used twice; we do not know which use was the employee's handset and which
+    # was not, because both send identical bytes. An alert implying the phone is
+    # compromised — or implying it is not — would be guessing, and the whole
+    # product is careful elsewhere not to claim more than the data supports.
     "credential_replay": (
-        "Token qayta ishlatilgan",
-        "Bir token ikki marta ishlatildi. Bu jiddiy — qurilmani ro'yxatdan "
-        "chiqarib, qaytadan ulang.",
+        "Token ikki marta ishlatilgan",
+        "Bitta token ikki marta ishlatildi. Buni xodimning telefoni qilganmi "
+        "yoki boshqa qurilmami — buni aytib bo'lmaydi. Xavfsizlik uchun ikkala "
+        "ulanish ham uzildi. Xodim bilan bog'laning va telefoniga yangi kod "
+        "bering; yuborilmagan qo'ng'iroqlar saqlanadi.",
     ),
     "installation_rebound": (
         "Raqam boshqa telefonga ulandi",
