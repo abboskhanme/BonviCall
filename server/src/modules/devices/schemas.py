@@ -87,14 +87,25 @@ class DeviceHealthListResponse(BaseModel):
 
 
 class CapabilityStateResponse(BaseModel):
-    """One capability's current state, as the panel's matrix renders it."""
+    """One capability's current state, as the panel's matrix renders it.
+
+    A **required** capability the phone has never reported appears here as
+    ``unknown`` with null timestamps, rather than being absent. Absence made
+    the page show every row green while ``capturing`` was false, with nothing
+    on screen saying which capability was missing — and a phone stuck part-way
+    through E2 is exactly that shape.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     capability: Capability
     state: CapabilityState
-    checked_at: datetime
-    changed_at: datetime
+    checked_at: datetime | None = Field(
+        default=None, description="Null when this capability has never been checked."
+    )
+    changed_at: datetime | None = Field(
+        default=None, description="Null until there is a state to have changed from."
+    )
     detail: str | None
 
 

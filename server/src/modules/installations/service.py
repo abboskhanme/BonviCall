@@ -266,9 +266,20 @@ class InstallationService:
     ) -> tuple[InstallationModel, DeviceTokenPair]:
         """Rotate an installation's pair.
 
-        Reuse increments ``token_version``, killing every token already issued,
-        and leaves the installation ``active``: a replayed credential is not a
-        reason to stop accepting the phone's queued calls (SPEC §4.3).
+        **On reuse this refuses and can do no more, and that is a real limit.**
+        A spent refresh token matches no row, so there is no installation whose
+        ``token_version`` we could increment — the caller is refused with
+        ``refresh_reused`` and any pair the thief already obtained keeps
+        working until it expires. Detecting reuse properly needs the previous
+        hash kept alongside the current one; it is not kept today.
+
+        This docstring said the opposite until 2026-09-06 — that reuse "kills
+        every token already issued" — which described a control that was never
+        implemented. Recorded in ``docs/ASSUMPTIONS.md``; a comment claiming a
+        mitigation is worse than none, because it stops the next reader looking.
+
+        A replay is deliberately *not* a reason to stop accepting the phone's
+        queued calls (SPEC §4.3): the installation stays ``active``.
         """
         installation = await self.session.scalar(
             select(InstallationModel).where(

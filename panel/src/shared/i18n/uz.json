@@ -825,5 +825,12 @@
   "import.actionSkip": "O'tkaziladi",
   "import.actionError": "Xato",
   "import.previewOnly": "Bu faqat ko'rsatish — hali hech narsa saqlanmadi.",
-  "import.done": "Saqlandi: {created} ta yangi, {updated} ta yangilangan xodim."
+  "import.done": "Saqlandi: {created} ta yangi, {updated} ta yangilangan xodim.",
+  "fleet.awaiting_telemetry": "Yozib olish yo'li aniqlanmagan",
+  "fleetProblem.awaiting_telemetry": "Telefon qanday yozib olishini hali xabar qilmagan",
+  "enrol.blockingTitle": "Nima to'sib turibdi:",
+  "enrol.olderAttempts": "Bu xodimda yana {n} ta eski o'rnatma bor. Yuqorida eng oxirgisi ko'rsatilmoqda.",
+  "devices.attentionMany": "{total} ta qurilmadan {n} tasi e'tibor talab qiladi: {breakdown}.",
+  "fleet.superseded": "Almashtirilgan",
+  "fleetProblem.superseded": "Bu o'rnatma yangisi bilan almashtirilgan"
 }

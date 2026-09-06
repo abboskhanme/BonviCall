@@ -33,7 +33,12 @@ import {
   FUNNEL_STAGE_TONE,
   isStuckStage,
 } from '@/modules/devices/labels'
-import type { Installation } from '@/modules/devices/api'
+import { useDevice, type Installation } from '@/modules/devices/api'
+import {
+  CAPABILITY_BLOCKING_ORDER,
+  CAPABILITY_LABEL,
+  CAPABILITY_STATE_LABEL,
+} from '@/modules/devices/labels'
 import { Perm } from '@/shared/auth/permissions'
 import { messageForError } from '@/shared/api/errors'
 import { t } from '@/shared/i18n'
@@ -183,12 +188,16 @@ export function EnrolmentSection({
   number,
   installation,
   agentName,
+  olderInstallations = 0,
 }: {
   number: RegisteredNumber | null
   installation: Installation | null
   /** Named in the attestation dialog: the admin is asserting something about
    *  a person, not about a row. */
   agentName: string
+  /** How many earlier attempts exist. A rollout retries, and twenty silent
+   *  installations behind one agent is worth saying out loud. */
+  olderInstallations?: number
 }) {
   const can = useAuth((state) => state.can)
   const mayWrite = can(Perm.ENROLMENT_WRITE)
@@ -198,6 +207,11 @@ export function EnrolmentSection({
   const codesQuery = useEnrolmentCodes(number?.id)
   const attemptsQuery = useEnrolmentAttempts(number?.id)
   const receiverQuery = useReceiverStatus(can(Perm.ENROLMENT_READ))
+  // The capability states, which now arrive BEFORE verification — this is the
+  // data R17 needs and the funnel could not previously show.
+  const deviceQuery = useDevice(
+    can(Perm.DEVICES_READ) || can(Perm.DEVICES_READ_OWN) ? installation?.id : undefined,
+  )
   const issue = useIssueEnrolmentCode(number?.id ?? '')
 
   const codes = [...(codesQuery.data?.items ?? [])].sort((a, b) =>
@@ -224,6 +238,16 @@ export function EnrolmentSection({
   const stuck = isStuckStage(stage)
   // Whether the escape hatch is open, and why. Computed rather than assumed:
   // offering it first every time would turn every binding into the weaker kind.
+  /**
+   * The capabilities standing in the way, worst first.
+   *
+   * `not_applicable` is excluded: the handset does not have the feature, which
+   * is nobody's problem and would bury the ones that are.
+   */
+  const blocking = (deviceQuery.data?.capabilities ?? [])
+    .filter((c) => c.state !== 'granted_working' && c.state !== 'not_applicable')
+    .sort((a, b) => CAPABILITY_BLOCKING_ORDER[a.state] - CAPABILITY_BLOCKING_ORDER[b.state])
+
   const stance = attestStance({
     stage,
     verifiedAt: installation?.verified_at ?? null,
@@ -272,6 +296,44 @@ export function EnrolmentSection({
           <p className={stuck ? 'text-sm font-medium text-warn' : 'text-sm text-text'}>
             {t(FUNNEL_STAGE_HINT[stage])}
           </p>
+
+          {/* ═══════════════════════════════════════════════════════════════
+              WHICH capability is blocking, by name.
+
+              This is what R17 needs and what the funnel could not say until
+              the telemetry gate opened: a phone reports its capabilities
+              before it verifies, so while somebody is stuck at a permission
+              screen the panel now knows exactly which screen. "Ruxsatlar
+              berilmagan" sends an admin to look; "Mikrofon — butunlay rad
+              etilgan" tells them what to do when they get there.
+              ═══════════════════════════════════════════════════════════════ */}
+          {blocking.length > 0 ? (
+            <div className="space-y-1 rounded-md border border-warn/40 bg-warn/5 p-3">
+              <p className="text-xs font-medium text-text">{t('enrol.blockingTitle')}</p>
+              <ul className="space-y-0.5">
+                {blocking.map((capability) => (
+                  <li key={capability.capability} className="text-sm text-text">
+                    {t(CAPABILITY_LABEL[capability.capability])}
+                    {' — '}
+                    <span className="text-warn">
+                      {t(CAPABILITY_STATE_LABEL[capability.state])}
+                    </span>
+                    {capability.detail ? (
+                      <span className="ms-1 text-2xs text-muted">({capability.detail})</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {olderInstallations > 0 ? (
+            /* A rollout retries. Showing only the newest attempt is right, but
+               silently discarding nineteen others is not. */
+            <p className="text-2xs text-muted">
+              {t('enrol.olderAttempts', { n: olderInstallations })}
+            </p>
+          ) : null}
 
           {issue.error ? (
             <p className="text-xs text-bad">{messageForError(issue.error)}</p>

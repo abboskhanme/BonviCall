@@ -1171,18 +1171,34 @@
         "type": "string"
       },
       "CapabilityStateResponse": {
-        "description": "One capability's current state, as the panel's matrix renders it.",
+        "description": "One capability's current state, as the panel's matrix renders it.\n\nA **required** capability the phone has never reported appears here as\n``unknown`` with null timestamps, rather than being absent. Absence made\nthe page show every row green while ``capturing`` was false, with nothing\non screen saying which capability was missing — and a phone stuck part-way\nthrough E2 is exactly that shape.",
         "properties": {
           "capability": {
             "$ref": "#/components/schemas/Capability"
           },
           "changed_at": {
-            "format": "date-time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null until there is a state to have changed from."
           },
           "checked_at": {
-            "format": "date-time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when this capability has never been checked."
           },
           "detail": {
             "anyOf": [
@@ -1201,8 +1217,6 @@
         "required": [
           "capability",
           "state",
-          "checked_at",
-          "changed_at",
           "detail"
         ],
         "title": "CapabilityStateResponse",

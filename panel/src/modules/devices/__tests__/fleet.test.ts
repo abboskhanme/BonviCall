@@ -154,3 +154,151 @@ describe('problems', () => {
     expect(fleet.map((row) => row.health.installation_id)).toEqual(['stale', 'recent'])
   })
 })
+
+describe('a phone that has told us nothing yet', () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * The live failure this exists to stop.
+   *
+   * A handset sends a heartbeat before it sends any capture telemetry, so
+   * `recording_route`, `capture_enabled` and `service_running` are all NULL
+   * for a while after enrolment. Every problem check asks "is this field
+   * false", and null is not false — so a phone we knew nothing about passed
+   * every check and the fleet page called it **Yaxshi**.
+   *
+   * That was on screen, on the client's own Samsung, while `capturing` was
+   * false. Absence of a reading is not a good reading.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  it('is not called healthy', () => {
+    const [row] = buildFleet([
+      health({
+        is_online: true,
+        recording_route: null,
+        capture_enabled: null,
+        service_running: null,
+        recording_route_ok: null,
+      }),
+    ])
+
+    expect(row?.state).not.toBe('healthy')
+    expect(row?.state).toBe('awaiting_telemetry')
+    expect(row?.problems).toContain('awaiting_telemetry')
+  })
+
+  it('is not called degraded either — nothing is known to be wrong', () => {
+    const [row] = buildFleet([
+      health({ is_online: true, recording_route: null, capture_enabled: null, service_running: null }),
+    ])
+    expect(row?.state).toBe('awaiting_telemetry')
+  })
+
+  it('becomes healthy as soon as ONE capture field arrives', () => {
+    const [row] = buildFleet([
+      health({
+        is_online: true,
+        recording_route: 'oem_file_harvest',
+        capture_enabled: null,
+        service_running: null,
+      }),
+    ])
+    expect(row?.state).toBe('healthy')
+  })
+
+  it('still reports a real fault over a missing reading', () => {
+    // Telemetry that says something bad outranks telemetry that says nothing.
+    const [row] = buildFleet([
+      health({ is_online: true, recording_route: null, capture_enabled: false, service_running: null }),
+    ])
+    expect(row?.state).toBe('degraded')
+    expect(row?.problems).toContain('capture_disabled')
+  })
+
+  it('sorts below the known faults and above healthy', () => {
+    const fleet = buildFleet([
+      health({ installation_id: 'healthy', is_online: true, recording_route: 'app_mic' }),
+      health({
+        installation_id: 'awaiting',
+        is_online: true,
+        recording_route: null,
+        capture_enabled: null,
+        service_running: null,
+      }),
+      health({ installation_id: 'degraded', is_online: true, recording_route_ok: false }),
+    ])
+    expect(fleet.map((row) => row.health.installation_id)).toEqual([
+      'degraded',
+      'awaiting',
+      'healthy',
+    ])
+  })
+})
+
+describe('abandoned enrolment attempts', () => {
+  /**
+   * A real rollout retries. The live fleet reached forty-eight installations
+   * for six agents, twenty-one of them `replaced`, and every one was rendered
+   * as a fault — thirty-three dead rows burying the three that were live. The
+   * page stopped being readable at exactly the moment it mattered.
+   */
+  it('is history, not a fault', () => {
+    const [row] = buildFleet([
+      health({ installation_status: 'replaced', never_reported: true, is_online: false }),
+    ])
+    expect(row?.state).toBe('superseded')
+    // Nothing else about it is worth a line.
+    expect(row?.problems).toEqual(['superseded'])
+  })
+
+  it('outranks everything else that could be said about it', () => {
+    // A replaced install can also be never-reported, offline and broken. None
+    // of that needs anybody's attention.
+    const [row] = buildFleet([
+      health({
+        installation_status: 'replaced',
+        is_online: false,
+        recording_route_ok: false,
+        capture_enabled: false,
+      }),
+    ])
+    expect(row?.state).toBe('superseded')
+  })
+
+  it('sorts below healthy, not above it', () => {
+    const fleet = buildFleet([
+      health({ installation_id: 'replaced', installation_status: 'replaced' }),
+      health({ installation_id: 'healthy', is_online: true, recording_route: 'app_mic' }),
+      health({ installation_id: 'broken', is_online: true, recording_route: 'app_mic', recording_route_ok: false }),
+    ])
+    expect(fleet.map((row) => row.health.installation_id)).toEqual([
+      'broken',
+      'healthy',
+      'replaced',
+    ])
+  })
+})
+
+describe('willing and running is not the same as able', () => {
+  it('does not call a phone healthy when it has no capture route', () => {
+    // Live: `capture_enabled: true`, `service_running: true`,
+    // `recording_route: null`. The phone has said it is willing and running,
+    // and nothing about whether it can actually record.
+    const [row] = buildFleet([
+      health({
+        is_online: true,
+        capture_enabled: true,
+        service_running: true,
+        recording_route: null,
+        recording_route_ok: null,
+      }),
+    ])
+    expect(row?.state).toBe('awaiting_telemetry')
+  })
+
+  it('is healthy once a route is named', () => {
+    const [row] = buildFleet([
+      health({ is_online: true, capture_enabled: true, service_running: true, recording_route: 'app_mic' }),
+    ])
+    expect(row?.state).toBe('healthy')
+  })
+})

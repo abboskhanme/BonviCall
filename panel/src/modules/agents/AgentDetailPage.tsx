@@ -162,12 +162,26 @@ function AgentCard({ agent }: { agent: Agent }) {
   const installationsQuery = useInstallations(
     can(Perm.INSTALLATIONS_READ) ? { agentId: agent.id } : undefined,
   )
-  // The live binding, if there is one; a replaced or revoked install is
-  // history and must not be read as "where they are in enrolment".
-  const installation =
-    installationsQuery.data?.items.find((item) => item.status === 'active') ??
-    installationsQuery.data?.items[0] ??
-    null
+
+  /**
+   * The CURRENT attempt, which is the newest one — not the active one.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * This used to pick `status === 'active'`, and on the live fleet that hid
+   * the phone the admin was standing next to. A real rollout retries: one
+   * agent had twenty installations, an old verified one among them, and the
+   * page showed that instead of the handset stuck at `installed` right now.
+   * The funnel then reported somebody as finished while they were stuck.
+   *
+   * Newest-first is what "where is this person up to" means. The older ones
+   * are counted so the churn is visible rather than silently discarded.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  const installations = [...(installationsQuery.data?.items ?? [])].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )
+  const installation = installations[0] ?? null
+  const olderInstallations = Math.max(0, installations.length - 1)
 
   return (
     <div className="flex flex-col gap-4">
@@ -216,6 +230,7 @@ function AgentCard({ agent }: { agent: Agent }) {
           number={openRow?.number ?? null}
           installation={installation}
           agentName={agent.full_name}
+          olderInstallations={olderInstallations}
         />
       ) : null}
 

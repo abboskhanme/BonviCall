@@ -27,6 +27,7 @@ from src.core.deps import Principal
 from src.core.enums import (
     AlertKind,
     AlertSeverity,
+    Capability,
     CapabilityState,
     InstallationStatus,
 )
@@ -43,6 +44,7 @@ from src.modules.devices.models import (
 )
 from src.modules.devices.rules import (
     CAPABILITY_ALERTS,
+    REQUIRED_CAPABILITIES,
     WorkingCalendar,
     alert_for_transition,
     is_capturing,
@@ -638,8 +640,22 @@ class DeviceService:
     async def capability_matrix(
         self, installation_id: uuid.UUID
     ) -> list[CapabilityStateModel]:
-        """Current state of every reported capability, for the device page."""
-        return list(
+        """Every capability the page should show — reported **or not**.
+
+        A required capability that has never been reported used to be simply
+        absent from this list, and that is the blindness this product keeps
+        having to unlearn: the device page showed every visible row green while
+        ``capturing`` was false, and nothing on the screen said which one was
+        missing. A phone stuck part-way through E2 is exactly that shape, and
+        it is the phone an admin most needs to read.
+
+        So a required capability with no row is returned as ``unknown``, which
+        is what the enum has that value for. It is not persisted — an absence
+        is not an observation, and writing one would make ``changed_at`` a
+        fiction and turn the first real report into a transition that never
+        happened.
+        """
+        reported = list(
             (
                 await self.session.scalars(
                     select(CapabilityStateModel)
@@ -648,6 +664,19 @@ class DeviceService:
                 )
             ).all()
         )
+        seen = {row.capability.value for row in reported}
+        missing = [
+            CapabilityStateModel(
+                installation_id=installation_id,
+                capability=Capability(name),
+                state=CapabilityState.UNKNOWN,
+                checked_at=None,
+                changed_at=None,
+                detail=None,
+            )
+            for name in sorted(REQUIRED_CAPABILITIES - seen)
+        ]
+        return sorted(reported + missing, key=lambda row: row.capability.value)
 
     async def get(self, principal: Principal, installation_id: uuid.UUID) -> dict:
         """One device. Wrong owner is 404, like every other scoped read."""

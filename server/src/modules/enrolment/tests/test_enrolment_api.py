@@ -382,3 +382,96 @@ async def test_the_receiver_banner_has_a_real_type(db, admin) -> None:
     assert up["status"] == "up"
     assert up["active_receivers"] == 1
     assert up["receiver_msisdn"] == "+998712000000"
+
+
+# --- a tunnel that dies between the commit and the response ----------------
+
+
+async def _redeem_body(code: str, fingerprint: str) -> dict:
+    from datetime import UTC, datetime
+
+    return {
+        "code": code,
+        "device_fingerprint": fingerprint,
+        "device_epoch_ms": int(datetime.now(UTC).timestamp() * 1000),
+        "device_timezone": "Asia/Tashkent",
+        "app": {"variant": "modern34", "version": "1.1.0", "version_code": 2},
+        "device": {
+            "manufacturer": "Samsung",
+            "model": "SM-A546E",
+            "android_release": "14",
+            "api_level": 34,
+            "build_fingerprint_hash": "b" * 64,
+        },
+        "sim_slot": 0,
+        "sim_subscription_id": 1,
+    }
+
+
+async def test_the_same_handset_recovers_a_redemption_whose_response_was_lost(
+    db, client, enrolment_code_factory
+) -> None:
+    """The first step of enrolment, over a tunnel that dies. The field case.
+
+    The server commits, the tunnel drops before the 201 arrives, the app
+    retries. Refusing it burns the agent's single-use code and strands them
+    until an admin issues another — over the same connection that just failed.
+    """
+    code = await enrolment_code_factory()
+    body = await _redeem_body(code.code, "f" * 64)
+
+    first = await client.post("/api/device/v1/enrolment/redeem", json=body)
+    assert first.status_code == 201
+    second = await client.post("/api/device/v1/enrolment/redeem", json=body)
+
+    assert second.status_code == 201, second.text
+    assert second.json()["installation_id"] == first.json()["installation_id"]
+    # A usable token, because the first one was never received.
+    assert second.json()["provisional_token"]
+
+
+async def test_a_different_handset_is_still_refused(
+    db, client, enrolment_code_factory
+) -> None:
+    """The recovery is keyed on the fingerprint, so it cannot become a way for
+    a second phone to redeem a code it happens to know."""
+    code = await enrolment_code_factory()
+    assert (
+        await client.post(
+            "/api/device/v1/enrolment/redeem", json=await _redeem_body(code.code, "f" * 64)
+        )
+    ).status_code == 201
+
+    other = await client.post(
+        "/api/device/v1/enrolment/redeem", json=await _redeem_body(code.code, "a" * 64)
+    )
+    assert other.status_code == 409
+    assert other.json()["error"]["code"] == "enrolment_code_used"
+
+
+async def test_a_verified_installation_cannot_be_re_redeemed(
+    db, client, enrolment_code_factory, installation_factory
+) -> None:
+    """Once the number is verified the code is genuinely spent.
+
+    Otherwise anybody holding the code could mint credentials for a live
+    installation, which is a way to take one over rather than a way to recover
+    from a dropped connection.
+    """
+    from src.core.enums import InstallationStatus
+    from src.modules.installations.models import InstallationModel
+
+    code = await enrolment_code_factory()
+    body = await _redeem_body(code.code, "f" * 64)
+    first = await client.post("/api/device/v1/enrolment/redeem", json=body)
+    assert first.status_code == 201
+
+    installation = await db.get(
+        InstallationModel, uuid.UUID(first.json()["installation_id"])
+    )
+    installation.status = InstallationStatus.ACTIVE
+    await db.flush()
+
+    again = await client.post("/api/device/v1/enrolment/redeem", json=body)
+    assert again.status_code == 409
+    assert again.json()["error"]["code"] == "enrolment_code_used"

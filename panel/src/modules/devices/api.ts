@@ -90,6 +90,8 @@ export type FleetState =
   | 'revoked'
   | 'offline'
   | 'degraded'
+  | 'awaiting_telemetry'
+  | 'superseded'
   | 'healthy'
 
 export interface FleetRow {
@@ -104,6 +106,8 @@ export type FleetProblem =
   | 'install_disappeared'
   | 'revoked'
   | 'offline'
+  | 'awaiting_telemetry'
+  | 'superseded'
   | 'capture_route_broken'
   | 'capture_disabled'
   | 'service_stopped'
@@ -173,11 +177,51 @@ export function hasDisappeared(
   return age !== null && age >= DISAPPEARED_AFTER_HOURS
 }
 
+/**
+ * Has this phone told us anything about whether it can actually record?
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A handset that has just enrolled sends a heartbeat before it sends any
+ * capture telemetry, so `recording_route`, `capture_enabled` and
+ * `service_running` are all NULL for a while. Every problem check is written
+ * as "is this field false", and null is not false — so a phone we know nothing
+ * about passed every check and came out `healthy`.
+ *
+ * That was live and wrong: the client's Samsung was online, `capturing:
+ * false`, one capability reported, and the fleet page called it **Yaxshi**.
+ * Absence of a reading is not a good reading, and on the page whose whole job
+ * is to say which phones are recording, it is the most expensive place to
+ * confuse the two.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function hasCaptureTelemetry(health: DeviceHealth): boolean {
+  // The ROUTE specifically, not "any telemetry at all". A phone reporting
+  // `capture_enabled: true` and `service_running: true` with no route has
+  // told us it is willing and running — and nothing about whether it can
+  // actually record, which is the only question this page answers. Three
+  // handsets were live in exactly that state and the fleet called them
+  // healthy.
+  return health.recording_route !== null
+}
+
 function isRevoked(health: DeviceHealth): boolean {
   return (
     health.installation_status === 'revoked' ||
     health.installation_status === 'revoked_pending_confirmation'
   )
+}
+
+/**
+ * Superseded by a later enrolment on the same number.
+ *
+ * A real rollout retries: the live fleet has forty-eight installations for six
+ * agents, twenty-one of them `replaced`. Those are abandoned attempts, not
+ * broken phones — but every one was being rendered as a fault, so thirty-three
+ * dead rows buried the three that were actually live and the page stopped
+ * being readable at exactly the moment it mattered most.
+ */
+function isSuperseded(health: DeviceHealth): boolean {
+  return health.installation_status === 'replaced'
 }
 
 export function problemsFor(
@@ -187,6 +231,12 @@ export function problemsFor(
 ): FleetProblem[] {
   const problems: FleetProblem[] = []
   if (isRevoked(health)) problems.push('revoked')
+  if (isSuperseded(health)) {
+    // History. Nothing else about it is worth a line on a page about phones
+    // that need somebody to do something.
+    problems.push('superseded')
+    return problems
+  }
   if (health.never_reported) {
     // Nothing else is knowable about a phone that has never spoken, and
     // listing "offline" beside it would suggest we once heard from it.
@@ -200,6 +250,9 @@ export function problemsFor(
   } else if (!health.is_online) {
     problems.push('offline')
   }
+  // Before any "is this false" check, because null is not false and a phone
+  // we know nothing about must not pass them all silently.
+  if (!hasCaptureTelemetry(health)) problems.push('awaiting_telemetry')
   if (health.recording_route_ok === false) problems.push('capture_route_broken')
   if (health.capture_enabled === false) problems.push('capture_disabled')
   if (health.service_running === false) problems.push('service_stopped')
@@ -215,11 +268,19 @@ export function stateFor(
   funnelStage?: FunnelStage | null,
   now: Date = new Date(),
 ): FleetState {
+  // Before every other test: a superseded attempt is not a phone with a
+  // problem, whatever else is true of it.
+  if (isSuperseded(health)) return 'superseded'
   if (health.never_reported) return 'never_reported'
   if (isRevoked(health)) return 'revoked'
   if (hasDisappeared(health, funnelStage, now)) return 'install_disappeared'
   if (!health.is_online) return 'offline'
-  return problemsFor(health, funnelStage, now).length > 0 ? 'degraded' : 'healthy'
+  const problems = problemsFor(health, funnelStage, now)
+  // "We have not heard whether it can record" is its own answer, and it is
+  // not `degraded` either: nothing is known to be wrong, and nothing is known
+  // to be right.
+  if (problems.length === 1 && problems[0] === 'awaiting_telemetry') return 'awaiting_telemetry'
+  return problems.length > 0 ? 'degraded' : 'healthy'
 }
 
 /** Worst first. The default order must serve the problem, not the alphabet. */
@@ -230,8 +291,15 @@ export const FLEET_STATE_ORDER: Record<FleetState, number> = {
   install_disappeared: 1,
   offline: 2,
   degraded: 3,
-  revoked: 4,
+  // Below the known faults but above healthy: during a rollout this is the
+  // phone somebody is standing next to right now, and it is the one state
+  // that resolves itself within a minute or never.
+  awaiting_telemetry: 4,
   healthy: 5,
+  // Deliberately last, below healthy: these are abandoned enrolment attempts
+  // and nobody needs to look at them.
+  revoked: 6,
+  superseded: 7,
 }
 
 export function buildFleet(

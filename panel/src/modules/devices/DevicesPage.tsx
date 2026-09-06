@@ -204,26 +204,41 @@ export function DevicesPage() {
   // `buildFleet` already sorts worst first, so the head of that list IS the
   // worst thing in the fleet.
   const worst = needAttention[0] ?? null
+  // Past half, naming one is not triage any more.
+  const mostlyBroken = fleet.length > 0 && needAttention.length > fleet.length / 2
+  const attentionBreakdown = [...new Set(needAttention.map((row) => row.state))]
+    .map(
+      (state) =>
+        `${needAttention.filter((row) => row.state === state).length} ${t(FLEET_STATE_LABEL[state])}`,
+    )
+    .join(', ')
 
   return (
     <Page>
       <PageHeader title={t('page.devices')} description={t('devices.subtitle')} />
 
       {worst ? (
-        /* "5 of 5 need attention" tells nobody anything — when everything is
-           flagged the sentence is noise. Name the single worst thing instead,
-           and say nothing at all when there is nothing to say. */
+        /* Naming the single worst thing beats "5 of 5 need attention" — but
+           only while "worst" means something. Once most of the fleet is
+           flagged, one name out of eleven is the same noise wearing a
+           different sentence, so it counts by state instead. */
         <Card className="flex items-start gap-3 border-warn/40 bg-warn/5 p-3">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
           <p className="text-sm text-text">
-            {t('devices.attentionWorst', {
-              state: t(FLEET_STATE_LABEL[worst.state]),
-              device:
-                `${worst.health.manufacturer ?? ''} ${worst.health.model ?? ''}`.trim() ||
-                t('devices.unknownModel'),
-              agent: agentName(worst.health.agent_id) ?? '',
-              more: needAttention.length - 1,
-            })}
+            {mostlyBroken
+              ? t('devices.attentionMany', {
+                  n: needAttention.length,
+                  total: fleet.length,
+                  breakdown: attentionBreakdown,
+                })
+              : t('devices.attentionWorst', {
+                  state: t(FLEET_STATE_LABEL[worst.state]),
+                  device:
+                    `${worst.health.manufacturer ?? ''} ${worst.health.model ?? ''}`.trim() ||
+                    t('devices.unknownModel'),
+                  agent: agentName(worst.health.agent_id) ?? '',
+                  more: needAttention.length - 1,
+                })}
           </p>
         </Card>
       ) : null}

@@ -237,6 +237,24 @@ class EnrolmentService:
             holder = await self.installations.get_optional(
                 code.redeemed_by_installation_id
             )
+            # The same handset asking again is a **lost response**, not a second
+            # device. The server committed, the tunnel died before the 201
+            # arrived, and the app retried — which is the first thing that
+            # happens in the field, on the first step of enrolment. Refusing it
+            # burns the agent's single-use code and strands them until an admin
+            # issues another, over the same tunnel that just failed.
+            #
+            # Only while the installation is still ``pending``: once the number
+            # is verified the code is genuinely spent, and re-issuing
+            # credentials for an active installation to anyone holding the code
+            # would be a way to take one over.
+            if (
+                holder is not None
+                and holder.device_fingerprint_hash == payload.device_fingerprint
+                and holder.status is InstallationStatus.PENDING
+            ):
+                return await self._resume_redeem(code, holder, payload, ip)
+
             device_model = await self.devices.describe(
                 holder.device_id if holder else None
             )
@@ -293,6 +311,56 @@ class EnrolmentService:
             "enrolment_redeemed",
             installation_id=str(installation.id),
             number_id=str(code.number_id),
+        )
+        return Redemption(
+            installation=installation,
+            number=number,
+            agent_name=agent.full_name,
+            agent_id=agent.id,
+            tokens=tokens,
+            callback_msisdn=receiver.msisdn if receiver else None,
+            receiver_status=receiver.status if receiver else None,
+            window_seconds=window,
+        )
+
+    async def _resume_redeem(
+        self,
+        code: EnrolmentCodeModel,
+        installation: InstallationModel,
+        payload: DeviceRedeemIn,
+        ip: str | None,
+    ) -> Redemption:
+        """Hand the same handset the same redemption again (the lost 201).
+
+        A fresh token pair rather than the original one: the first pair was
+        never received, and the phone has nothing to present. That is safe
+        because the code has already proved this device may hold credentials
+        for this installation, and the installation is still ``pending`` — it
+        can do nothing but finish verifying.
+
+        Recorded as its own outcome, not as ``ok``: an admin reading the
+        enrolment list should see that the phone had to ask twice. Two of these
+        in a row is a connection problem, and that is worth being visible while
+        somebody is standing next to the agent.
+        """
+        await self._attempt(
+            EnrolmentAttemptKind.CODE_REDEEM,
+            EnrolmentOutcome.OK,
+            payload=payload,
+            ip=ip,
+            code=code,
+            installation_id=installation.id,
+        )
+        tokens = await self.installations.issue_device_pair(installation)
+        receiver = await self.usable_receiver()
+        window = await self._setting_int(SETTING_CALLBACK_WINDOW_SECONDS)
+        agent = await self.session.get(AgentModel, code.agent_id)
+        number = await self.session.get(RegisteredNumberModel, code.number_id)
+        await self.session.commit()
+        log.info(
+            "enrolment_redeem_resumed",
+            installation_id=str(installation.id),
+            reason="same_fingerprint_still_pending",
         )
         return Redemption(
             installation=installation,

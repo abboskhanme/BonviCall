@@ -162,6 +162,8 @@ export const ENROLMENT_ATTEMPT_KIND_LABEL: Record<EnrolmentAttemptKind, MessageK
 export const FLEET_STATE_LABEL: Record<FleetState, MessageKey> = {
   never_reported: 'fleet.never_reported',
   install_disappeared: 'fleet.install_disappeared',
+  awaiting_telemetry: 'fleet.awaiting_telemetry',
+  superseded: 'fleet.superseded',
   revoked: 'fleet.revoked',
   offline: 'fleet.offline',
   degraded: 'fleet.degraded',
@@ -171,6 +173,10 @@ export const FLEET_STATE_LABEL: Record<FleetState, MessageKey> = {
 export const FLEET_STATE_TONE: Record<FleetState, Tone> = {
   never_reported: 'bad',
   install_disappeared: 'bad',
+  // Neutral, not good and not bad: nothing is known to be wrong and nothing
+  // is known to be right.
+  awaiting_telemetry: 'neutral',
+  superseded: 'neutral',
   revoked: 'neutral',
   offline: 'bad',
   degraded: 'warn',
@@ -180,6 +186,8 @@ export const FLEET_STATE_TONE: Record<FleetState, Tone> = {
 export const FLEET_PROBLEM_LABEL: Record<FleetProblem, MessageKey> = {
   never_reported: 'fleetProblem.never_reported',
   install_disappeared: 'fleetProblem.install_disappeared',
+  awaiting_telemetry: 'fleetProblem.awaiting_telemetry',
+  superseded: 'fleetProblem.superseded',
   revoked: 'fleetProblem.revoked',
   offline: 'fleetProblem.offline',
   capture_route_broken: 'fleetProblem.capture_route_broken',
@@ -238,4 +246,21 @@ export const CAPABILITY_STATE_TONE: Record<CapabilityStateValue, Tone> = {
   denied_permanently: 'bad',
   not_applicable: 'neutral',
   unknown: 'neutral',
+}
+
+/**
+ * Which broken capability to name first.
+ *
+ * `granted_not_working` leads because it is R3 itself — Android says the
+ * permission is granted and an OEM layer refuses it anyway — and it is the
+ * one an admin would never guess at. `denied_permanently` next, because it
+ * needs a visit to the phone's settings rather than a second prompt.
+ */
+export const CAPABILITY_BLOCKING_ORDER: Record<CapabilityStateValue, number> = {
+  granted_not_working: 0,
+  denied_permanently: 1,
+  denied: 2,
+  unknown: 3,
+  not_applicable: 4,
+  granted_working: 5,
 }

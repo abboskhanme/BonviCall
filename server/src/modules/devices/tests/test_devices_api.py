@@ -211,7 +211,49 @@ async def test_the_detail_page_opens_for_a_phone_that_never_reported(
     assert body["never_reported"] is True
     assert body["capturing"] is False
     assert body["battery_level"] is None
-    assert body["capabilities"] == []
+
+    # It used to be ``== []``, and that assertion encoded the blindness: every
+    # visible row green, ``capturing`` false, and nothing on screen saying
+    # which capability was missing. The required set is now listed as
+    # ``unknown``, so the page answers "which one" for a phone that has told us
+    # nothing — which is the phone this page exists for.
+    from src.modules.devices.rules import REQUIRED_CAPABILITIES
+
+    reported = {row["capability"]: row for row in body["capabilities"]}
+    assert set(reported) == REQUIRED_CAPABILITIES
+    assert {row["state"] for row in reported.values()} == {"unknown"}
+    assert all(row["checked_at"] is None for row in reported.values())
+
+
+async def test_a_reported_capability_is_not_overwritten_by_the_unknown_filler(
+    db, manager, installation_factory, device_client_factory
+) -> None:
+    """The filler must not hide a real observation — the whole point is to make
+    the gap visible, not to make the page uniform."""
+    from datetime import UTC, datetime
+
+    installation = await installation_factory()
+    client = await device_client_factory(installation)
+    await client.post(
+        "/api/device/v1/capabilities",
+        json={
+            "capabilities": [
+                {
+                    "capability": "microphone",
+                    "state": "denied",
+                    "checked_at": datetime.now(UTC).isoformat(),
+                    "detail": "user refused",
+                }
+            ]
+        },
+    )
+
+    body = (await manager.get(f"/api/v1/devices/{installation.id}")).json()
+    rows = {row["capability"]: row for row in body["capabilities"]}
+    assert rows["microphone"]["state"] == "denied"
+    assert rows["microphone"]["detail"] == "user refused"
+    assert rows["microphone"]["checked_at"] is not None
+    assert rows["call_log"]["state"] == "unknown"
 
 
 async def test_the_shape_is_the_same_either_way(
