@@ -35,6 +35,7 @@ from src.core.config import get_settings
 from src.core.enums import AlertKind, AlertSeverity
 from src.core.jobs import JobCallable, JobRunner
 from src.core.logging import configure_logging, get_logger
+from src.modules.alerts.jobs import close_superseded_alerts
 from src.modules.alerts.service import AlertService
 from src.modules.audio.jobs import (
     audio_retention,
@@ -69,6 +70,9 @@ log = get_logger(__name__)
 #:   retention pass does not delay the storage figure that measures it.
 SCHEDULE: dict[str, tuple[JobCallable, object]] = {
     "command_timeout": (command_timeout, IntervalTrigger(seconds=10)),
+    # Hourly, not nightly: an admin looking at the inbox an hour after a phone
+    # was replaced should not be reading work that no longer exists.
+    "close_superseded_alerts": (close_superseded_alerts, IntervalTrigger(hours=1)),
     "offline_sweep": (offline_sweep, IntervalTrigger(minutes=1)),
     "silence_detection": (silence_detection, IntervalTrigger(minutes=5)),
     "funnel_refresh": (funnel_refresh, IntervalTrigger(minutes=5)),
