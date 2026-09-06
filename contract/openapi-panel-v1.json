@@ -251,6 +251,17 @@
               }
             ]
           },
+          "installation_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstallationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Status of the installation this alert is about. New alerts are not raised against a superseded phone and its open ones are closed when it is replaced — this is here so a page can also tell at a glance, without a second query, for alerts raised before that rule existed."
+          },
           "kind": {
             "$ref": "#/components/schemas/AlertKind"
           },
@@ -1887,6 +1898,18 @@
               }
             ]
           },
+          "bound_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When this installation was bound to the number."
+          },
           "capabilities": {
             "description": "Empty for a phone that has never reported — not missing.",
             "items": {
@@ -1929,6 +1952,18 @@
                 "type": "null"
               }
             ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the row was created. With `installation_status` it is what distinguishes a live binding from one superseded an hour ago."
           },
           "device_timezone": {
             "anyOf": [
@@ -2260,6 +2295,18 @@
               }
             ]
           },
+          "bound_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When this installation was bound to the number."
+          },
           "capture_enabled": {
             "anyOf": [
               {
@@ -2269,6 +2316,10 @@
                 "type": "null"
               }
             ]
+          },
+          "capturing": {
+            "description": "Whether this phone is recording **right now**: every required capability working, the installation verified, the service alive (UC-03). Never null — a phone that has told us nothing is not recording, and a null here reads as 'no problem' to any check asking whether it is false.",
+            "type": "boolean"
           },
           "cellular_bytes_month": {
             "anyOf": [
@@ -2290,6 +2341,18 @@
                 "type": "null"
               }
             ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the row was created. With `installation_status` it is what distinguishes a live binding from one superseded an hour ago."
           },
           "device_timezone": {
             "anyOf": [
@@ -2503,6 +2566,7 @@
           "last_heartbeat_at",
           "last_call_at",
           "is_online",
+          "capturing",
           "battery_level",
           "battery_charging",
           "battery_optimisation_exempt",

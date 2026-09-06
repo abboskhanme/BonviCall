@@ -632,10 +632,40 @@ class DeviceService:
         )
         rows = (await self.session.execute(statement)).all()
         cutoff = await self._offline_cutoff()
+        # One query for the whole page, not one per row. ``capturing`` is the
+        # question this page exists to answer — "which phones are recording" —
+        # and it was only on the detail response, so the list could not say.
+        states = await self._capability_states([r[0].id for r in rows])
         return [
-            self._row(health, installation, device, cutoff)
+            self._row(
+                health,
+                installation,
+                device,
+                cutoff,
+                states=states.get(installation.id, {}),
+            )
             for installation, device, health in rows
         ]
+
+    async def _capability_states(
+        self, installation_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[str, str]]:
+        """``{installation: {capability: state}}`` for a page, in one query."""
+        if not installation_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(
+                    CapabilityStateModel.installation_id,
+                    CapabilityStateModel.capability,
+                    CapabilityStateModel.state,
+                ).where(CapabilityStateModel.installation_id.in_(set(installation_ids)))
+            )
+        ).all()
+        states: dict[uuid.UUID, dict[str, str]] = {}
+        for installation_id, capability, state in rows:
+            states.setdefault(installation_id, {})[capability.value] = state.value
+        return states
 
     async def capability_matrix(
         self, installation_id: uuid.UUID
@@ -714,6 +744,7 @@ class DeviceService:
         installation: InstallationModel,
         device: DeviceModel,
         cutoff,
+        states: dict[str, str] | None = None,
     ) -> dict:
         """One row. ``health`` is ``None`` for a phone that never reported.
 
@@ -736,11 +767,26 @@ class DeviceService:
                 "app_variant": installation.app_variant,
                 "never_reported": True,
                 "is_online": False,
+                # A phone that has told us nothing is not recording. Saying so
+                # explicitly rather than leaving it null: the panel's checks
+                # asked "is this false", and null is not false, so a null here
+                # would read as "no problem" — which is how three live phones
+                # showed "Yaxshi" while they were not recording.
+                "capturing": False,
+                "bound_at": installation.bound_at,
+                "created_at": installation.created_at,
                 **dict.fromkeys(_HEALTH_ONLY_FIELDS),
             }
         return {
             "installation_id": health.installation_id,
             "never_reported": False,
+            "capturing": is_capturing(
+                states or {},
+                verified=installation.verified_at is not None,
+                service_running=bool(health.service_running),
+            ),
+            "bound_at": installation.bound_at,
+            "created_at": installation.created_at,
             "agent_id": installation.agent_id,
             "number_id": installation.number_id,
             "installation_status": installation.status,

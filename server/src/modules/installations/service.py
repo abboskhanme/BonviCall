@@ -432,6 +432,10 @@ class InstallationService:
         )
         if previous is not None:
             previous.status = InstallationStatus.REPLACED
+            # Its open alerts go with it: nobody will fix a handset the agent
+            # no longer holds, so nobody acknowledges them, and they sit at the
+            # top of a page sorted worst-first for ever.
+            await AlertService(self.session).resolve_all_for(previous.id)
             previous.replaced_at = clock.now()
             previous.funnel_stage = FunnelStage.REVOKED
             previous.funnel_changed_at = clock.now()
@@ -527,6 +531,7 @@ class InstallationService:
             self.session
         ).queue_snapshot(installation_id)
 
+        await AlertService(self.session).resolve_all_for(installation_id)
         installation.status = InstallationStatus.REVOKED_PENDING_CONFIRMATION
         installation.revoked_at = clock.now()
         installation.token_version += 1

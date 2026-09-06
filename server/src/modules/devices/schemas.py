@@ -52,6 +52,25 @@ class DeviceHealthResponse(BaseModel):
             "to keep it false, and it would be wrong between runs."
         )
     )
+    capturing: bool = Field(
+        description=(
+            "Whether this phone is recording **right now**: every required "
+            "capability working, the installation verified, the service alive "
+            "(UC-03). Never null — a phone that has told us nothing is not "
+            "recording, and a null here reads as 'no problem' to any check "
+            "asking whether it is false."
+        )
+    )
+    bound_at: datetime | None = Field(
+        default=None, description="When this installation was bound to the number."
+    )
+    created_at: datetime | None = Field(
+        default=None,
+        description=(
+            "When the row was created. With `installation_status` it is what "
+            "distinguishes a live binding from one superseded an hour ago."
+        ),
+    )
     ws_connected: bool | None = Field(
         default=None,
         description=(

@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from src.core.enums import AlertKind, AlertSeverity
+from src.core.enums import AlertKind, AlertSeverity, InstallationStatus
 from src.core.messages_uz import alert_text
 
 
@@ -28,6 +28,16 @@ class AlertResponse(BaseModel):
     )
     agent_id: uuid.UUID | None
     installation_id: uuid.UUID | None
+    installation_status: InstallationStatus | None = Field(
+        default=None,
+        description=(
+            "Status of the installation this alert is about. New alerts are "
+            "not raised against a superseded phone and its open ones are "
+            "closed when it is replaced — this is here so a page can also tell "
+            "at a glance, without a second query, for alerts raised before "
+            "that rule existed."
+        ),
+    )
     number_id: uuid.UUID | None
     device_model: str | None
     detail: dict[str, Any] | None

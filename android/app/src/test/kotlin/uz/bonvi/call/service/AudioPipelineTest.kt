@@ -36,7 +36,7 @@ class AudioPipelineTest {
     private fun recording(): File = temp.newFile("call.m4a").apply { writeText("raw-audio") }
 
     private fun transcodedTo(dir: File): File =
-        File(dir, "call.ogg").apply { parentFile.mkdirs(); writeText("opus") }
+        File(dir, "call.ogg").apply { dir.mkdirs(); writeText("opus") }
 
     /** Records what it was asked to send, and answers with [next]. */
     private class FakeUploader(

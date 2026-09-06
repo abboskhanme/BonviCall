@@ -369,3 +369,69 @@ async def test_losing_a_capability_that_worked_still_says_it_was_lost(
     assert (alert["title_uz"], alert["body_uz"]) == ALERT_TEXT[
         "permission_lost_microphone"
     ]
+
+
+async def test_no_alert_is_raised_against_a_superseded_phone(
+    db, admin, installation_factory
+) -> None:
+    """A phone the agent no longer holds cannot be fixed.
+
+    Forty-seven open alerts on a fleet whose live half was six phones, because
+    every replaced installation kept raising. Nobody acknowledges work they
+    cannot do, so they sit at the top of a page sorted worst-first for ever.
+    """
+    from src.core.enums import AlertKind, AlertSeverity, InstallationStatus
+    from src.modules.alerts.service import AlertService
+
+    installation = await installation_factory()
+    installation.status = InstallationStatus.REPLACED
+    await db.flush()
+
+    raised = await AlertService(db).raise_alert(
+        kind=AlertKind.DEVICE_OFFLINE,
+        severity=AlertSeverity.WARNING,
+        scope=installation.id,
+        installation_id=installation.id,
+    )
+    assert raised is None
+    assert (await admin.get("/api/v1/alerts")).json()["total"] == 0
+
+
+async def test_a_live_phone_still_alerts(db, admin, installation_factory) -> None:
+    """The other half. Suppression that suppresses everything is not a filter."""
+    from src.core.enums import AlertKind, AlertSeverity
+    from src.modules.alerts.service import AlertService
+
+    installation = await installation_factory()
+    raised = await AlertService(db).raise_alert(
+        kind=AlertKind.DEVICE_OFFLINE,
+        severity=AlertSeverity.WARNING,
+        scope=installation.id,
+        installation_id=installation.id,
+    )
+    assert raised is not None
+
+    item = (await admin.get("/api/v1/alerts")).json()["items"][0]
+    assert item["installation_status"] == "active"
+
+
+async def test_replacing_a_phone_closes_the_alerts_it_left_behind(
+    db, admin, installation_factory
+) -> None:
+    """The historical half: alerts raised while it *was* live."""
+    from src.core.enums import AlertKind, AlertSeverity
+    from src.modules.alerts.service import AlertService
+
+    installation = await installation_factory()
+    service = AlertService(db)
+    await service.raise_alert(
+        kind=AlertKind.DEVICE_OFFLINE,
+        severity=AlertSeverity.WARNING,
+        scope=installation.id,
+        installation_id=installation.id,
+    )
+    assert (await admin.get("/api/v1/alerts")).json()["open_count"] == 1
+
+    closed = await service.resolve_all_for(installation.id)
+    assert closed == 1
+    assert (await admin.get("/api/v1/alerts")).json()["open_count"] == 0

@@ -37,7 +37,7 @@ async def list_alerts(
         severity=severity, open_only=open_only, limit=limit
     )
     return AlertListResponse(
-        items=[AlertResponse.model_validate(row) for row in items],
+        items=items,
         total=total,
         open_count=open_count,
     )

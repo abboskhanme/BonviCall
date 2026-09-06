@@ -25,12 +25,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import clock
-from src.core.enums import ActorType, AlertKind, AlertSeverity, AuditAction
+from src.core.enums import ActorType, AlertKind, AlertSeverity, AuditAction, InstallationStatus
 from src.core.errors import NotFoundError
 from src.core.logging import get_logger
 from src.core.messages_uz import alert_text
 from src.modules.alerts.models import AlertModel
+from src.modules.alerts.schemas import AlertResponse
 from src.modules.audit.service import AuditService
+from src.modules.installations.models import InstallationModel
 
 log = get_logger(__name__)
 
@@ -52,6 +54,38 @@ class AlertService:
         self.session = session
         self.audit = AuditService(session)
 
+    async def _is_live(self, installation_id: uuid.UUID) -> bool:
+        """Whether this installation is the one the agent is actually using."""
+        status = await self.session.scalar(
+            select(InstallationModel.status).where(
+                InstallationModel.id == installation_id
+            )
+        )
+        return status in (None, InstallationStatus.ACTIVE, InstallationStatus.PENDING)
+
+    async def resolve_all_for(self, installation_id: uuid.UUID) -> int:
+        """Close every open alert for an installation that has been superseded.
+
+        Called when a phone is replaced or revoked. Without it the alerts
+        raised while it *was* live stay open for ever — nobody will fix a
+        handset the agent no longer holds, so nobody will acknowledge them, and
+        they sit at the top of a page sorted worst-first.
+        """
+        rows = list(
+            (
+                await self.session.scalars(
+                    select(AlertModel).where(
+                        AlertModel.installation_id == installation_id,
+                        AlertModel.resolved_at.is_(None),
+                    )
+                )
+            ).all()
+        )
+        for alert in rows:
+            alert.resolved_at = clock.now()
+        await self.session.flush()
+        return len(rows)
+
     async def raise_alert(
         self,
         kind: AlertKind,
@@ -62,12 +96,21 @@ class AlertService:
         number_id: uuid.UUID | None = None,
         device_model: str | None = None,
         detail: dict[str, Any] | None = None,
-    ) -> AlertModel:
+    ) -> AlertModel | None:
         """Raise ``kind`` for ``scope``, or bump the open one if it exists.
 
         The Uzbek wording comes from ``core/messages_uz.py``: a caller names the
         cause, it never writes the sentence (§14).
         """
+        if installation_id is not None and not await self._is_live(installation_id):
+            # A superseded or revoked phone cannot be fixed: the agent is
+            # holding a different handset. Alerts about it are work an admin
+            # cannot do, and forty-seven of them buried the six that mattered.
+            # The queue of a ``replaced`` installation is still accepted
+            # (SPEC §9.3) — this suppresses the *alerting*, not the ingest.
+            log.debug("alert_suppressed_for_superseded_installation", kind=kind.value)
+            return None
+
         title_uz, body_uz = alert_text(
             kind.value, first_report=bool(detail and detail.get("first_report"))
         )
@@ -109,7 +152,7 @@ class AlertService:
         severity: AlertSeverity | None = None,
         open_only: bool = True,
         limit: int = 200,
-    ) -> tuple[list[AlertModel], int, int]:
+    ) -> tuple[list[AlertResponse], int, int]:
         """The inbox feed, newest activity first."""
         statement = select(AlertModel).order_by(AlertModel.last_seen_at.desc())
         if severity is not None:
@@ -126,7 +169,30 @@ class AlertService:
                 AlertModel.acknowledged_at.is_(None), AlertModel.resolved_at.is_(None)
             )
         )
-        return rows, len(rows), open_count
+        # The installation's status, for the whole page in one query. Without
+        # it a panel filtering out superseded phones needs a second request per
+        # alert, which is why it was inferring instead.
+        statuses = await self._statuses_for(
+            [row.installation_id for row in rows if row.installation_id]
+        )
+        items = [
+            AlertResponse.model_validate(row).model_copy(
+                update={"installation_status": statuses.get(row.installation_id)}
+            )
+            for row in rows
+        ]
+        return items, len(items), open_count
+
+    async def _statuses_for(self, installation_ids) -> dict:
+        wanted = {value for value in installation_ids if value is not None}
+        if not wanted:
+            return {}
+        rows = await self.session.execute(
+            select(InstallationModel.id, InstallationModel.status).where(
+                InstallationModel.id.in_(wanted)
+            )
+        )
+        return dict(rows.all())
 
     async def acknowledge(self, alert_id: uuid.UUID, actor_id: uuid.UUID) -> AlertModel:
         """Mark it seen. Idempotent, and it never removes the row.

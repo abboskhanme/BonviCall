@@ -1,6 +1,7 @@
 package uz.bonvi.call.arch
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import uz.bonvi.call.TestPaths
 import java.io.File
@@ -74,7 +75,8 @@ class UzbekCatalogueTest {
             val claimsNoContacts = value.contains("Kontaktlar") &&
                 value.contains("yuborilmaydi") &&
                 !value.contains("ismi")
-            assertThat(claimsNoContacts)
+            assertWithMessage("$key promises contacts are never sent")
+                .that(claimsNoContacts)
                 .isEqualTo(false)
         }
     }
@@ -112,10 +114,12 @@ class UzbekCatalogueTest {
         val why = strings.filterKeys { it.startsWith("perm_") && it.endsWith("_why") }
         assertThat(why).isNotEmpty()
         for ((key, value) in why) {
-            assertThat(value.length).isAtLeast(40)
+            assertWithMessage("$key explains too little to be worth showing")
+                .that(value.length).isAtLeast(40)
             // No raw Android permission names in front of a salesperson.
             for (leak in listOf("READ_", "RECORD_AUDIO", "android.permission")) {
-                assertThat(value).doesNotContain(leak)
+                assertWithMessage("$key leaks a permission name").that(value)
+                    .doesNotContain(leak)
             }
         }
     }
@@ -129,7 +133,8 @@ class UzbekCatalogueTest {
             RegexOption.IGNORE_CASE)
         for ((key, value) in strings) {
             if (value in allowed) continue
-            assertThat(english.containsMatchIn(value)).isEqualTo(false)
+            assertWithMessage("$key contains English: \"$value\"")
+                .that(english.containsMatchIn(value)).isEqualTo(false)
         }
     }
 
