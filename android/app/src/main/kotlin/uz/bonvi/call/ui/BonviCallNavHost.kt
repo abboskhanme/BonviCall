@@ -102,6 +102,7 @@ fun BonviCallNavHost(
             EnrolCodeScreen(
                 viewModel = enrolmentViewModel(navController, entry),
                 prefilledCode = entry.arguments?.getString(ARG_CODE) ?: deepLinkCode,
+                onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
             )
         }
         composable(Routes.ENROL_PERMISSIONS) { entry ->

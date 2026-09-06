@@ -40,6 +40,17 @@ import uz.bonvi.call.enrolment.EnrolmentViewModel
 fun EnrolCodeScreen(
     viewModel: EnrolmentViewModel,
     prefilledCode: String? = null,
+    /**
+     * "Yordam kerak" on E1 must also OPEN the diagnostics screen, not only
+     * report the stall.
+     *
+     * E1 is where a wrong or dead server address surfaces, and the screen that
+     * fixes it was reachable only from E6 — so the one control that repairs a
+     * broken connection sat behind having a working one. A real handset hit
+     * that twice today: a correct build, an unreachable address, and no way
+     * from the failing screen to the field that sets it.
+     */
+    onOpenDiagnostics: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycleCompat()
     var code by remember { mutableStateOf(prefilledCode.orEmpty()) }
@@ -47,7 +58,12 @@ fun EnrolCodeScreen(
     EnrolScaffold(
         number = state.registeredNumber,
         title = stringResource(R.string.enrol_code_title),
-        onStuck = viewModel::onStuck,
+        onStuck = {
+            // Both: the admin needs to know somebody is stuck, and the person
+            // stuck needs the screen that shows what is wrong.
+            viewModel.onStuck()
+            onOpenDiagnostics()
+        },
     ) {
         state.agentName?.let { Text(stringResource(R.string.enrol_hello, it)) }
         Text(stringResource(R.string.enrol_code_explain))
