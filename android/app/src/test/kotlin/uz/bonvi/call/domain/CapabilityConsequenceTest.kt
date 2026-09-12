@@ -50,8 +50,17 @@ class CapabilityConsequenceTest {
     fun `the screen offers the control on every failing step, not just optional ones`() {
         val screen = TestPaths.kotlinSources()
             .single { it.name == "EnrolPermissionsScreen.kt" }.readText()
-        assertThat(screen).contains("if (!alreadyWorking)")
+        // The ONE condition a row may bail out on is the capability already
+        // working. Anything else — optional vs required, denied vs
+        // granted_not_working — must still reach the control below, because a
+        // step whose own text says "retrying will not fix this" cannot also be
+        // the end of the road (UC-14).
+        assertThat(screen).contains("if (working) return@Column")
         assertThat(screen).contains("viewModel.onContinueWithout(capability)")
+        // Never gated on optionality. This is the assertion that would have
+        // caught the original bug: the escape existed only for the steps that
+        // did not need it.
+        assertThat(screen).doesNotContain("if (capability in CaptureReadiness.OPTIONAL) {\n                TextButton")
     }
 
     @Test

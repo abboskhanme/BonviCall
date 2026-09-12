@@ -52,6 +52,33 @@ interface DeviceEnrolmentApi {
         @Query("verification_id") verificationId: String,
     ): Response<DeviceVerificationStatusOut>
 
+    /**
+     * §9.3, route 3 — finish on the strength of the enrolment code alone.
+     *
+     * The route that exists because the other two are frequently both
+     * unavailable on this fleet at once: Uzbek SIMs leave `getLine1Number()`
+     * empty and the callback needs a receiver line nobody has provided. Before
+     * it, such a handset had no path to `active` at all.
+     *
+     * 409 `self_declared_disabled` when an admin has turned it off — a
+     * configuration answer, so the screen sends the agent to a person rather
+     * than offering the same button again.
+     */
+    @POST("enrolment/verify/self")
+    suspend fun verifySelfDeclared(): Response<DeviceVerificationStatusOut>
+
+    /**
+     * Where this installation stands, and its real token pair once it is
+     * active — **including when an admin attested it from the panel**.
+     *
+     * Without this the attestation never reached the phone: the pair is minted
+     * at verification, so a handset waiting on an admin held a provisional
+     * token and no way to discover that the thing it was waiting for had
+     * already happened.
+     */
+    @GET("enrolment/status")
+    suspend fun enrolmentStatus(): Response<DeviceVerificationStatusOut>
+
     /** E2. Posted immediately after every check so the panel shows where the
      *  agent is stuck within 2 minutes (UC-03 AC). */
     @POST("capabilities")

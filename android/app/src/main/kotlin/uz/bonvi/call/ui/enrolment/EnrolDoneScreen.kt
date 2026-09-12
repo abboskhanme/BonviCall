@@ -1,6 +1,7 @@
 package uz.bonvi.call.ui.enrolment
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -10,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import uz.bonvi.call.R
 import uz.bonvi.call.domain.CaptureReadiness
+import uz.bonvi.call.domain.NumberVerification
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 
 /**
@@ -30,7 +32,20 @@ import uz.bonvi.call.enrolment.EnrolmentViewModel
  * identity anchor must never silently degrade.
  */
 @Composable
-fun EnrolDoneScreen(viewModel: EnrolmentViewModel, onOpenDiagnostics: () -> Unit) {
+fun EnrolDoneScreen(
+    viewModel: EnrolmentViewModel,
+    onOpenDiagnostics: () -> Unit,
+    /**
+     * Leave enrolment for the home screen.
+     *
+     * Offered whatever the state, including BLOCKED: a phone that cannot
+     * capture yet is still enrolled, the panel can see it, and stranding the
+     * agent on the last step of a flow they cannot finish teaches them the app
+     * is broken. The home screen repeats the same reason and keeps the number
+     * on screen (N41).
+     */
+    onFinish: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycleCompat()
 
     EnrolScaffold(
@@ -80,11 +95,30 @@ fun EnrolDoneScreen(viewModel: EnrolmentViewModel, onOpenDiagnostics: () -> Unit
             Text(stringResource(R.string.enrol_done_blocked_next))
         }
 
-        if (state.isAttestedRatherThanProven) {
-            Text(
+        // SPEC §9.3: an unproven binding is named, and named for what it
+        // actually is. Two of the four routes vouch rather than prove, and
+        // they vouch differently — an admin looked at this number, or nobody
+        // has. Rendering both as "administrator tasdiqlagan" would be the
+        // silent degradation the rule exists to stop.
+        when (state.verificationMethod) {
+            NumberVerification.Method.ADMIN_ATTESTED -> Text(
                 text = stringResource(R.string.enrol_done_attested),
                 color = MaterialTheme.colorScheme.tertiary,
             )
+
+            NumberVerification.Method.SELF_DECLARED -> Text(
+                text = stringResource(R.string.enrol_done_self_declared),
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+
+            NumberVerification.Method.SIM_MSISDN,
+            NumberVerification.Method.CALLBACK,
+            null,
+            -> Unit
+        }
+
+        Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.common_continue))
         }
 
         TextButton(onClick = onOpenDiagnostics, modifier = Modifier.fillMaxWidth()) {

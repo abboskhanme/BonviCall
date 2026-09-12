@@ -129,6 +129,51 @@ object LiveAdmin {
         return session
     }
 
+    /**
+     * Issue a command the way the panel does (T55, UC-16).
+     *
+     * `202 Accepted` means queued for delivery, not done — the device half is
+     * what makes it done, which is exactly what the test using this checks.
+     *
+     * @return the command id, or null when the admin path is unavailable.
+     */
+    fun issueCommand(installationId: String, kind: String, number: String? = null): String? {
+        val bearer = login() ?: return null
+        val body = if (number == null) {
+            """{"kind":"$kind"}"""
+        } else {
+            """{"kind":"$kind","number":"$number"}"""
+        }
+        return runCatching {
+            client.newCall(
+                Request.Builder()
+                    .url("${LiveHarness.baseUrl}/api/v1/devices/$installationId/commands")
+                    .header("Authorization", "Bearer $bearer")
+                    .post(body.toRequestBody(json))
+                    .build(),
+            ).execute().use { response ->
+                if (!response.isSuccessful) return null
+                JSONObject(response.body!!.string()).getString("id")
+            }
+        }.getOrNull()
+    }
+
+    /** What the panel shows for one command: `sent`, `acknowledged`, `failed`. */
+    fun commandStatus(commandId: String): String? {
+        val bearer = login() ?: return null
+        return runCatching {
+            client.newCall(
+                Request.Builder()
+                    .url("${LiveHarness.baseUrl}/api/v1/commands/$commandId")
+                    .header("Authorization", "Bearer $bearer")
+                    .build(),
+            ).execute().use { response ->
+                if (!response.isSuccessful) return null
+                JSONObject(response.body!!.string()).getString("status")
+            }
+        }.getOrNull()
+    }
+
     /** UC-08, from the admin side, so the device half can be observed. */
     fun revoke(installationId: String): Boolean {
         val bearer = login() ?: return false

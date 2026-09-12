@@ -87,4 +87,33 @@ class DeviceAuthStateTest {
             "active", "auth_expired", "revoked", "update_required",
         )
     }
+
+    /**
+     * The two states in which a handset holds an installation id and can do
+     * nothing with it.
+     *
+     * `EnrolmentViewModel` keys its "resume past E1" decision on exactly this,
+     * because keying it on the id alone made the documented recovery — a new
+     * code on the same number — unreachable from the app. A live Redmi Note 14
+     * sat on a home screen claiming to capture, with 39 calls held and no way
+     * to enter the code that would have freed them.
+     */
+    @Test
+    fun `a dead credential is not a usable one`() {
+        assertThat(DeviceAuthState.AUTH_EXPIRED.canCapture).isFalse()
+        assertThat(DeviceAuthState.REVOKED.canCapture).isFalse()
+        // And the two that ARE usable, so the fix cannot swing the other way
+        // and send a healthy phone back to the code screen on every launch.
+        assertThat(DeviceAuthState.ACTIVE.canCapture).isTrue()
+        assertThat(DeviceAuthState.UPDATE_REQUIRED.canCapture).isTrue()
+    }
+
+    @Test
+    fun `a refused refresh always lands somewhere unusable`() {
+        // Whatever the server said, the phone must not stay in a state that
+        // lets the home screen claim it is capturing.
+        for (code in listOf("refresh_reused", "unauthorized", "installation_revoked", null)) {
+            assertThat(AuthStateRule.onRefreshRefused(code).canCapture).isFalse()
+        }
+    }
 }

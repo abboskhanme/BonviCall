@@ -32,9 +32,11 @@ object CaptureReadiness {
         Capability.SUBSCRIPTION_RESOLUTION,
     )
 
-    /** Needed for UC-16 click-to-call but not for capture. Missing it costs the
-     *  dial command, not the recording — so it must not block E6. */
-    val RECOMMENDED: Set<Capability> = setOf(Capability.CALL_PHONE, Capability.STORAGE_ACCESS)
+    // `RECOMMENDED` was here and had no reader. What it encoded — that
+    // CALL_PHONE and STORAGE_ACCESS must not block E6 — is already true by
+    // construction: neither is in [REQUIRED], and [E2_ORDER] asks for them
+    // anyway. A second list saying the same thing is a second list that can
+    // disagree.
 
     enum class CaptureState(val wire: String) {
         /** Everything works and the number is proven or attested. */

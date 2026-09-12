@@ -84,17 +84,23 @@ class CallLogReader @Inject constructor(
             projection,
             "${CallLog.Calls.DATE} >= ?",
             arrayOf(fromEpochMillis.toString()),
-            "${CallLog.Calls.DATE} ASC LIMIT $limit",
+            // ⚠️ **No `LIMIT` here either.** Android 11+ rejects it in the sort
+            // order with `IllegalArgumentException`, which this class catches
+            // and reports as a gap — so on a modern handset the recovery sweep
+            // would quietly find nothing, for ever. The bound is applied while
+            // reading instead: a cursor is fetched in windows, so stopping
+            // early costs nothing.
+            "${CallLog.Calls.DATE} ASC",
         ).use { cursor ->
             if (cursor == null) return emptyList()
-            val entries = ArrayList<Entry>(cursor.count)
+            val entries = ArrayList<Entry>(minOf(cursor.count, limit))
             val date = cursor.getColumnIndex(CallLog.Calls.DATE)
             val duration = cursor.getColumnIndex(CallLog.Calls.DURATION)
             val type = cursor.getColumnIndex(CallLog.Calls.TYPE)
             val number = cursor.getColumnIndex(CallLog.Calls.NUMBER)
             val account =
                 cursor.getColumnIndex(SubscriptionPrivacyBoundary.SIM_ATTRIBUTION_COLUMN)
-            while (cursor.moveToNext()) {
+            while (entries.size < limit && cursor.moveToNext()) {
                 val callType = cursor.getInt(type)
                 entries += Entry(
                     startedAtEpochMillis = cursor.getLong(date),

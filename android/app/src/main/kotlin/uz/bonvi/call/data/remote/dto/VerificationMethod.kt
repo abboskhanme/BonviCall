@@ -28,9 +28,9 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * How we proved the phone holds the registered number (UC-04, T142).
+ * How we proved the phone holds the registered number (UC-04, T142).  Ordered strongest to weakest, and the order is load-bearing: SPEC §9.3 requires the identity anchor to degrade visibly, so every place that renders a binding renders which of these it rests on.  ``self_declared`` is the weakest. It says only that whoever held the single-use code an admin issued for this number typed it into this handset — no line was proven. It exists because on this fleet the two proving routes are frequently both unavailable: Uzbek SIMs leave ``getLine1Number()`` empty, and the callback route needs a receiver line. Without it those handsets have no path to ``active`` at all, which is strictly worse: an unenrolled phone reports nothing, so nobody can even see that it is unverified. Governed by ``enrolment.allow_self_declared``.
  *
- * Values: SIM_MSISDN,CALLBACK,ADMIN_ATTESTED
+ * Values: SIM_MSISDN,CALLBACK,ADMIN_ATTESTED,SELF_DECLARED
  */
 
 @JsonClass(generateAdapter = false)
@@ -43,7 +43,10 @@ enum class VerificationMethod(val value: kotlin.String) {
     CALLBACK("callback"),
 
     @Json(name = "admin_attested")
-    ADMIN_ATTESTED("admin_attested");
+    ADMIN_ATTESTED("admin_attested"),
+
+    @Json(name = "self_declared")
+    SELF_DECLARED("self_declared");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use

@@ -6,7 +6,9 @@ import uz.bonvi.call.core.Clock
 import uz.bonvi.call.data.local.PendingCallDao
 import uz.bonvi.call.data.local.PendingCallEntity
 import uz.bonvi.call.di.IoDispatcher
+import uz.bonvi.call.domain.AudioMissingReason
 import uz.bonvi.call.domain.CallDirection
+import uz.bonvi.call.domain.CaptureRoute
 import uz.bonvi.call.domain.RejectReason
 import uz.bonvi.call.service.PendingCall
 import uz.bonvi.call.service.PendingCallStore
@@ -59,6 +61,14 @@ class RoomPendingCallStore @Inject constructor(
         startedElapsedMillis = startedElapsedMillis,
         answeredAtEpochMillis = answeredAtEpochMillis,
         endedAtEpochMillis = endedAtEpochMillis,
+        audioPath = audioPath,
+        // An unknown wire value resolves to null rather than throwing: a row
+        // written by a newer build must not take down the sweep that is trying
+        // to upload a call that already happened.
+        captureRoute = captureRoute?.let { wire -> CaptureRoute.entries.firstOrNull { it.wire == wire } },
+        audioReason = audioReason?.let { wire ->
+            AudioMissingReason.entries.firstOrNull { it.wire == wire }
+        },
     )
 
     private fun PendingCall.toEntity() = PendingCallEntity(
@@ -71,6 +81,9 @@ class RoomPendingCallStore @Inject constructor(
         startedElapsedMillis = startedElapsedMillis,
         answeredAtEpochMillis = answeredAtEpochMillis,
         endedAtEpochMillis = endedAtEpochMillis,
+        audioPath = audioPath,
+        captureRoute = captureRoute?.wire,
+        audioReason = audioReason?.wire,
     )
 
     private companion object {

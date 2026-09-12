@@ -38,6 +38,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, MessageKey> = {
   enrolment_code_issued: 'audit.enrolment_code_issued',
   enrolment_code_revoked: 'audit.enrolment_code_revoked',
   installation_attested: 'audit.installation_attested',
+  installation_self_declared: 'audit.installation_self_declared',
   installation_revoked: 'audit.installation_revoked',
   installation_rebound: 'audit.installation_rebound',
   command_issued: 'audit.command_issued',

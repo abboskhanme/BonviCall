@@ -63,21 +63,18 @@ object Capabilities {
      */
     fun canUseVoiceRecognitionSource(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
 
-    /** Android 14 requires every foreground service to declare a type. */
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
-    fun requiresForegroundServiceType(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+    // Four predicates were removed here, all of them with no caller:
+    // `requiresForegroundServiceType`, `notificationPermissionRequired` and
+    // `phoneNumbersPermissionRequired` — the manifest and the permission
+    // checks answer those questions directly — and
+    // `phoneCallServiceTypeIsRestricted`, whose documentation had also become
+    // wrong: it said the app is not the default dialer, does not hold
+    // MANAGE_OWN_CALLS and is not a device owner, and the app has held
+    // MANAGE_OWN_CALLS since 2026-09-06. An uncalled predicate carrying a
+    // stale claim is worse than no predicate: the next person reads it as
+    // current.
 
-    /**
-     * Does the `phoneCall` foreground-service type need the caller to be the
-     * default dialer / hold MANAGE_OWN_CALLS / be a device owner?
-     *
-     * BonviCall is none of the three, so on these devices the `modern34`
-     * flavour must start with `microphone|dataSync` alone. M0 measures what
-     * that costs (see src/modern34/AndroidManifest.xml).
-     */
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    fun phoneCallServiceTypeIsRestricted(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+
 
     /**
      * Can `MediaMuxer` write Opus into an Ogg container?
@@ -103,15 +100,7 @@ object Capabilities {
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.P)
     fun supportsSigningInfo(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
 
-    /** POST_NOTIFICATIONS became a runtime permission at API 33. */
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
-    fun notificationPermissionRequired(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
-    /** READ_PHONE_NUMBERS split out of READ_PHONE_STATE at API 30 (UC-04). */
-    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.R)
-    fun phoneNumbersPermissionRequired(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
     /**
      * All-files access is the only route to the OEM folder under scoped

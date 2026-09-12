@@ -16,6 +16,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import timber.log.Timber
 import uz.bonvi.call.data.repository.CallUploader
+import uz.bonvi.call.service.AudioDrain
+import uz.bonvi.call.service.Revocation
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,6 +38,8 @@ class CallUploadWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted parameters: WorkerParameters,
     private val uploader: CallUploader,
+    private val audio: AudioDrain,
+    private val revocation: Revocation,
 ) : CoroutineWorker(context, parameters) {
 
     override suspend fun doWork(): Result {
@@ -44,7 +48,25 @@ class CallUploadWorker @AssistedInject constructor(
             "Upload pass: sent=%d confirmed=%d parked=%d",
             outcome.sent, outcome.confirmed, outcome.parked,
         )
+        // This drain is where the server's `installation_revoked` is usually
+        // heard first, and the answer to it is a deletion (UC-08) — so the
+        // enforcement runs here rather than waiting up to fifteen minutes for
+        // the heartbeat. It is idempotent and silent when there is nothing
+        // left to delete.
+        revocation.enforceIfRevoked()
+
+        // Audio follows metadata, always. The server accepts a recording only
+        // against a call it already holds, so draining in the other order would
+        // upload nothing on the first pass and look like a capture failure.
+        val recordings = audio.drainOnce()
+
         return when {
+            // A recording that was interrupted mid-upload resumes from the
+            // bytes the server already has; coming back sooner than the
+            // fifteen-minute period is worth it for a call somebody is waiting
+            // to hear.
+            recordings.unfinished > 0 -> Result.retry()
+
             // More waiting, or the server asked us to come back.
             outcome.retryLater -> Result.retry()
             else -> Result.success()

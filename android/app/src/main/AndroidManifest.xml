@@ -79,8 +79,22 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- UC-05, UC-11: hold the CPU while a call is being reconciled and while a
-         chunk is uploading, so doze does not truncate either. -->
+         chunk is uploading, so doze does not truncate either. `CaptureService`
+         holds a partial lock for its whole lifetime — declared since T22 and
+         unused until 2026-09-06, which is why the first real handset went
+         silent 19 minutes after its screen went off. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- UC-05. The two that qualify this app for the `phoneCall`
+         foreground-service type. MANAGE_OWN_CALLS is a NORMAL permission —
+         granted at install, no dialog, nothing an agent has to understand —
+         and holding it is one of the three routes Android 14+ accepts for that
+         type. CallSentry qualified the same way and survived on these
+         handsets. What it buys: exemption from Android 15's six-hour
+         `dataSync` budget, and permission to restart from the background,
+         which is exactly what the watchdog does after an OEM kill. -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <!-- UC-03: ask for the battery-optimisation exemption. The capability check
          then verifies it actually took effect (granted_not_working is real). -->
@@ -128,15 +142,21 @@
         </activity>
 
         <!-- UC-05, UC-14, UC-11.
-             The type list is `microphone|dataSync` for BOTH flavours and is
-             declared once, here, so they cannot drift. `phoneCall` is
-             deliberately absent — the app does not qualify for it and starting
-             an FGS of a type you do not qualify for throws. The reasoning is
-             written out in src/modern34/AndroidManifest.xml. -->
+             All three types are DECLARED here for both flavours; which one is
+             used is decided at runtime by CaptureService, best first, because
+             starting an FGS of a type the app does not qualify for throws and
+             the manifest cannot express "try this, then that".
+
+             `phoneCall` is now in the list: MANAGE_OWN_CALLS above qualifies
+             the app for it (Android 14+ accepts that route), and it is the type
+             that survives Android 15's six-hour `dataSync` budget and may be
+             restarted from the background. The earlier comment saying it must
+             never be added was right about the rule and wrong about the app —
+             the permission was simply missing. -->
         <service
             android:name=".service.CaptureService"
             android:exported="false"
-            android:foregroundServiceType="microphone|dataSync" />
+            android:foregroundServiceType="phoneCall|microphone|dataSync" />
 
         <!-- UC-05: BOOT_COMPLETED, MY_PACKAGE_REPLACED and LOCKED_BOOT_COMPLETED
              all restart the service. If the OS refuses, the app reports

@@ -48,6 +48,7 @@ class ReconcileSweep @Inject constructor(
     private val pending: PendingCallStore,
     private val sessions: CallSessionManager,
     private val queue: CallQueueRepository,
+    private val audioJobs: uz.bonvi.call.data.repository.AudioJobRepository,
     private val session: SessionStore,
     private val moshi: Moshi,
 ) {
@@ -165,18 +166,40 @@ class ReconcileSweep @Inject constructor(
         reason: AudioMissingReason? = null,
         durationSec: Int? = null,
     ) {
+        // What capture actually produced, written onto the pending row when the
+        // call ended. `NONE` with the recorder's own reason is the honest
+        // answer for a call that produced nothing — and for a recovered call,
+        // which never had a recorder running at all.
+        val captured = call.audioPath?.let { java.io.File(it) }?.takeIf { it.isFile }
         val record = CallRecordBuilder.build(
             call = call,
             endedAtEpochMillis = endedAt,
             endedElapsedMillis = call.startedElapsedMillis +
                 (durationSec?.times(1000L) ?: (endedAt - call.startedAtEpochMillis)),
-            captureRoute = CaptureRoute.NONE,
-            captureReason = reason,
+            captureRoute = if (captured != null) {
+                call.captureRoute ?: CaptureRoute.NONE
+            } else {
+                CaptureRoute.NONE
+            },
+            captureReason = reason ?: call.audioReason,
             source = source,
             reconciledStartedAtEpochMillis = reconciledStartedAt,
         )
         val payload = moshi.adapter(DeviceCallIn::class.java).toJson(record.toWire())
         queue.enqueue(record.clientCallId, payload)
+
+        // The recording can only be queued NOW: `client_call_id` is derived
+        // from the reconciled start time, and the server accepts audio only
+        // against a call it already holds. Before this line the app recorded
+        // calls it never uploaded.
+        if (captured != null && call.captureRoute != null) {
+            audioJobs.enqueue(
+                clientCallId = record.clientCallId,
+                path = captured.path,
+                captureRoute = call.captureRoute,
+                recordedAtEpochMillis = call.answeredAtEpochMillis ?: call.startedAtEpochMillis,
+            )
+        }
         // The id is stable, so a repeat of the same call is the same row: the
         // sweep can run as often as it likes without duplicating anything (N2).
         pending.remove(call.callId)

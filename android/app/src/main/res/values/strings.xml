@@ -108,7 +108,28 @@
     <string name="perm_state_denied_permanently">Sozlamalardan yoqing</string>
     <string name="perm_state_unknown">Tekshirib bo\'lmadi</string>
     <string name="perm_check_running">Tekshirilmoqda…</string>
-    <string name="perm_allow">Ruxsat berish</string>
+    <!-- E2 asks for every runtime permission in ONE request now. Six system
+         dialogs still appear, in the same order, but the agent starts them with
+         one tap instead of six. The wording promises the sequence so nobody
+         thinks the button did nothing when the second dialog opens. -->
+    <string name="perm_allow_all">Barcha ruxsatlarni berish</string>
+    <string name="perm_recheck">Qayta tekshirish</string>
+    <string name="perm_blocking_summary">Yana %1$d ta ruxsat yetishmayapti. Ularsiz qo\'ng\'iroqlar qayd etilmaydi.</string>
+
+    <string name="enrol_permissions_intro">Quyidagi tugmani bosing va telefon ketma-ket so\'raydigan oynalarda «Ruxsat berish»ni tanlang. Har bir ruxsat nima uchun kerakligi pastda yozilgan.</string>
+
+    <!-- E3 — the manufacturer's own screens (R3). Shown only on the OEMs that
+         need it. Nothing here can be verified by the platform, so the app never
+         records it as granted; the step is guidance, and the screen says so
+         rather than pretending a green tick means anything. -->
+    <string name="enrol_oem_explain">Telefoningiz ilovani fonda to\'xtatib qo\'yishi mumkin. Quyidagi sozlamalarni yoqsangiz, qo\'ng\'iroqlar tunda ham qayd etiladi.</string>
+
+    <!-- E5's way out, offered even when the callback route works. A proven
+         binding is worth more than a declared one, so the challenge is still
+         shown first — but a screen whose only exit is "dial this number and
+         wait five minutes" is where an unaided install ends. -->
+    <string name="enrol_verify_later">Keyinroq tasdiqlash — hozir davom etish</string>
+    <string name="enrol_verify_awaiting_admin">Administrator raqamingizni tasdiqlashini kutmoqda. Bu oynani yopmang — tasdiqlangach, o\'zi davom etadi.</string>
 
     <!-- E4 -->
     <string name="enrol_sim_explain">Ish raqamingiz turgan SIM kartani tanlang. Ikkinchi SIM kartaga hech qachon tegilmaydi.</string>
@@ -132,6 +153,11 @@
     <string name="enrol_done_blocked_next">Administrator buni ko\'rib turibdi va siz bilan bog\'lanadi. Sozlamalardan ruxsat bersangiz, ilova o\'zi ishlab ketadi.</string>
     <string name="enrol_done_audio_only">Qo\'ng\'iroqlar qayd etilmoqda, lekin suhbat ovozi yozilmaydi.</string>
     <string name="enrol_done_attested">Raqamni administrator tasdiqlagan.</string>
+    <!-- SPEC §9.3: an unproven binding is never rendered as a proven one, and
+         "administrator tasdiqlagan" would be a plain lie here — nobody has
+         looked at this number yet. The sentence says what is true and what
+         happens next, so the agent is not surprised by a later call. -->
+    <string name="enrol_done_self_declared">Raqam kod asosida biriktirildi va hali tasdiqlanmagan. Qo\'ng\'iroqlar qayd etilmoqda; administrator raqamni keyinroq tasdiqlaydi.</string>
     <string name="enrol_done_diagnostics">Ilova holatini ko\'rish</string>
     <string name="enrol_not_finished">Ro\'yxatdan o\'tish tugamagan — qo\'ng\'iroqlar hali yuborilmaydi.</string>
 
@@ -161,6 +187,20 @@
     <string name="diag_server_no_host">Manzilda server nomi yo\'q.</string>
     <string name="diag_server_saved">Saqlandi.</string>
 
+
+    <!-- Bosh sahifa (N41, T76). The screen an enrolled phone opens on. It says
+         "qayd etilmoqda" only when capture is actually running; otherwise it
+         names the reason, because an app that claims to be recording while it
+         is not is how a rollout looks finished and produces nothing. -->
+    <string name="home_my_calls">Mening qo\'ng\'iroqlarim</string>
+    <string name="home_service_off">Telefon ilovani to\'xtatib qo\'ygan. Ilovani ochib turing yoki batareya sozlamalarini tekshiring.</string>
+    <string name="home_revoked">Administrator bu telefonni ro\'yxatdan chiqargan. Yangi qo\'ng\'iroqlar qayd etilmaydi.</string>
+    <string name="home_auth_expired">Ulanish muddati tugagan. Administratorga murojaat qiling.</string>
+    <string name="home_update_required">Ilovaning yangi versiyasi kerak. Yangilanish o\'zi yuklanadi.</string>
+    <!-- N25's promise, in the place somebody worries about it: nothing that was
+         captured is ever thrown away by the app. -->
+    <string name="home_re_enrol">Yangi kod kiritish</string>
+    <string name="home_queue_safe">Bular telefonda saqlanib turibdi va aloqa tiklanganda o\'zi yuboriladi.</string>
 
     <!-- The employee's own calls (client request, N41). docs/QOLLANMA.md
          promises transparency about what is recorded; this is that promise as
@@ -210,5 +250,4 @@
     <string name="perm_cost_blocked">Davom etsangiz: qo\'ng\'iroqlar qayd etilmaydi. Ilova o\'rnatiladi va administrator nima yetishmayotganini ko\'radi — keyinroq tuzatish mumkin.</string>
     <string name="perm_cost_none">Bu qadam majburiy emas.</string>
 
-    <string name="common_not_ready">Bu ekran hali tayyor emas.</string>
 </resources>

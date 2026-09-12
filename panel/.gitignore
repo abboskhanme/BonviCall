@@ -4,3 +4,7 @@ coverage
 *.local
 .vite
 *.tsbuildinfo
+
+# Sideload uchun qo'yilgan APK — build artefakti, repoga kirmaydi
+public/*.apk
+public/apk.html

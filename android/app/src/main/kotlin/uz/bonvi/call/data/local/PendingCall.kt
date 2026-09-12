@@ -27,6 +27,15 @@ data class PendingCallEntity(
     val startedElapsedMillis: Long,
     val answeredAtEpochMillis: Long?,
     val endedAtEpochMillis: Long?,
+    /** What capture produced, written when the call ends and read by the sweep
+     *  twenty seconds later. It is on this row rather than in memory because
+     *  the service is killed between those two moments on most of this fleet —
+     *  and what would be lost is the recording of a call that happened. */
+    val audioPath: String? = null,
+    /** `CaptureRoute.wire`, or null when nothing was captured. */
+    val captureRoute: String? = null,
+    /** `AudioMissingReason.wire` when there is no file. Never free text (N5). */
+    val audioReason: String? = null,
 )
 
 /**

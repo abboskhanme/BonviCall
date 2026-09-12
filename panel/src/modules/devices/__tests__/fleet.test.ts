@@ -29,6 +29,23 @@ import {
 } from '@/modules/devices/api'
 import type { DeviceHealth, Installation } from '@/modules/devices/api'
 
+/**
+ * A timestamp relative to the real clock, which is what `buildFleet` reads
+ * when the caller passes no `now`.
+ *
+ * ⚠️ The fixtures used to carry absolute dates — `2026-09-05T10:00:00+05:00` —
+ * while every call below let `now` default to `new Date()`. That is a test
+ * suite with a fuse in it: `DISAPPEARED_AFTER_HOURS` is 48, so **every test in
+ * this file began failing two days after it was written**, reporting a healthy
+ * fixture as `install_disappeared`. Twelve of them were failing when this was
+ * found, which means the file had stopped guarding anything it claims to
+ * guard. Ages are stated as ages now, and they read better for it: "a
+ * heartbeat an hour ago" is the fact the test is about.
+ */
+function hoursAgo(hours: number): string {
+  return new Date(Date.now() - hours * 3_600_000).toISOString()
+}
+
 function health(overrides: Partial<DeviceHealth> = {}): DeviceHealth {
   return {
     installation_id: 'inst-1',
@@ -43,7 +60,7 @@ function health(overrides: Partial<DeviceHealth> = {}): DeviceHealth {
     app_version: '1.0.0',
     app_variant: 'modern34',
     is_online: true,
-    last_heartbeat_at: '2026-09-05T10:00:00+05:00',
+    last_heartbeat_at: hoursAgo(1),
     last_call_at: null,
     battery_level: 80,
     battery_charging: false,
@@ -62,7 +79,7 @@ function health(overrides: Partial<DeviceHealth> = {}): DeviceHealth {
     clock_skew_sec: 1,
     device_timezone: 'Asia/Tashkent',
     network_type: 'wifi',
-    updated_at: '2026-09-05T10:00:00+05:00',
+    updated_at: hoursAgo(1),
     ...overrides,
   }
 }
@@ -154,8 +171,8 @@ describe('problems', () => {
 
   it('sorts the longest-unheard-from first within a state', () => {
     const fleet = buildFleet([
-      health({ installation_id: 'recent', is_online: false, last_heartbeat_at: '2026-09-05T10:00:00+05:00' }),
-      health({ installation_id: 'stale', is_online: false, last_heartbeat_at: '2026-09-01T10:00:00+05:00' }),
+      health({ installation_id: 'recent', is_online: false, last_heartbeat_at: hoursAgo(3) }),
+      health({ installation_id: 'stale', is_online: false, last_heartbeat_at: hoursAgo(96) }),
     ])
     expect(fleet.map((row) => row.health.installation_id)).toEqual(['stale', 'recent'])
   })

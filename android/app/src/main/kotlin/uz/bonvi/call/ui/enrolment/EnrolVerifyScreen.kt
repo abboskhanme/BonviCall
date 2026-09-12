@@ -18,6 +18,10 @@ import kotlinx.coroutines.delay
 import uz.bonvi.call.R
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 
+/** Slow on purpose: nobody attests in under a second, and this runs on a phone
+ *  whose data the employee pays for (N15). */
+private const val ATTESTATION_POLL_MS = 5_000L
+
 /**
  * **E5 — proving the number** (SPEC §8.2, §9).
  *
@@ -33,6 +37,19 @@ import uz.bonvi.call.enrolment.EnrolmentViewModel
  *
  * The call is not answered — ringing is enough — so nobody is charged and no
  * audio exists.
+ *
+ * ═══ Why this screen is usually invisible now ══════════════════════════════
+ * On this fleet neither proving route is normally available: Uzbek SIMs leave
+ * `getLine1Number()` empty and no callback receiver has ever been in service.
+ * Every enrolment therefore reached this screen, was told to contact an admin,
+ * and stopped — which is why no handset ever captured a call. Route 3 finishes
+ * the install on the strength of the code, so the ordinary path through here
+ * is a spinner and nothing else.
+ *
+ * When route 2 IS available the challenge is still offered, because a proven
+ * binding is worth more than a declared one — but never as the only way out:
+ * "Keyinroq tasdiqlash" finishes now and leaves the panel showing exactly how
+ * weak the binding is.
  */
 @Composable
 fun EnrolVerifyScreen(
@@ -59,6 +76,16 @@ fun EnrolVerifyScreen(
             viewModel.onPollCallback()
             remaining -= (active.pollAfterMs / 1000).coerceAtLeast(1)
             viewModel.onCallbackTick(remaining)
+        }
+    }
+
+    // An admin attesting from the panel is the only route left. Poll, so the
+    // screen completes itself the moment they act rather than leaving the agent
+    // watching a sentence that has stopped being true.
+    LaunchedEffect(state.awaitingAttestation) {
+        while (state.awaitingAttestation) {
+            delay(ATTESTATION_POLL_MS)
+            viewModel.onPollStatus()
         }
     }
 
@@ -95,6 +122,20 @@ fun EnrolVerifyScreen(
                     "%d:%02d".format(state.secondsLeft / 60, state.secondsLeft % 60),
                 ),
             )
+            // Never the only way out. Dialling and waiting five minutes is a
+            // step, and a step on the last screen of an unaided install is
+            // where people stop.
+            TextButton(
+                onClick = viewModel::onSkipVerification,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.enrol_verify_later))
+            }
+        }
+
+        if (state.awaitingAttestation) {
+            Text(stringResource(R.string.enrol_verify_awaiting_admin))
+            CircularProgressIndicator()
         }
 
         state.message?.let { message ->

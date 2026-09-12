@@ -78,11 +78,14 @@ class CallSessionManager @Inject constructor(
         result.state
     }
 
-    /** Attach the idempotency key once the call is attributed. */
-    suspend fun bindClientCallId(callId: String, clientCallId: String) = lock.withLock {
-        val existing = store.find(callId) ?: return@withLock
-        store.save(existing.copy(clientCallId = clientCallId), Clock.epochMillis())
-    }
+    // `bindClientCallId` was here and nothing called it, so `Session.clientCallId`
+    // was written by nobody and read as null for ever. It is not a missing
+    // wiring — `client_call_id` is derived in `CallRecordBuilder` and lives on
+    // the QUEUE row, which is the row of record (N8) and the one the audio job
+    // and the sweep both read. The session's copy is a second home for a fact
+    // that already has one. The column stays: dropping it needs a Room
+    // migration, and a migration to delete an always-null column is not a
+    // trade worth making on a fleet about to go into the field.
 
     suspend fun stateOf(callId: String): CallState =
         store.find(callId)?.state ?: CallStateMachine.INITIAL

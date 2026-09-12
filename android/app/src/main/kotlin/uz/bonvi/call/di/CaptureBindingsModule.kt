@@ -60,6 +60,14 @@ abstract class CaptureBindingsModule {
     @Singleton
     abstract fun audioPlayback(impl: Media3AudioPlayback): AudioPlayback
 
+    /** The capture path's entry point. One implementation; the seam exists so
+     *  `CallDetector`'s privacy-boundary branches can be tested without a
+     *  phone, which is the only reason they have tests at all. */
+    @Binds
+    @Singleton
+    abstract fun callCapture(impl: uz.bonvi.call.service.CaptureCoordinator):
+        uz.bonvi.call.service.CallCapture
+
     @Binds
     @Singleton
     abstract fun pendingCallStore(impl: RoomPendingCallStore): PendingCallStore

@@ -22,6 +22,7 @@ import uz.bonvi.call.data.remote.api.DeviceAudioApi
 import uz.bonvi.call.data.remote.api.DeviceAuthApi
 import uz.bonvi.call.data.remote.api.DeviceCallReadApi
 import uz.bonvi.call.data.remote.api.DeviceCallsApi
+import uz.bonvi.call.data.remote.api.DeviceCommandApi
 import uz.bonvi.call.data.remote.api.DeviceEnrolmentApi
 import uz.bonvi.call.data.session.SessionStore
 import java.util.concurrent.TimeUnit
@@ -102,6 +103,11 @@ object NetworkModule {
     @Singleton
     fun callReadApi(retrofit: Retrofit): DeviceCallReadApi =
         retrofit.create(DeviceCallReadApi::class.java)
+
+    @Provides
+    @Singleton
+    fun commandApi(retrofit: Retrofit): DeviceCommandApi =
+        retrofit.create(DeviceCommandApi::class.java)
 
     @Provides
     @Singleton

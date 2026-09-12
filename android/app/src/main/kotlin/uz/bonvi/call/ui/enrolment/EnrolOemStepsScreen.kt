@@ -16,13 +16,17 @@ import androidx.compose.ui.unit.dp
 import uz.bonvi.call.R
 import uz.bonvi.call.core.Capabilities
 import uz.bonvi.call.domain.Capability
+import uz.bonvi.call.domain.OemGuidance
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 
 /**
  * **E3 — the OEM-specific steps** (SPEC §8.2).
  *
  * Shown **only** on the manufacturers that need them: autostart, battery lock,
- * "allow background activity". Each has that OEM's own screen path.
+ * "allow background activity". Each has that OEM's own screen path, and
+ * [OemGuidance] is where those paths live — the flow asks the same object
+ * whether this screen appears at all, so a phone can never be routed to an
+ * empty E3.
  *
  * ⚠️ Where the platform exposes no check, the step is **user-attested and
  * recorded as `unknown`, never as `granted`**. A false green here is exactly
@@ -38,13 +42,15 @@ import uz.bonvi.call.enrolment.EnrolmentViewModel
 fun EnrolOemStepsScreen(viewModel: EnrolmentViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycleCompat()
     val context = LocalContext.current
-    val steps = oemSteps(Capabilities.manufacturer)
+    val steps = OemGuidance.stepsFor(Capabilities.manufacturer)
 
     EnrolScaffold(
         number = state.registeredNumber,
         title = stringResource(R.string.enrol_oem_title),
         onStuck = viewModel::onStuck,
     ) {
+        Text(stringResource(R.string.enrol_oem_explain))
+
         steps.forEach { step ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -59,38 +65,19 @@ fun EnrolOemStepsScreen(viewModel: EnrolmentViewModel) {
                 }
             }
         }
+
+        // The way OUT, and there is only one of it.
+        //
+        // Nothing on this screen can be verified by the platform, so "I did it"
+        // and "I will do it later" are the same claim as far as the app is
+        // concerned — offering both would be a choice with no consequence. The
+        // step is recorded as `unknown` either way, which keeps a phone that
+        // skipped it visible to the panel instead of pretending it is fine.
+        Button(
+            onClick = viewModel::onOemStepsFinished,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.common_continue))
+        }
     }
-}
-
-/** One OEM step: the manufacturer's own path, as a person reads it on screen. */
-data class OemStep(val path: String)
-
-/**
- * The manufacturers SPEC §8.2 names. Anything else gets no E3 at all — showing
- * an irrelevant step costs a minute of a fifteen-minute budget and teaches the
- * agent that the instructions do not match their phone.
- *
- * The paths stay English here because they are the OEM's own menu labels, which
- * are not translated on the handset either; the SENTENCE explaining why is
- * Uzbek and lives in strings.xml (CONVENTIONS.md §14).
- */
-fun oemSteps(manufacturer: String): List<OemStep> = when (manufacturer.lowercase()) {
-    "xiaomi", "redmi", "poco" -> listOf(
-        OemStep("Settings › Apps › BonviCall › Autostart"),
-        OemStep("Settings › Battery › App battery saver › BonviCall › No restrictions"),
-    )
-    "huawei", "honor" -> listOf(
-        OemStep("Settings › Battery › App launch › BonviCall › Manage manually"),
-    )
-    "oppo", "realme", "oneplus" -> listOf(
-        OemStep("Settings › Battery › Background usage › BonviCall › Allow"),
-        OemStep("Settings › Apps › Auto-start › BonviCall"),
-    )
-    "samsung" -> listOf(
-        OemStep("Settings › Battery › Background usage limits › Never sleeping apps"),
-    )
-    "vivo" -> listOf(
-        OemStep("Settings › Battery › High background power consumption › BonviCall"),
-    )
-    else -> emptyList()
 }

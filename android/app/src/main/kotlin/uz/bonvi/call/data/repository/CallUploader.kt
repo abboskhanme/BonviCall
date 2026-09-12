@@ -78,7 +78,14 @@ class CallUploader @Inject constructor(
             // No response at all — a phone in a lift, which is the normal case
             // this queue exists for. Every row keeps its place and its order.
             Timber.i("Upload could not reach the server; %d call(s) stay queued", batch.size)
-            batch.forEach { queue.recordFailure(it, status = 0, code = null) }
+            // Named, not null. The policy has to tell this apart from
+            // `payload_unreadable`, which is also status 0 and MUST park —
+            // and an unreachable server must never park anything. Passing
+            // null here meant every outage longer than about 1 h 45 m parked
+            // the whole queue permanently (39 calls on the first real handset).
+            batch.forEach {
+                queue.recordFailure(it, status = 0, code = UploadPolicy.UNREACHABLE)
+            }
             return@withContext Outcome(batch.size, 0, 0, retryLater = true)
         }
 

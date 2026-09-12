@@ -50,6 +50,7 @@ export const ERROR_CODES = [
   'refresh_reused',
   'retention_confirmation_required',
   'sales_user_requires_agent',
+  'self_declared_disabled',
   'stranded_count_mismatch',
   'unauthorized',
   'upload_expired',

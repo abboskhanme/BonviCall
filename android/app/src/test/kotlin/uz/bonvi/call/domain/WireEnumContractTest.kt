@@ -68,6 +68,22 @@ class WireEnumContractTest {
     }
 
     @Test
+    fun `CommandKind matches the contract`() {
+        // The app answers every kind the server can issue — `unsupported` for
+        // the ones this build does not implement, never silence. A kind the
+        // contract has and Kotlin does not would be acknowledged as unsupported
+        // forever, which reads in the panel like a phone ignoring its admin.
+        assertMatches("CommandKind", CommandKind.entries.map { it.wire }.toSet())
+    }
+
+    @Test
+    fun `CommandFailure matches the contract`() {
+        // The panel groups refused commands by this value; one the server does
+        // not know is a 422 on the ack, which loses the outcome entirely.
+        assertMatches("CommandFailureReason", CommandFailure.entries.map { it.wire }.toSet())
+    }
+
+    @Test
     fun `AppVariant matches the contract and the two product flavours`() {
         val fromContract = contractValues("AppVariant")
         assertThat(AppVariant.entries.map { it.wire }.toSet()).containsExactlyElementsIn(fromContract)

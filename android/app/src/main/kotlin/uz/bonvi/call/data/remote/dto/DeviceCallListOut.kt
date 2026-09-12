@@ -29,12 +29,12 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * A page of the employee's own calls.  Same shape as the panel's list (``items``/``next_cursor``/``has_more``) so there is one pagination convention in the product. ``total`` is left unset: a phone scrolls, and a COUNT per page is cellular data spent on a number nobody reads.
+ * A page of the employee's own calls.  Same shape as the panel's list (``items``/``next_cursor``/``has_more``) so there is one pagination convention in the product.
  *
  * @param hasMore 
  * @param items 
  * @param nextCursor 
- * @param total 
+ * @param total How many calls this agent has, **on the first page only**; null on later pages. The screen's header asks once and a COUNT per scroll would be cellular data spent re-answering it.
  */
 
 
@@ -49,6 +49,7 @@ data class DeviceCallListOut (
     @Json(name = "next_cursor")
     val nextCursor: kotlin.String?,
 
+    /* How many calls this agent has, **on the first page only**; null on later pages. The screen's header asks once and a COUNT per scroll would be cellular data spent re-answering it. */
     @Json(name = "total")
     val total: kotlin.Int? = null
 

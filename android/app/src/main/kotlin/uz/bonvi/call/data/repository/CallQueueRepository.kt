@@ -53,6 +53,23 @@ class CallQueueRepository @Inject constructor(
         created
     }
 
+    /**
+     * The server is reachable again — give back the rows that were parked only
+     * because it was not.
+     *
+     * Returns how many came back, so the caller can log it: a handset that
+     * silently recovers 39 calls should say so, because "the queue emptied
+     * overnight" and "the queue was thrown away overnight" look identical from
+     * the panel otherwise.
+     */
+    suspend fun unparkUnreachable(): Int = withContext(io) {
+        val restored = dao.unparkUnreachable(Clock.epochMillis())
+        if (restored > 0) {
+            Timber.i("Server reachable again; %d parked call(s) requeued", restored)
+        }
+        restored
+    }
+
     /** The next rows to send: oldest first, parked excluded, backoff respected. */
     suspend fun nextBatch(limit: Int = DEFAULT_BATCH): List<QueuedCallEntity> = withContext(io) {
         dao.nextBatch(nowEpochMillis = Clock.epochMillis(), limit = limit)

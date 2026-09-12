@@ -44,23 +44,8 @@ class StepTimer {
     }
 }
 
-/**
- * One row of E2's checklist.
- *
- * Every row carries a **purpose and consequence** sentence, not a permission
- * name: the person reading it is not technical, it is their own phone, and some
- * of these screens are designed by Android to look alarming. "Mikrofon bo'lmasa
- * suhbat yozilmaydi, lekin qo'ng'iroq baribir qayd etiladi" tells them what
- * they lose; "RECORD_AUDIO ruxsati" tells them nothing.
- */
-data class PermissionStepUi(
-    val capability: Capability,
-    /** Uzbek, from `strings.xml`. Resolved by the screen, not stored here. */
-    val titleRes: Int,
-    val purposeRes: Int,
-    /** The runtime permission to request, or null when the step is a settings
-     *  screen rather than a dialog (battery exemption, all-files access). */
-    val permission: String?,
-    /** Skippable without blocking E6 (SPEC §8.2 marks `contacts` *ixtiyoriy*). */
-    val optional: Boolean,
-)
+// `PermissionStepUi` stood here: a row model for E2 that E2 never built, on
+// either the old one-card-at-a-time screen or the batched one. The screen
+// resolves a capability's title, purpose and consequence from `strings.xml`
+// at render time, which is where a string resource belongs; a data class
+// holding resource ids was a second description of the same row.

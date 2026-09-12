@@ -30,7 +30,7 @@ import com.squareup.moshi.JsonClass
 /**
  * State of one verification attempt.
  *
- * Values: PENDING,MATCHED,FAILED,EXPIRED,ATTESTED
+ * Values: PENDING,MATCHED,FAILED,EXPIRED,ATTESTED,SELF_DECLARED
  */
 
 @JsonClass(generateAdapter = false)
@@ -49,7 +49,10 @@ enum class VerificationState(val value: kotlin.String) {
     EXPIRED("expired"),
 
     @Json(name = "attested")
-    ATTESTED("attested");
+    ATTESTED("attested"),
+
+    @Json(name = "self_declared")
+    SELF_DECLARED("self_declared");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use

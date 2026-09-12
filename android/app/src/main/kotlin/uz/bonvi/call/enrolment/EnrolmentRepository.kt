@@ -23,6 +23,7 @@ import uz.bonvi.call.data.remote.toFailure
 import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.di.IoDispatcher
 import uz.bonvi.call.domain.CapabilityResult
+import uz.bonvi.call.domain.DeviceAuthState
 import uz.bonvi.call.domain.NumberVerification
 import java.time.OffsetDateTime
 import javax.inject.Inject
@@ -106,6 +107,11 @@ class EnrolmentRepository @Inject constructor(
             // PROVISIONAL. It gets the phone through verification and nothing
             // else — no call upload is accepted until the number is proven.
             session.saveProvisionalToken(body.provisionalToken)
+            // A redeem is a NEW installation, so the old one's verdict must not
+            // outlive it: a handset re-enrolled after a revoke would otherwise
+            // stay `revoked` locally and capture nothing, with no visible
+            // reason (UC-07, UC-08).
+            session.saveAuthState(DeviceAuthState.ACTIVE.wire)
 
             Result.Ok(
                 Redeemed(
@@ -185,11 +191,53 @@ class EnrolmentRepository @Inject constructor(
         val installationActive: Boolean,
         val method: NumberVerification.Method?,
     ) {
-        val isMatched: Boolean get() = state == "matched" || state == "attested"
+        /** Every state that means "the server will now accept this phone's
+         *  calls". Three of them, and they are three different strengths of
+         *  binding — which is why [method] travels alongside rather than being
+         *  flattened away here (SPEC §9.3). */
+        val isMatched: Boolean get() = NumberVerification.isBound(state)
     }
 
     suspend fun callbackStatus(verificationId: String): Result<VerificationStatus> = call {
         val response = api.callbackStatus(verificationId)
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            return@call Result.Failed(response.toFailure(moshi))
+        }
+        Result.Ok(persistTokensIfIssued(body))
+    }
+
+    /**
+     * §9.3, route 3 — finish on the strength of the code alone.
+     *
+     * Reached when neither proving route is available, which on this fleet is
+     * the ordinary case rather than the exception. What it costs is honest and
+     * visible: the installation is recorded as `self_declared` and the panel
+     * renders it as the weakest of the three bindings, so an admin can still
+     * attest it properly. What it buys is a phone that captures calls instead
+     * of one stranded on E5 reporting nothing.
+     */
+    suspend fun verifySelfDeclared(): Result<VerificationStatus> = call {
+        inferredProvenMethod = NumberVerification.Method.SELF_DECLARED
+        val response = api.verifySelfDeclared()
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            return@call Result.Failed(response.toFailure(moshi))
+        }
+        Result.Ok(persistTokensIfIssued(body))
+    }
+
+    /**
+     * Poll for an activation this phone did not perform itself.
+     *
+     * The one that matters is an admin attesting from the panel: that
+     * activated the installation server-side and the handset had no way to
+     * hear about it, so a phone told "contact the admin" stayed on that screen
+     * after the admin had acted. E5 polls this in the background, and the
+     * screen completes itself.
+     */
+    suspend fun enrolmentStatus(): Result<VerificationStatus> = call {
+        val response = api.enrolmentStatus()
         val body = response.body()
         if (!response.isSuccessful || body == null) {
             return@call Result.Failed(response.toFailure(moshi))
@@ -297,6 +345,7 @@ class EnrolmentRepository @Inject constructor(
         // it was persisted here.
         val method = when (body.state.value) {
             "attested" -> NumberVerification.Method.ADMIN_ATTESTED
+            "self_declared" -> NumberVerification.Method.SELF_DECLARED
             "matched" -> inferredProvenMethod
             else -> null
         }

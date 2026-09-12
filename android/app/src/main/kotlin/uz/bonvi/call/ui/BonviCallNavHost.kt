@@ -1,12 +1,15 @@
 package uz.bonvi.call.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import uz.bonvi.call.enrolment.EnrolmentStep
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 import uz.bonvi.call.ui.calls.MyCallsScreen
 import uz.bonvi.call.ui.diagnostics.DiagnosticsScreen
@@ -16,6 +19,7 @@ import uz.bonvi.call.ui.enrolment.EnrolOemStepsScreen
 import uz.bonvi.call.ui.enrolment.EnrolPermissionsScreen
 import uz.bonvi.call.ui.enrolment.EnrolSimScreen
 import uz.bonvi.call.ui.enrolment.EnrolVerifyScreen
+import uz.bonvi.call.ui.enrolment.collectAsStateWithLifecycleCompat
 import uz.bonvi.call.ui.home.HomeScreen
 
 /**
@@ -64,6 +68,28 @@ object Routes {
         ENROL_CODE, ENROL_PERMISSIONS, ENROL_OEM_STEPS, ENROL_SIM, ENROL_VERIFY, ENROL_DONE,
         HOME, CALLS, DIAGNOSTICS,
     )
+
+    /**
+     * Where each enrolment step is drawn.
+     *
+     * The ViewModel owns the STEP and the graph owns the ROUTE, and until
+     * [FollowEnrolmentStep] existed nothing joined them: E1 redeemed the code,
+     * moved the step to `PERMISSIONS`, and the phone stayed on E1 with the
+     * agent's name freshly printed on it. From the outside that is
+     * indistinguishable from a dead server — the first real handset pressed
+     * "Davom etish" repeatedly and the redeem kept succeeding, because a repeat
+     * from the same fingerprint on a pending installation is deliberately
+     * idempotent server-side. Exhaustive `when`, so a seventh step cannot be
+     * added without deciding where it is shown.
+     */
+    fun forStep(step: EnrolmentStep): String = when (step) {
+        EnrolmentStep.CODE -> ENROL_CODE
+        EnrolmentStep.PERMISSIONS -> ENROL_PERMISSIONS
+        EnrolmentStep.OEM_STEPS -> ENROL_OEM_STEPS
+        EnrolmentStep.SIM -> ENROL_SIM
+        EnrolmentStep.VERIFY -> ENROL_VERIFY
+        EnrolmentStep.DONE -> ENROL_DONE
+    }
 }
 
 @Composable
@@ -73,6 +99,36 @@ private fun enrolmentViewModel(
 ): EnrolmentViewModel {
     val graph = remember(entry) { navController.getBackStackEntry(Routes.ENROL_CODE) }
     return hiltViewModel(graph)
+}
+
+/**
+ * Moves the graph to whatever step the shared ViewModel is on.
+ *
+ * Placed on every enrolment destination rather than around the NavHost,
+ * because the ViewModel is scoped to E1's back-stack entry and can only be
+ * reached from inside a destination.
+ *
+ * The whole enrolment is ONE forward-only transaction: the code is single-use,
+ * so returning to E1 to re-enter it is an unrecoverable loop. Everything above
+ * E1 is therefore replaced rather than stacked, and E1 itself stays at the
+ * bottom because it hosts the ViewModel the six screens share — popping it
+ * would take the transaction with it.
+ */
+@Composable
+private fun FollowEnrolmentStep(
+    viewModel: EnrolmentViewModel,
+    navController: NavHostController,
+    thisRoute: String,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycleCompat()
+    val target = Routes.forStep(state.step)
+    LaunchedEffect(target, thisRoute) {
+        if (target == thisRoute) return@LaunchedEffect
+        navController.navigate(target) {
+            popUpTo(Routes.ENROL_CODE) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
 }
 
 @Composable
@@ -99,37 +155,65 @@ fun BonviCallNavHost(
         // Six ViewModels would mean passing that state between destinations,
         // which is how a half-finished enrolment ends up looking finished.
         composable(Routes.ENROL_CODE) { entry ->
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_CODE)
             EnrolCodeScreen(
-                viewModel = enrolmentViewModel(navController, entry),
+                viewModel = viewModel,
                 prefilledCode = entry.arguments?.getString(ARG_CODE) ?: deepLinkCode,
                 onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
             )
         }
         composable(Routes.ENROL_PERMISSIONS) { entry ->
-            EnrolPermissionsScreen(enrolmentViewModel(navController, entry))
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_PERMISSIONS)
+            EnrolPermissionsScreen(viewModel)
         }
         composable(Routes.ENROL_OEM_STEPS) { entry ->
-            EnrolOemStepsScreen(enrolmentViewModel(navController, entry))
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_OEM_STEPS)
+            EnrolOemStepsScreen(viewModel)
         }
         composable(Routes.ENROL_SIM) { entry ->
-            EnrolSimScreen(enrolmentViewModel(navController, entry))
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_SIM)
+            EnrolSimScreen(viewModel)
         }
         composable(Routes.ENROL_VERIFY) { entry ->
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_VERIFY)
             EnrolVerifyScreen(
-                viewModel = enrolmentViewModel(navController, entry),
+                viewModel = viewModel,
                 line1Number = simFacts?.line1Number,
                 carrierName = simFacts?.carrierName,
                 simSlot = simFacts?.slotIndex,
             )
         }
         composable(Routes.ENROL_DONE) { entry ->
+            val viewModel = enrolmentViewModel(navController, entry)
+            FollowEnrolmentStep(viewModel, navController, Routes.ENROL_DONE)
             EnrolDoneScreen(
-                viewModel = enrolmentViewModel(navController, entry),
+                viewModel = viewModel,
                 onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
+                // The way out of enrolment, and the last screen that may pop
+                // E1: the shared ViewModel is not needed past this point, and
+                // leaving the six steps on the stack would put a back button
+                // into a consumed enrolment.
+                onFinish = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.ENROL_CODE) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
-        composable(Routes.HOME) { HomeScreen() }
+        composable(Routes.HOME) {
+            HomeScreen(
+                onOpenCalls = { navController.navigate(Routes.CALLS) },
+                onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
+                onReEnrol = { navController.navigate(Routes.ENROL_CODE) },
+            )
+        }
         composable(Routes.CALLS) { MyCallsScreen() }
         composable(Routes.DIAGNOSTICS) { DiagnosticsScreen() }
     }

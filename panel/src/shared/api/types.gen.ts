@@ -1412,7 +1412,7 @@ export interface components {
          *     that "everything that happened" is answerable from one column.
          * @enum {string}
          */
-        AuditAction: "login_succeeded" | "login_failed" | "logout" | "password_changed" | "password_reset" | "user_created" | "user_updated" | "user_deactivated" | "agent_created" | "agent_updated" | "agent_archived" | "agents_imported" | "number_created" | "number_updated" | "assignment_created" | "assignment_closed" | "calls_reattributed" | "enrolment_code_issued" | "enrolment_code_revoked" | "installation_attested" | "installation_revoked" | "installation_rebound" | "command_issued" | "call_note_updated" | "calls_exported" | "audio_play" | "audio_download" | "audio_deleted" | "alert_acknowledged" | "setting_updated" | "retention_changed" | "line_directory_updated" | "supported_model_updated" | "app_version_uploaded" | "app_version_published" | "service_token_created" | "service_token_revoked" | "export_read";
+        AuditAction: "login_succeeded" | "login_failed" | "logout" | "password_changed" | "password_reset" | "user_created" | "user_updated" | "user_deactivated" | "agent_created" | "agent_updated" | "agent_archived" | "agents_imported" | "number_created" | "number_updated" | "assignment_created" | "assignment_closed" | "calls_reattributed" | "enrolment_code_issued" | "enrolment_code_revoked" | "installation_attested" | "installation_self_declared" | "installation_revoked" | "installation_rebound" | "command_issued" | "call_note_updated" | "calls_exported" | "audio_play" | "audio_download" | "audio_deleted" | "alert_acknowledged" | "setting_updated" | "retention_changed" | "line_directory_updated" | "supported_model_updated" | "app_version_uploaded" | "app_version_published" | "service_token_created" | "service_token_revoked" | "export_read";
         /** AuditListResponse */
         AuditListResponse: {
             /** Items */
@@ -1664,7 +1664,7 @@ export interface components {
          * @description How the record reached us.
          * @enum {string}
          */
-        CallSource: "live_capture" | "call_log_recovery";
+        CallSource: "live_capture" | "call_log_recovery" | "provider";
         /**
          * CallType
          * @description Internal vs external (UC-25). ``unknown`` is the mandatory default.
@@ -1716,7 +1716,7 @@ export interface components {
          *     ``NONE`` may only appear with ``has_audio = false``.
          * @enum {string}
          */
-        CaptureRoute: "oem_file_harvest" | "app_voice_recognition" | "app_voice_communication" | "app_mic" | "none";
+        CaptureRoute: "oem_file_harvest" | "app_voice_call" | "app_voice_recognition" | "app_voice_communication" | "app_mic" | "none";
         /**
          * ChangePasswordRequest
          * @description ``POST /api/v1/auth/password`` — the user's own password.
@@ -2338,7 +2338,7 @@ export interface components {
          *     degrade silently (T142).
          * @enum {string}
          */
-        FunnelStage: "invited" | "installed" | "permitted" | "number_verified" | "verified_by_admin" | "capturing" | "needs_assisted_install" | "install_disappeared" | "revoked";
+        FunnelStage: "invited" | "installed" | "permitted" | "number_verified" | "verified_by_admin" | "self_declared" | "capturing" | "needs_assisted_install" | "install_disappeared" | "revoked";
         /** GapByAgentOut */
         GapByAgentOut: {
             /**
@@ -3103,7 +3103,7 @@ export interface components {
          * @description How we proved the phone holds the registered number (UC-04, T142).
          * @enum {string}
          */
-        VerificationMethod: "sim_msisdn" | "callback" | "admin_attested";
+        VerificationMethod: "sim_msisdn" | "callback" | "admin_attested" | "self_declared";
         /**
          * VersionGateImpactResponse
          * @description What raising the floor would cost, **before** it is raised (N34, UC-28).

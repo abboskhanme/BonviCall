@@ -8,12 +8,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import uz.bonvi.call.core.Capabilities
 import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.domain.Capability
 import uz.bonvi.call.domain.CapabilityResult
 import uz.bonvi.call.domain.CapabilityState
 import uz.bonvi.call.domain.CaptureReadiness
+import uz.bonvi.call.domain.DeviceAuthState
 import uz.bonvi.call.domain.NumberVerification
+import uz.bonvi.call.domain.OemGuidance
+import uz.bonvi.call.domain.runtimePermission
+import uz.bonvi.call.domain.SimDirectory
+import uz.bonvi.call.domain.SimOptionInfo
 import javax.inject.Inject
 
 /**
@@ -36,6 +42,8 @@ class EnrolmentViewModel @Inject constructor(
     private val checks: CapabilityChecks,
     private val session: SessionStore,
     private val timer: StepTimer,
+    private val sims: SimDirectory,
+    private val capture: CaptureLauncher,
 ) : ViewModel() {
 
     data class UiState(
@@ -57,16 +65,24 @@ class EnrolmentViewModel @Inject constructor(
         val debugDetail: String? = null,
 
         val capabilities: Map<Capability, CapabilityResult> = emptyMap(),
-        val currentPermissionIndex: Int = 0,
         /** A check is running. The microphone probe is a real one-second
          *  capture, and a button that looks dead for a second on the step
          *  people already find alarming is where they stop. */
         val checking: Capability? = null,
+        /** The whole E2 sweep is running — every check at once, after the one
+         *  permission dialog. Distinct from [checking], which is one row being
+         *  re-tested after a trip to a settings screen. */
+        val checkingAll: Boolean = false,
 
         val simOptions: List<SimChoice> = emptyList(),
         val chosenSubscriptionId: Int? = null,
 
         val callback: EnrolmentRepository.CallbackChallenge? = null,
+
+        /** No route this handset can take is left, and an admin attesting from
+         *  the panel is the only way forward. The screen polls while this is
+         *  true, so the enrolment completes itself the moment they act. */
+        val awaitingAttestation: Boolean = false,
         val secondsLeft: Int = 0,
         val verificationState: String? = null,
         val verificationMethod: NumberVerification.Method? = null,
@@ -82,8 +98,8 @@ class EnrolmentViewModel @Inject constructor(
         val readiness: CaptureReadiness.Readiness
             get() = CaptureReadiness.evaluate(
                 states = capabilities.mapValues { it.value.state },
-                installationActive = verificationState == "matched" || verificationState == "attested",
-                numberVerified = verificationState == "matched" || verificationState == "attested",
+                installationActive = NumberVerification.isBound(verificationState),
+                numberVerified = NumberVerification.isBound(verificationState),
             )
 
         val isFullyEnrolled: Boolean get() = readiness.isCapturing
@@ -100,11 +116,12 @@ class EnrolmentViewModel @Inject constructor(
             get() = capabilities[Capability.MICROPHONE]?.isWorking == true ||
                 capabilities[Capability.OEM_RECORDER]?.isWorking == true
 
-        /** SPEC §9.3: attested is weaker evidence than proven and is rendered
-         *  differently everywhere, so the identity anchor cannot silently
-         *  degrade. */
-        val isAttestedRatherThanProven: Boolean
-            get() = verificationMethod == NumberVerification.Method.ADMIN_ATTESTED
+        // `isAttestedRatherThanProven` lived here and is gone: it collapsed
+        // two different unproven bindings into one boolean, and E6 has to tell
+        // them apart — "an admin looked at this number" and "nobody has" are
+        // not the same sentence. The screens branch on [verificationMethod]
+        // and `Method.isProven` directly, which is one fact rather than a
+        // derived second one that can disagree with it (SPEC §9.3).
     }
 
     data class SimChoice(
@@ -163,7 +180,31 @@ class EnrolmentViewModel @Inject constructor(
             // step: E2's checks are live and idempotent, so re-running them
             // costs a second and re-reads the truth, and E5 reads verification
             // state from the server rather than from anything held here.
-            if (session.installationId.first() != null &&
+            // ⚠️ A REVOKED installation is the exception. Its id is still on
+            // the phone, so the resume rule would skip the agent straight past
+            // the one screen they need — the code field — and there would be no
+            // way back to it. UC-08 ends with a handset that can be enrolled
+            // again, not one locked out by its own history.
+            // ⚠️ The test is "does this phone hold a credential it can still
+            // use", not "has it ever enrolled".
+            //
+            // An installation id survives everything, including the two states
+            // in which the phone can do nothing at all: REVOKED, and
+            // AUTH_EXPIRED — which is where a refused refresh lands it, and a
+            // refused refresh is ordinary here (`refresh_reused` after a
+            // response is lost mid-rotation kills both pairs server-side by
+            // design). Keying the skip on the id alone sent such a handset
+            // straight past the one screen it needs, and the code field was
+            // then unreachable: a live Redmi sat on a home screen claiming to
+            // capture, uploading nothing, with 39 calls held and no way for
+            // the agent to enter the new code that would have freed them.
+            //
+            // The server's own recovery note says re-enrolling on the same
+            // number keeps the queue. This is what makes that reachable.
+            val authState = session.authStateSnapshot()
+            val usable = authState.canCapture && session.refreshToken.first() != null
+            if (usable &&
+                session.installationId.first() != null &&
                 _state.value.step == EnrolmentStep.CODE
             ) {
                 timer.finish(EnrolmentStep.CODE)
@@ -176,14 +217,99 @@ class EnrolmentViewModel @Inject constructor(
     /** E2 order, with the alarming permissions after two easy successes. */
     val permissionOrder: List<Capability> = CaptureReadiness.E2_ORDER
 
+    /**
+     * Every runtime permission E2 needs, asked for in **one** request.
+     *
+     * ═══ Why this replaced nine sequential steps ═══════════════════════════
+     * E2 used to walk the nine capabilities one card at a time: tap, dialog,
+     * check, next card, tap again. Six of them are ordinary runtime
+     * permissions, and Android will show those six dialogs back to back from a
+     * single `RequestMultiplePermissions` — same dialogs, same order, one tap
+     * to start them instead of six.
+     *
+     * The three that are left are not dialogs at all (battery exemption,
+     * all-files access, OEM autostart); they are settings screens, and those
+     * still get their own button because that is what they are. So the
+     * ordinary handset now goes: one tap, the system's own sequence, done.
+     *
+     * What is deliberately unchanged is the part that matters: **every
+     * capability is still exercised** after the dialogs, and a row goes green
+     * only when its check passes, never because a dialog was dismissed.
+     */
+    val runtimePermissions: List<String> =
+        CaptureReadiness.E2_ORDER.mapNotNull { it.runtimePermission() }.distinct()
+
+    /** The E2 rows that are a settings screen rather than a dialog, so the
+     *  screen can render them apart and only when they are not already
+     *  working. */
+    val settingsCapabilities: List<Capability> =
+        CaptureReadiness.E2_ORDER.filter { it.runtimePermission() == null }
+
+    /**
+     * Run every E2 check at once, report them in one batch, and move on when
+     * nothing required is missing.
+     *
+     * One batch rather than nine posts: the panel wants to know where an agent
+     * is stuck within two minutes (UC-03 AC), and nine round trips on the link
+     * this app is installed over is how E2 came to feel slow.
+     */
+    fun onPermissionsChecked() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(checkingAll = true)
+            val results = permissionOrder.map { checks.check(it) }
+            _state.value = _state.value.copy(
+                checkingAll = false,
+                capabilities = _state.value.capabilities +
+                    results.associateBy { it.capability },
+            )
+            repository.reportCapabilities(results)
+
+            // Advance only when every REQUIRED capability works. A missing
+            // optional one — contacts, autostart — never holds the flow, and a
+            // missing required one leaves the agent on a screen that now shows
+            // exactly which rows failed and what each costs.
+            if (blockingRequired().isEmpty()) leavePermissions()
+        }
+    }
+
+    /** Required capabilities still not working, in the order E2 asks for them. */
+    fun blockingRequired(): List<Capability> =
+        CaptureReadiness.REQUIRED
+            .filter { it in permissionOrder }
+            .filter { _state.value.capabilities[it]?.isWorking != true }
+            .sortedBy { permissionOrder.indexOf(it) }
+
+    /**
+     * Leave E2 with whatever the checks found.
+     *
+     * Reachable with a required capability still failing, and that is the
+     * decision UC-14 asks for rather than a hole: the screen has already named
+     * what each missing capability costs, the state is reported either way, and
+     * an enrolled handset reporting `BLOCKED` is visible to an admin while an
+     * unenrolled one is not.
+     */
+    fun onPermissionsDone() {
+        viewModelScope.launch {
+            val unchecked = permissionOrder.filter { it !in _state.value.capabilities }
+            if (unchecked.isNotEmpty()) {
+                val skipped = unchecked.map {
+                    CapabilityResult(it, CapabilityState.NOT_APPLICABLE, "skipped by the agent")
+                }
+                _state.value = _state.value.copy(
+                    capabilities = _state.value.capabilities + skipped.associateBy { it.capability },
+                )
+                repository.reportCapabilities(skipped)
+            }
+            leavePermissions()
+        }
+    }
+
     fun onCodeEntered(code: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true, message = null)
             when (val result = repository.redeem(code, chosenSubscription(), chosenSlot())) {
                 is EnrolmentRepository.Result.Ok -> {
-                    timer.finish(EnrolmentStep.CODE)?.let {
-                        repository.reportStepTiming(EnrolmentStep.CODE.wire, it)
-                    }
+                    val elapsed = timer.finish(EnrolmentStep.CODE)
                     timer.start(EnrolmentStep.PERMISSIONS)
                     _state.value = _state.value.copy(
                         busy = false,
@@ -191,6 +317,14 @@ class EnrolmentViewModel @Inject constructor(
                         registeredNumber = result.value.numberDisplay,
                         agentName = result.value.agentName,
                     )
+                    // Reported AFTER the step moves. `step_timing` is
+                    // telemetry, and the repository's own rule is that
+                    // telemetry never blocks a person from finishing an
+                    // install — awaiting it here holds E1 on screen for a
+                    // whole HTTP timeout on the slow link this app is
+                    // installed over, which is indistinguishable from the
+                    // button doing nothing.
+                    elapsed?.let { repository.reportStepTiming(EnrolmentStep.CODE.wire, it) }
                 }
 
                 is EnrolmentRepository.Result.Failed ->
@@ -224,11 +358,12 @@ class EnrolmentViewModel @Inject constructor(
             // Immediately, so the panel shows where the agent is stuck within
             // two minutes (UC-03 AC).
             repository.reportCapabilities(listOf(result))
-            // Advance on success only. A failure does NOT strand the agent —
-            // the screen offers `onContinueWithout` with the consequence named
-            // (UC-14: a phone that logs calls without audio is a supported
-            // state, and refusing to enrol it is strictly worse).
-            if (result.isWorking) advancePermission()
+            // No navigation here any more. This is the single-row re-check —
+            // the agent came back from a settings screen and the row should now
+            // say what the OS actually reports. Leaving E2 is
+            // [onPermissionsChecked]'s decision or the agent's
+            // ([onPermissionsDone]), and a re-check that also navigated used to
+            // take the screen away mid-list.
         }
     }
 
@@ -259,27 +394,73 @@ class EnrolmentViewModel @Inject constructor(
                 )
                 repository.reportCapabilities(listOf(skipped))
             }
-            advancePermission()
         }
     }
 
-    private fun advancePermission() {
-        val next = _state.value.currentPermissionIndex + 1
-        if (next < permissionOrder.size) {
-            _state.value = _state.value.copy(currentPermissionIndex = next)
-            return
-        }
+    private fun leavePermissions() {
         viewModelScope.launch {
-            timer.finish(EnrolmentStep.PERMISSIONS)?.let {
-                repository.reportStepTiming(EnrolmentStep.PERMISSIONS.wire, it)
+            val elapsed = timer.finish(EnrolmentStep.PERMISSIONS)
+            // E3 first, on the manufacturers that need it (R3). Asking
+            // [OemGuidance] rather than a version check is T63's rule, and it
+            // is the same object the screen renders from — so the flow can
+            // never route a phone to an empty E3, and never skip a MIUI one.
+            if (OemGuidance.applies(Capabilities.manufacturer)) {
+                timer.start(EnrolmentStep.OEM_STEPS)
+                _state.value = _state.value.copy(step = EnrolmentStep.OEM_STEPS)
+            } else {
+                openSimStep()
             }
+            // After the step moves, for the reason E1 gives above.
+            elapsed?.let { repository.reportStepTiming(EnrolmentStep.PERMISSIONS.wire, it) }
         }
-        _state.value = _state.value.copy(step = EnrolmentStep.SIM)
-        timer.start(EnrolmentStep.SIM)
     }
+
+    /**
+     * E3 is done — as far as anything on this handset can tell.
+     *
+     * The OEM screens expose no check, so this records nothing new: the
+     * `oem_autostart` capability stays whatever E2's check made it (`unknown`
+     * on most manufacturers), and the panel keeps seeing a phone whose autostart
+     * is unproven rather than one that claims it is on.
+     */
+    fun onOemStepsFinished() {
+        viewModelScope.launch {
+            val elapsed = timer.finish(EnrolmentStep.OEM_STEPS)
+            openSimStep()
+            elapsed?.let { repository.reportStepTiming(EnrolmentStep.OEM_STEPS.wire, it) }
+        }
+    }
+
+    /**
+     * Read the SIM list and hand over to E4 or E5.
+     *
+     * The list is read HERE and nowhere earlier: it needs READ_PHONE_STATE,
+     * which is the first row of E2, so asking before that returns an empty list
+     * — and an empty E4 is a screen with an explanation and no buttons, which
+     * is the same dead end as a step that never navigates.
+     *
+     * [onSimOptions] then decides whether E4 is shown at all: a single-SIM
+     * phone skips it silently and lands on E5 (SPEC §8.2).
+     */
+    private fun openSimStep() {
+        onSimOptions(sims.available().map(::choiceOf))
+    }
+
+    /** The domain's SIM row as E4 renders it. The MSISDN travels as-is,
+     *  including null: it is a hint for the human and never evidence — it is
+     *  empty on many Uzbek SIMs (SPEC §9.1). */
+    private fun choiceOf(sim: SimOptionInfo): SimChoice = SimChoice(
+        subscriptionId = sim.subscriptionId,
+        slotIndex = sim.slotIndex,
+        carrierName = sim.carrierName,
+        msisdn = sim.msisdn,
+    )
 
     fun onSimOptions(options: List<SimChoice>) {
-        // A single-SIM phone skips E4 silently (SPEC §8.2).
+        // A single-SIM phone skips E4 silently (SPEC §8.2). So does a phone
+        // whose OS told us nothing: an empty list is "we do not know", and
+        // stopping on a SIM screen with no rows would strand the enrolment on
+        // a question nobody can answer — E5 proves the number anyway.
         if (options.size <= 1) {
             _state.value = _state.value.copy(
                 simOptions = options,
@@ -287,22 +468,30 @@ class EnrolmentViewModel @Inject constructor(
                 step = EnrolmentStep.VERIFY,
             )
             timer.start(EnrolmentStep.VERIFY)
+            options.firstOrNull()?.let {
+                viewModelScope.launch { session.saveSubscription(it.subscriptionId) }
+            }
         } else {
-            _state.value = _state.value.copy(simOptions = options)
+            _state.value = _state.value.copy(
+                simOptions = options,
+                step = EnrolmentStep.SIM,
+            )
+            timer.start(EnrolmentStep.SIM)
         }
     }
 
     fun onSimChosen(subscriptionId: Int) {
         viewModelScope.launch {
+            // The local write stays first: Guard 1 judges every future call
+            // against it, and it is a DataStore write rather than a round trip.
             session.saveSubscription(subscriptionId)
-            timer.finish(EnrolmentStep.SIM)?.let {
-                repository.reportStepTiming(EnrolmentStep.SIM.wire, it)
-            }
+            val elapsed = timer.finish(EnrolmentStep.SIM)
             timer.start(EnrolmentStep.VERIFY)
             _state.value = _state.value.copy(
                 chosenSubscriptionId = subscriptionId,
                 step = EnrolmentStep.VERIFY,
             )
+            elapsed?.let { repository.reportStepTiming(EnrolmentStep.SIM.wire, it) }
         }
     }
 
@@ -341,30 +530,90 @@ class EnrolmentViewModel @Inject constructor(
                     secondsLeft = CALLBACK_WINDOW_SECONDS,
                 )
 
-            is EnrolmentRepository.Result.Failed -> {
-                val receiverDown = started.failure.code == "callback_receiver_down"
-                _state.value = _state.value.copy(
-                    busy = false,
-                    callbackFailure = if (receiverDown) {
-                        NumberVerification.CallbackOutcome.RECEIVER_DOWN
-                    } else {
-                        null
-                    },
-                    // Never "dial into nothing": if every receiver is down the
-                    // agent is told to contact the admin instead.
-                    message = if (receiverDown) {
-                        UiMessage(R_RECEIVER_DOWN, R_CONTACT_ADMIN, UiMessage.Action.CONTACT_ADMIN)
-                    } else {
-                        UiMessage(R_GENERIC, R_RETRY, UiMessage.Action.RETRY)
-                    },
-                )
-            }
+            // ⚠️ Route 2 unavailable is NOT the end of the flow any more.
+            //
+            // It used to be: "contact the admin", and the agent sat there. On
+            // this fleet no callback receiver exists at all, so every single
+            // enrolment reached this branch and stopped — which is the whole
+            // reason handsets never captured anything. Route 3 finishes the
+            // install on the strength of the code, visibly and weakly, and
+            // that is strictly better than a phone that reports nothing.
+            is EnrolmentRepository.Result.Failed -> selfDeclare()
 
+            // Same reasoning, different cause: a phone that cannot reach the
+            // server to start a challenge can still be enrolled the moment it
+            // can, and route 3 is one request rather than a five-minute window.
             is EnrolmentRepository.Result.Offline ->
                 _state.value = _state.value.copy(
                     busy = false,
                     message = UiMessage(R_OFFLINE, R_RETRY, UiMessage.Action.RETRY),
                 )
+        }
+    }
+
+    /**
+     * E5's "Keyinroq tasdiqlash" — finish now, on the code alone.
+     *
+     * Offered even when the callback route IS available, because dialling a
+     * number and waiting is a step, and a step on the last screen of an
+     * unaided install is where people stop. It costs the strength of the
+     * binding and the panel shows exactly that.
+     */
+    fun onSkipVerification() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, message = null)
+            selfDeclare()
+        }
+    }
+
+    /**
+     * Route 3 (SPEC §9.3): bind on the strength of the enrolment code.
+     *
+     * When an admin has turned it off, the only route left is attestation from
+     * the panel — so the screen says so **and starts polling**, rather than
+     * telling the agent to contact somebody and then never noticing that they
+     * did.
+     */
+    private suspend fun selfDeclare() {
+        when (val declared = repository.verifySelfDeclared()) {
+            is EnrolmentRepository.Result.Ok -> finishVerification(declared.value)
+
+            is EnrolmentRepository.Result.Failed ->
+                _state.value = _state.value.copy(
+                    busy = false,
+                    awaitingAttestation = declared.failure.code == "self_declared_disabled",
+                    callbackFailure = NumberVerification.CallbackOutcome.RECEIVER_DOWN,
+                    message = UiMessage(
+                        R_RECEIVER_DOWN,
+                        R_CONTACT_ADMIN,
+                        UiMessage.Action.CONTACT_ADMIN,
+                    ),
+                )
+
+            is EnrolmentRepository.Result.Offline ->
+                _state.value = _state.value.copy(
+                    busy = false,
+                    message = UiMessage(R_OFFLINE, R_RETRY, UiMessage.Action.RETRY),
+                    debugDetail = debugDetailOf(declared.cause),
+                )
+        }
+    }
+
+    /**
+     * Ask the server whether somebody else finished this enrolment.
+     *
+     * The somebody is an admin attesting from the panel. That activated the
+     * installation server-side, and the handset had no way to hear about it —
+     * the real token pair is minted at verification, so a phone told to contact
+     * an admin stayed on that screen after the admin had acted. Polled while
+     * [UiState.awaitingAttestation] is true.
+     */
+    fun onPollStatus() {
+        viewModelScope.launch {
+            val status = repository.enrolmentStatus()
+            if (status is EnrolmentRepository.Result.Ok && status.value.isMatched) {
+                finishVerification(status.value)
+            }
         }
     }
 
@@ -393,9 +642,7 @@ class EnrolmentViewModel @Inject constructor(
     }
 
     private suspend fun finishVerification(status: EnrolmentRepository.VerificationStatus) {
-        timer.finish(EnrolmentStep.VERIFY)?.let {
-            repository.reportStepTiming(EnrolmentStep.VERIFY.wire, it)
-        }
+        val elapsed = timer.finish(EnrolmentStep.VERIFY)
         // Re-check the capabilities that only become true once the device is
         // bound, so E6 cannot be reached on a stale green (UC-03).
         val resolution = checks.check(Capability.SUBSCRIPTION_RESOLUTION)
@@ -409,7 +656,15 @@ class EnrolmentViewModel @Inject constructor(
                 (Capability.SUBSCRIPTION_RESOLUTION to resolution) +
                 (Capability.FOREGROUND_SERVICE to service),
         )
+
+        // The number is proven, so the server now accepts this phone's calls —
+        // and capture starts here rather than at the next reboot. Nothing used
+        // to make this call: an enrolled handset sent its first heartbeat only
+        // when something else happened to wake the service, and until then the
+        // panel showed it as a device that had never reported.
+        capture.onEnrolmentComplete()
         repository.reportCapabilities(listOf(resolution, service))
+        elapsed?.let { repository.reportStepTiming(EnrolmentStep.VERIFY.wire, it) }
     }
 
     /** SPEC §8.1's "Yordam kerak". A stalled enrolment must be an event, not

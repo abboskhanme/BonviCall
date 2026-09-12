@@ -68,6 +68,31 @@ class Revocation @Inject constructor(
     }
 
     /**
+     * Run the revocation if the server has already said so.
+     *
+     * The auth state flips to `REVOKED` inside the upload path, the moment a
+     * request comes back with `installation_revoked` — but the deletion cannot
+     * happen there, because that code runs on a network thread deep inside a
+     * drain. So the flag is set there and enforced here, from the workers.
+     *
+     * **Idempotent and cheap.** It walks two app-private directories only when
+     * the state says revoked, and it stays silent when there was nothing left
+     * to delete — otherwise a revoked phone that is still switched on would
+     * write the same warning every fifteen minutes forever.
+     */
+    suspend fun enforceIfRevoked(): Result? = withContext(io) {
+        if (session.authStateSnapshot() != DeviceAuthState.REVOKED) return@withContext null
+        val result = deleteAllAudio()
+        if (result.deletedFiles > 0) {
+            Timber.w(
+                "Revoked installation: deleted %d leftover audio file(s), %d bytes",
+                result.deletedFiles, result.deletedBytes,
+            )
+        }
+        result
+    }
+
+    /**
      * Every recording this app made or transcoded.
      *
      * Only app-private storage is touched. An **OEM-harvested file is never

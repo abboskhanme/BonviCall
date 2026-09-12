@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,55 +21,61 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import uz.bonvi.call.R
 import uz.bonvi.call.domain.Capability
-import uz.bonvi.call.domain.CapabilityState
 import uz.bonvi.call.domain.CapabilityConsequence
+import uz.bonvi.call.domain.CapabilityState
 import uz.bonvi.call.domain.CaptureReadiness
-import uz.bonvi.call.domain.runtimePermission
 import uz.bonvi.call.enrolment.EnrolmentViewModel
 
 /**
- * **E2 — permissions, one at a time** (SPEC §8.2).
+ * **E2 — permissions, in one request** (SPEC §8.2).
  *
- * Exactly one row is expanded. Each row carries one Uzbek sentence of PURPOSE
- * AND CONSEQUENCE — "Mikrofon bo'lmasa suhbat yozilmaydi, lekin qo'ng'iroq
- * baribir qayd etiladi" — a single button, and a live result chip.
+ * ═══ What changed, and why ═════════════════════════════════════════════════
+ * This screen used to walk nine capabilities one card at a time: tap, dialog,
+ * check, next card, tap again — nine taps before anything else happened, on
+ * the step of an unaided install where people already stop. Six of the nine
+ * are ordinary runtime permissions, and Android shows those six dialogs back
+ * to back from a single `RequestMultiplePermissions`. Same dialogs, same
+ * order, **one tap to start them**.
  *
- * ═══ The row turns green only when the CAPABILITY works ════════════════════
- * Not when the dialog was dismissed. `viewModel.onPermissionStepFinished` runs
- * the real check from SPEC §7.8 — a one-second microphone capture, a one-row
- * call-log query — and the chip shows what it found. "Did you enable it?" with
- * a checkbox is how a rollout looks fine and captures nothing.
+ * The three that are left are not dialogs at all — battery exemption,
+ * all-files access, OEM autostart are settings screens — so they keep their
+ * own buttons, and only while they are not already satisfied.
+ *
+ * ═══ The rule that did NOT change ══════════════════════════════════════════
+ * **A row goes green only when the CAPABILITY works**, never because a dialog
+ * was dismissed. `onPermissionsChecked` runs the real checks from SPEC §7.8 —
+ * a one-second microphone capture, a one-row call-log query — and the chip
+ * shows what each found. "Did you enable it?" with a checkbox is how a rollout
+ * looks fine and captures nothing.
  *
  * Three outcomes, three different next actions, because they are three
  * different problems:
- *  • `denied` → the system dialog will help;
+ *  • `denied` → the system dialog will help, so the button asks again;
  *  • `denied_permanently` → "Sozlamalardan yoqing" with a deep link;
  *  • `granted_not_working` → the OEM's own permission manager is blocking it,
  *    and **retrying the system dialog will never fix it**, so the screen says
  *    so instead of offering the same button again.
- *
- * The order is SPEC's: the alarming permissions come after two easy successes.
  */
 @Composable
 fun EnrolPermissionsScreen(viewModel: EnrolmentViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycleCompat()
     val context = LocalContext.current
-    val order = viewModel.permissionOrder
-    val current = order.getOrNull(state.currentPermissionIndex)
+    val blocking = viewModel.blockingRequired()
 
     val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
+        ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        // The RESULT of the dialog is deliberately ignored. What decides the
-        // row is the capability check that follows, not what the dialog
-        // reported — that is the whole point of E2.
-        current?.let(viewModel::onPermissionStepFinished)
+        // The RESULT map is deliberately ignored. What decides every row is the
+        // capability check that follows, not what the dialogs reported — that
+        // is the whole point of E2.
+        viewModel.onPermissionsChecked()
     }
 
-    LaunchedEffect(current) {
-        // Re-check on entry: a permission granted in a previous run, or granted
-        // from the settings screen and returned from, must not need a tap.
-        current?.let(viewModel::onPermissionStepFinished)
+    LaunchedEffect(Unit) {
+        // Check on entry, before asking for anything. A phone where the
+        // permissions are already granted — a reinstall, a resumed enrolment —
+        // walks straight through without a single dialog.
+        viewModel.onPermissionsChecked()
     }
 
     EnrolScaffold(
@@ -76,97 +83,157 @@ fun EnrolPermissionsScreen(viewModel: EnrolmentViewModel) {
         title = stringResource(R.string.enrol_permissions_title),
         onStuck = viewModel::onStuck,
     ) {
-        order.forEachIndexed { index, capability ->
-            val result = state.capabilities[capability]
-            val expanded = index == state.currentPermissionIndex
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = stringResource(capability.titleRes()),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        if (capability in CaptureReadiness.OPTIONAL) {
-                            Text(
-                                text = " (" + stringResource(R.string.common_optional) + ")",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
+        Text(stringResource(R.string.enrol_permissions_intro))
 
-                    if (state.checking == capability) {
-                        Text(stringResource(R.string.perm_check_running))
+        if (state.checkingAll) {
+            Text(stringResource(R.string.perm_check_running))
+        }
+
+        // ═══ One button, all six dialogs ═══════════════════════════════════
+        Button(
+            onClick = { launcher.launch(viewModel.runtimePermissions.toTypedArray()) },
+            enabled = !state.checkingAll,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.perm_allow_all))
+        }
+
+        // The list is a RESULT, not a queue. Every row is visible from the
+        // start so the agent can see how long the step is, and each says what
+        // the check found rather than what was tapped.
+        viewModel.permissionOrder.forEach { capability ->
+            CapabilityRow(
+                capability = capability,
+                result = state.capabilities[capability],
+                checking = state.checking == capability,
+                isSettingsScreen = capability in viewModel.settingsCapabilities,
+                onOpenSettings = {
+                    if (state.capabilities[capability]?.needsSettingsScreen == true) {
+                        context.openAppSettings()
                     } else {
-                        result?.let { Text(text = stringResource(it.state.labelRes())) }
+                        context.openSettingsFor(capability)
                     }
+                },
+                onRecheck = { viewModel.onPermissionStepFinished(capability) },
+                onContinueWithout = { viewModel.onContinueWithout(capability) },
+            )
+        }
 
-                    if (!expanded) return@Column
+        // ⚠️ ALWAYS available. A screen whose own text says "retrying will not
+        // fix this" must not also be the end of the road (UC-14): a phone that
+        // logs calls without audio is a supported state, and refusing to enrol
+        // it is strictly worse — an enrolled handset reporting BLOCKED is
+        // visible to an admin, an unenrolled one is not. What it costs is
+        // named above the control, so it is a decision and not an escape.
+        if (blocking.isEmpty()) {
+            Button(
+                onClick = viewModel::onPermissionsDone,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.common_continue))
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.perm_blocking_summary, blocking.size),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                onClick = viewModel::onPermissionsDone,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.perm_continue_without))
+            }
+        }
+    }
+}
 
-                    Text(stringResource(capability.purposeRes()))
-
-                    // `granted_not_working`: say why the obvious action will not
-                    // work, and send them where it will.
-                    if (result?.state == CapabilityState.GRANTED_NOT_WORKING) {
-                        Text(
-                            text = stringResource(R.string.perm_state_not_working_help),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    // What the check actually found — "1s test capture, 4800
-                    // samples, peak 812". Evidence, not a verdict: "it did not
-                    // work" with nothing behind it is an unactionable call to
-                    // the admin.
-                    result?.detail?.let {
-                        Text(text = it, style = MaterialTheme.typography.bodySmall)
-                    }
-
-                    val permission = capability.runtimePermission()
-                    Button(
-                        onClick = {
-                            when {
-                                result?.needsSettingsScreen == true ->
-                                    context.openAppSettings()
-                                permission != null -> launcher.launch(permission)
-                                else -> context.openSettingsFor(capability)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (result?.needsSettingsScreen == true) {
-                                    R.string.common_open_settings
-                                } else {
-                                    R.string.perm_allow
-                                },
-                            ),
-                        )
-                    }
-
-                    // ⚠️ ALWAYS available, for every capability. A step whose
-                    // own text says "retrying will not fix this" must not also
-                    // be the end of the road (UC-14). The cost is named above
-                    // the control, so this is a decision rather than an escape.
-                    val consequence = CapabilityConsequence.of(capability)
-                    val alreadyWorking = result?.isWorking == true
-                    if (!alreadyWorking) {
-                        Text(
-                            text = stringResource(consequence.costRes()),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        TextButton(onClick = { viewModel.onContinueWithout(capability) }) {
-                            Text(
-                                stringResource(
-                                    if (consequence == CapabilityConsequence.NONE) {
-                                        R.string.common_skip
-                                    } else {
-                                        R.string.perm_continue_without
-                                    },
-                                ),
-                            )
-                        }
-                    }
+/** One capability, and what the check actually found. */
+@Composable
+private fun CapabilityRow(
+    capability: Capability,
+    result: uz.bonvi.call.domain.CapabilityResult?,
+    checking: Boolean,
+    isSettingsScreen: Boolean,
+    onOpenSettings: () -> Unit,
+    onRecheck: () -> Unit,
+    onContinueWithout: () -> Unit,
+) {
+    val working = result?.isWorking == true
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(capability.titleRes()),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (capability in CaptureReadiness.OPTIONAL) {
+                    Text(
+                        text = " (" + stringResource(R.string.common_optional) + ")",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
+            }
+
+            when {
+                checking -> Text(stringResource(R.string.perm_check_running))
+                result != null -> Text(
+                    text = stringResource(result.state.labelRes()),
+                    color = if (working) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+            }
+
+            // A satisfied row is a line of text and nothing else. Buttons on a
+            // finished step are the noise that made this screen feel long.
+            if (working) return@Column
+
+            Text(stringResource(capability.purposeRes()))
+
+            // `granted_not_working`: say why the obvious action will not work,
+            // and send them where it will.
+            if (result?.state == CapabilityState.GRANTED_NOT_WORKING) {
+                Text(
+                    text = stringResource(R.string.perm_state_not_working_help),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            // What the check actually found — "1s test capture, 4800 samples,
+            // peak 812". Evidence, not a verdict: "it did not work" with
+            // nothing behind it is an unactionable call to the admin.
+            result?.detail?.let {
+                Text(text = it, style = MaterialTheme.typography.bodySmall)
+            }
+
+            // A settings screen for the three that are one, and for any runtime
+            // permission the agent has denied permanently — where the system
+            // dialog no longer appears at all.
+            if (isSettingsScreen || result?.needsSettingsScreen == true) {
+                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.common_open_settings))
+                }
+                TextButton(onClick = onRecheck, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.perm_recheck))
+                }
+            }
+
+            Text(
+                text = stringResource(CapabilityConsequence.of(capability).costRes()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = onContinueWithout) {
+                Text(
+                    stringResource(
+                        if (CapabilityConsequence.of(capability) == CapabilityConsequence.NONE) {
+                            R.string.common_skip
+                        } else {
+                            R.string.perm_continue_without
+                        },
+                    ),
+                )
             }
         }
     }

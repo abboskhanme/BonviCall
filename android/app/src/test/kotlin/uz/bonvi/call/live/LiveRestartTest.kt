@@ -62,6 +62,7 @@ class LiveRestartTest {
         sessions = sessions,
         pending = pending,
         onCallEnded = CallEndedListener { },
+        capture = NoCapture,
         io = kotlinx.coroutines.Dispatchers.Unconfined,
     )
 
@@ -186,4 +187,14 @@ class LiveRestartTest {
             ),
         ).isInstanceOf(Decision.Reject::class.java)
     }
+}
+
+/** The capture path is an Android runtime; this suite is about what survives a
+ *  restart, which is the database. */
+private object NoCapture : uz.bonvi.call.service.CallCapture {
+    override fun prepare(callId: String, capture: uz.bonvi.call.domain.Decision.Capture) = Unit
+    override fun start(callId: String) = Unit
+    override fun stop(callId: String): uz.bonvi.call.service.CaptureOutcome? = null
+    override fun discard(callId: String) = Unit
+    override fun workDir(): java.io.File = java.io.File("build/tmp")
 }

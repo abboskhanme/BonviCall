@@ -55,6 +55,11 @@ enum class ErrorCode(val wire: String) {
     NUMBER_MISMATCH("number_mismatch"),
     CALLBACK_RECEIVER_DOWN("callback_receiver_down"),
 
+    /** Route 3 is off on this server, so an admin attesting from the panel is
+     *  the only way this handset finishes. E5 says so and polls for it rather
+     *  than offering a button that cannot work. */
+    SELF_DECLARED_DISABLED("self_declared_disabled"),
+
     // Calls
     CALL_NOT_FOUND("call_not_found"),
     CALL_IDENTITY_CONFLICT("call_identity_conflict"),

@@ -51,6 +51,7 @@ export const FUNNEL_STAGE_LABEL: Record<FunnelStage, MessageKey> = {
   permitted: 'funnel.permitted',
   number_verified: 'funnel.number_verified',
   verified_by_admin: 'funnel.verified_by_admin',
+  self_declared: 'funnel.self_declared',
   capturing: 'funnel.capturing',
   needs_assisted_install: 'funnel.needs_assisted_install',
   install_disappeared: 'funnel.install_disappeared',
@@ -64,6 +65,7 @@ export const FUNNEL_STAGE_HINT: Record<FunnelStage, MessageKey> = {
   permitted: 'funnel.hint.permitted',
   number_verified: 'funnel.hint.number_verified',
   verified_by_admin: 'funnel.hint.verified_by_admin',
+  self_declared: 'funnel.hint.self_declared',
   capturing: 'funnel.hint.capturing',
   needs_assisted_install: 'funnel.hint.needs_assisted_install',
   install_disappeared: 'funnel.hint.install_disappeared',
@@ -77,6 +79,10 @@ export const FUNNEL_STAGE_TONE: Record<FunnelStage, Tone> = {
   number_verified: 'accent',
   // Attested is deliberately distinct from proven: it is weaker evidence.
   verified_by_admin: 'warn',
+  // Weaker still — nobody has looked at this binding at all yet. It is a
+  // working handset, so it is not `bad`; it is a queue of one thing an admin
+  // still owes each phone, so it is not `accent` either.
+  self_declared: 'warn',
   capturing: 'good',
   needs_assisted_install: 'warn',
   install_disappeared: 'bad',
@@ -95,6 +101,7 @@ export const VERIFICATION_METHOD_LABEL: Record<VerificationMethod, MessageKey> =
   sim_msisdn: 'verification.sim_msisdn',
   callback: 'verification.callback',
   admin_attested: 'verification.admin_attested',
+  self_declared: 'verification.self_declared',
 }
 
 export const NETWORK_TYPE_LABEL: Record<NetworkType, MessageKey> = {
@@ -105,6 +112,7 @@ export const NETWORK_TYPE_LABEL: Record<NetworkType, MessageKey> = {
 
 export const CAPTURE_ROUTE_LABEL: Record<CaptureRoute, MessageKey> = {
   oem_file_harvest: 'calls.captureRoute.oem_file_harvest',
+  app_voice_call: 'calls.captureRoute.app_voice_call',
   app_voice_recognition: 'calls.captureRoute.app_voice_recognition',
   app_voice_communication: 'calls.captureRoute.app_voice_communication',
   app_mic: 'calls.captureRoute.app_mic',

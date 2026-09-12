@@ -76,10 +76,15 @@ class UploadPolicyTest {
 
     @Test
     fun `a parked row is never sendable and never deleted by the policy`() {
-        assertThat(UploadPolicy.isSendable(attempts = 0, parked = true)).isFalse()
-        assertThat(UploadPolicy.isSendable(attempts = UploadPolicy.MAX_ATTEMPTS, parked = false))
-            .isFalse()
-        assertThat(UploadPolicy.isSendable(attempts = 1, parked = false)).isTrue()
+        // Asserted through the rule that creates the state rather than through
+        // a second predicate describing it: reaching MAX_ATTEMPTS is what
+        // parks a row, and being parked is what takes it out of the DAO's
+        // `WHERE parkedAtEpochMillis IS NULL`. `isSendable` said the same
+        // thing a second time and was deleted for it.
+        assertThat(UploadPolicy.onFailure(UploadPolicy.MAX_ATTEMPTS, 503, null))
+            .isInstanceOf(UploadPolicy.Outcome.Park::class.java)
+        assertThat(UploadPolicy.onFailure(1, 503, null))
+            .isInstanceOf(UploadPolicy.Outcome.Retry::class.java)
 
         // There is no outcome that means "delete". The only delete in the whole
         // queue is confirm(), which runs after the server acknowledges (N11).
@@ -109,5 +114,60 @@ class UploadPolicyTest {
 
         assertThat(row.isParked).isFalse()
         assertThat(row.copy(parkedAtEpochMillis = 2L).isParked).isTrue()
+    }
+
+    // --- An unreachable server (found on the first real handset) -------------
+    //
+    // A live Redmi Note 14 captured 39 calls over two days and delivered none
+    // of them: every row sat parked with `max_attempts`, because the laptop
+    // running the server was off overnight and each failed attempt counted.
+    // The backoff reaches attempt five after about 1 h 45 m, so any outage
+    // longer than an afternoon killed the whole queue permanently — and
+    // nothing ever retried a parked row. Each test below fails against the
+    // policy as it stood.
+
+    @Test
+    fun `an unreachable server never parks a row, however many times it is tried`() {
+        for (attempts in 0..50) {
+            val outcome = UploadPolicy.onFailure(attempts, 0, UploadPolicy.UNREACHABLE)
+            assertThat(outcome).isInstanceOf(UploadPolicy.Outcome.Retry::class.java)
+        }
+    }
+
+    @Test
+    fun `an unreachable server still backs off, and the backoff is capped`() {
+        // Counted, so the wait widens and the panel can see how long a handset
+        // has been shouting into nothing — just never made permanent.
+        val first = UploadPolicy.onFailure(0, 0, UploadPolicy.UNREACHABLE)
+        val late = UploadPolicy.onFailure(40, 0, UploadPolicy.UNREACHABLE)
+        assertThat((first as UploadPolicy.Outcome.Retry).afterSeconds).isEqualTo(30)
+        // Capped rather than unbounded: a phone back after a week must drain
+        // that week promptly, not wait longer and longer.
+        assertThat((late as UploadPolicy.Outcome.Retry).afterSeconds).isEqualTo(3_600)
+    }
+
+    @Test
+    fun `an unreadable payload still parks, even though it is also status zero`() {
+        // The distinction the fix turns on. Both cases reach the policy with
+        // status 0, and only one of them is exempt from the attempt limit: a
+        // row that cannot be parsed can never succeed, so it must still come
+        // to rest rather than block the queue behind it for ever.
+        assertThat(UploadPolicy.onFailure(0, 0, "payload_unreadable"))
+            .isInstanceOf(UploadPolicy.Outcome.Retry::class.java)
+        assertThat(UploadPolicy.onFailure(UploadPolicy.MAX_ATTEMPTS, 0, "payload_unreadable"))
+            .isInstanceOf(UploadPolicy.Outcome.Park::class.java)
+        // Whereas an unreachable server never does, at any count.
+        assertThat(UploadPolicy.onFailure(UploadPolicy.MAX_ATTEMPTS, 0, UploadPolicy.UNREACHABLE))
+            .isInstanceOf(UploadPolicy.Outcome.Retry::class.java)
+    }
+
+    @Test
+    fun `a judged rejection still parks while the server is reachable`() {
+        // The fix must not turn the queue into an infinite retry loop against
+        // a server that has already said no.
+        assertThat(UploadPolicy.onFailure(0, 409, "call_identity_conflict"))
+            .isInstanceOf(UploadPolicy.Outcome.Park::class.java)
+        assertThat(UploadPolicy.onFailure(UploadPolicy.MAX_ATTEMPTS, 503, null))
+            .isInstanceOf(UploadPolicy.Outcome.Park::class.java)
     }
 }

@@ -45,6 +45,7 @@ export const CALL_TYPE_LABEL: Record<CallType, MessageKey> = {
 export const SOURCE_LABEL: Record<CallSource, MessageKey> = {
   live_capture: 'calls.source.live_capture',
   call_log_recovery: 'calls.source.call_log_recovery',
+  provider: 'calls.source.provider',
 }
 
 /**
@@ -100,6 +101,7 @@ export const AUDIO_MISSING_REASON_TONE: Record<AudioMissingReason, BadgeTone> = 
 
 export const CAPTURE_ROUTE_LABEL: Record<CaptureRoute, MessageKey> = {
   oem_file_harvest: 'calls.captureRoute.oem_file_harvest',
+  app_voice_call: 'calls.captureRoute.app_voice_call',
   app_voice_recognition: 'calls.captureRoute.app_voice_recognition',
   app_voice_communication: 'calls.captureRoute.app_voice_communication',
   app_mic: 'calls.captureRoute.app_mic',

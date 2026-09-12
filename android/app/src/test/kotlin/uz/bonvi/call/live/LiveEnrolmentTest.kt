@@ -259,4 +259,77 @@ class LiveEnrolmentTest {
             assertThat(failure.code).isEqualTo("callback_receiver_down")
         }
     }
+
+    /**
+     * WALL 8: **the dead end, closed.**
+     *
+     * This is the wall the whole fleet was standing at. Route 1 is empty on
+     * these SIMs, no callback receiver has ever been in service, and admin
+     * attestation could not reach the phone — so every enrolment stopped at E5
+     * and not one handset ever captured a call. If this test fails, the app is
+     * back to being an install that finishes and records nothing.
+     */
+    @Test
+    fun `a handset with no proving route can still finish enrolment`() = runTest {
+        val code = LiveAdmin.issueCode() ?: return@runTest
+        val session = session()
+        val redeemed = LiveHarness.enrolment(session).redeem(redeemBody(code)).body()!!
+        session.installationId = redeemed.installationId.toString()
+        session.accessToken = redeemed.provisionalToken
+
+        val response = LiveHarness.enrolment(session).verifySelfDeclared()
+
+        assertThat(response.isSuccessful).isTrue()
+        val body = response.body()!!
+        assertThat(body.state.value).isEqualTo("self_declared")
+        // The REAL pair. Without it the server accepts no call from this phone,
+        // which is the state the flow has to leave behind.
+        assertThat(body.tokens?.accessToken).isNotEmpty()
+        assertThat(body.tokens?.refreshToken).isNotEmpty()
+        assertThat(body.status?.value).isEqualTo("active")
+    }
+
+    /**
+     * WALL 9: the status poll, which is how an admin's attestation reaches the
+     * handset at all. Before it existed the phone held a provisional token and
+     * no way to discover that the thing it was waiting for had already
+     * happened.
+     */
+    @Test
+    fun `a pending handset can ask where it stands without being handed tokens`() = runTest {
+        val code = LiveAdmin.issueCode() ?: return@runTest
+        val session = session()
+        val redeemed = LiveHarness.enrolment(session).redeem(redeemBody(code)).body()!!
+        session.installationId = redeemed.installationId.toString()
+        session.accessToken = redeemed.provisionalToken
+
+        val response = LiveHarness.enrolment(session).enrolmentStatus()
+
+        assertThat(response.isSuccessful).isTrue()
+        val body = response.body()!!
+        assertThat(body.state.value).isEqualTo("pending")
+        // Waiting is an answer; a credential is not.
+        assertThat(body.tokens).isNull()
+    }
+
+    /**
+     * WALL 10: and once it IS active, the same poll hands over the pair — so a
+     * screen that was told "contact the admin" completes itself.
+     */
+    @Test
+    fun `the status poll hands over the pair once the installation is active`() = runTest {
+        val code = LiveAdmin.issueCode() ?: return@runTest
+        val session = session()
+        val redeemed = LiveHarness.enrolment(session).redeem(redeemBody(code)).body()!!
+        session.installationId = redeemed.installationId.toString()
+        session.accessToken = redeemed.provisionalToken
+        LiveHarness.enrolment(session).verifySelfDeclared()
+
+        val response = LiveHarness.enrolment(session).enrolmentStatus()
+
+        assertThat(response.isSuccessful).isTrue()
+        val body = response.body()!!
+        assertThat(body.tokens?.accessToken).isNotEmpty()
+        assertThat(body.status?.value).isEqualTo("active")
+    }
 }

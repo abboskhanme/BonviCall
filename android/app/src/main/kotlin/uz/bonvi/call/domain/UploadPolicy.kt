@@ -21,6 +21,24 @@ object UploadPolicy {
     /** N8: five attempts, then park and report. */
     const val MAX_ATTEMPTS: Int = 5
 
+    /**
+     * The request never reached a server at all.
+     *
+     * ⚠️ **This must never park a row, at any attempt count.** An unreachable
+     * server is a fact about the network — a phone in a lift, a laptop asleep,
+     * a tunnel that dropped — and not a judgement on the call. Treating it as
+     * one of the five attempts is what put 39 real calls on a live handset
+     * into a permanent parked state that nothing would ever retry: the backoff
+     * reaches attempt five after about 1 h 45 m offline, so any outage longer
+     * than an afternoon silently killed the entire queue.
+     *
+     * `CallUploader` passes this code for the no-response case, which is
+     * deliberately distinct from `payload_unreadable` — that one is also
+     * `status = 0` and *must* park, because a row that cannot be parsed can
+     * never succeed and would block the queue behind it for ever.
+     */
+    const val UNREACHABLE: String = "server_unreachable"
+
     /** Backoff, in seconds, indexed by attempt count. Capped rather than
      *  unbounded: a phone that comes back after a week should drain that week's
      *  calls promptly, not wait an hour between them. */
@@ -47,6 +65,15 @@ object UploadPolicy {
     fun onFailure(attemptsSoFar: Int, status: Int, code: String?): Outcome {
         val attempt = attemptsSoFar + 1
 
+        // Before every other rule, including the attempt limit: nothing that
+        // never reached a server may be parked. The attempt is still counted,
+        // so the backoff keeps widening and the panel can see how long a
+        // handset has been shouting into nothing — it just never becomes
+        // permanent. See [UNREACHABLE].
+        if (code == UNREACHABLE) {
+            return Outcome.Retry(attempt, backoffFor(attempt))
+        }
+
         // 426 is special and the order is the rule (CONVENTIONS.md §4.4): an
         // app below the minimum version is refused only AFTER its queue has
         // drained, so if we ever see it on an ingest call the right answer is
@@ -62,13 +89,20 @@ object UploadPolicy {
 
         if (attempt >= MAX_ATTEMPTS) return Outcome.Park(code ?: "max_attempts")
 
-        val index = (attempt - 1).coerceIn(0, BACKOFF_SECONDS.lastIndex)
-        return Outcome.Retry(attempt, BACKOFF_SECONDS[index])
+        return Outcome.Retry(attempt, backoffFor(attempt))
     }
 
-    /** True when this row should be handed to the network at all. */
-    fun isSendable(attempts: Int, parked: Boolean): Boolean =
-        !parked && attempts < MAX_ATTEMPTS
+    /** The wait before attempt [attempt], capped at the last step so a handset
+     *  that has been offline for a week still drains that week promptly rather
+     *  than waiting longer and longer for ever. */
+    private fun backoffFor(attempt: Int): Long =
+        BACKOFF_SECONDS[(attempt - 1).coerceIn(0, BACKOFF_SECONDS.lastIndex)]
+
+    // `isSendable(attempts, parked)` was here with no production caller. It is
+    // not a missing wiring: [onFailure] parks a row the moment it reaches
+    // [MAX_ATTEMPTS], so "not parked" already means "under the limit", and the
+    // DAO's `WHERE parkedAtEpochMillis IS NULL` is the same rule expressed
+    // where the rows are. Two spellings of one rule is how they drift.
 
     private const val TOO_MANY_REQUESTS = 429
     private const val REQUEST_TIMEOUT = 408

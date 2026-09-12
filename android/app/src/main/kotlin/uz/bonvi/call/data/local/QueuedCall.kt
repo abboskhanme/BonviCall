@@ -97,6 +97,24 @@ interface QueuedCallDao {
     )
     suspend fun park(clientCallId: String, parkedAtEpochMillis: Long, errorCode: String?)
 
+    /**
+     * Give back the rows that were parked only because nobody answered.
+     *
+     * Called when the server is demonstrably reachable again. Rows parked by a
+     * JUDGEMENT — a 4xx, an unreadable payload, a refused version — are left
+     * exactly where they are: the server has already ruled on those and
+     * retrying burns the employee's data for nothing. Only the two codes that
+     * mean "we never got through" come back, and their attempt count is reset
+     * so they get a full run rather than one last try.
+     */
+    @Query(
+        "UPDATE queued_calls SET parkedAtEpochMillis = NULL, attempts = 0, " +
+            "nextAttemptAtEpochMillis = :nowEpochMillis " +
+            "WHERE parkedAtEpochMillis IS NOT NULL " +
+            "AND lastErrorCode IN ('max_attempts', 'server_unreachable')",
+    )
+    suspend fun unparkUnreachable(nowEpochMillis: Long): Int
+
     /** The only delete in this DAO, and it runs only after the server has the
      *  row (N11). */
     @Query("DELETE FROM queued_calls WHERE clientCallId = :clientCallId")

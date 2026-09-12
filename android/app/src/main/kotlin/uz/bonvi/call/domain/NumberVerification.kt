@@ -14,6 +14,22 @@ import uz.bonvi.call.core.Phone
  */
 object NumberVerification {
 
+    /**
+     * Does this verification state mean the server will now accept the
+     * handset's calls?
+     *
+     * Three states do, at three different strengths, and the list lives HERE
+     * because two callers need the same answer: the repository, deciding
+     * whether a response carried a real token pair, and the ViewModel,
+     * deciding whether E6 may be reached. It was written out twice and the two
+     * copies had already drifted — the repository knew about a third state the
+     * readiness check did not, so a self-declared handset held real tokens and
+     * still rendered as unenrolled.
+     */
+    fun isBound(state: String?): Boolean = state in BOUND_STATES
+
+    private val BOUND_STATES = setOf("matched", "attested", "self_declared")
+
     /** Why route 1 could not prove the match. Wire names from `EnrolmentOutcome`. */
     enum class MsisdnOutcome(val wire: String) {
         MATCHED("ok"),
@@ -66,6 +82,22 @@ object NumberVerification {
         /** An admin vouched for it, with a mandatory reason and an audit row.
          *  Not proven — vouched for. */
         ADMIN_ATTESTED("admin_attested", isProven = false),
+
+        /**
+         * The weakest binding of the four, and the ordinary one on this fleet.
+         *
+         * It says that whoever held the single-use code an admin issued **for
+         * this one number** typed it into this handset. No line was proven.
+         *
+         * It exists because the two proving routes are frequently both
+         * unavailable at once here — Uzbek SIMs leave `getLine1Number()` empty
+         * and the callback needs a receiver line — and a handset with no route
+         * to `active` captures nothing and reports nothing, so nobody can even
+         * see that it is stuck. An enrolled phone with a visibly unproven
+         * binding is strictly better than that, and an admin can still attest
+         * it afterwards.
+         */
+        SELF_DECLARED("self_declared", isProven = false),
         ;
 
         companion object {

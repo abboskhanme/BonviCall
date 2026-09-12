@@ -80,6 +80,21 @@ class LiveQueueDrainTest {
 
         override suspend fun deleteConfirmed(clientCallId: String) { rows.remove(clientCallId) }
         override suspend fun pendingCount() = rows.values.count { it.parkedAtEpochMillis == null }
+        override suspend fun unparkUnreachable(nowEpochMillis: Long): Int {
+            val restored = rows.values.filter {
+                it.parkedAtEpochMillis != null &&
+                    it.lastErrorCode in setOf("max_attempts", "server_unreachable")
+            }
+            restored.forEach {
+                rows[it.clientCallId] = it.copy(
+                    parkedAtEpochMillis = null,
+                    attempts = 0,
+                    nextAttemptAtEpochMillis = nowEpochMillis,
+                )
+            }
+            return restored.size
+        }
+
         override suspend fun parkedCount() = rows.values.count { it.parkedAtEpochMillis != null }
         override suspend fun queuedBytes() = rows.values.sumOf { it.payloadJson.length.toLong() }
     }

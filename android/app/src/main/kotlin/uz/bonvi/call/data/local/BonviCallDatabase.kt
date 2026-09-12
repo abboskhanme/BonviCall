@@ -21,6 +21,7 @@ import uz.bonvi.call.domain.CallState
         CallSessionEntity::class,
         PendingCallEntity::class,
         DiscardCounterEntity::class,
+        AudioJobEntity::class,
     ],
     version = BonviCallDatabase.VERSION,
     exportSchema = true,
@@ -34,8 +35,14 @@ abstract class BonviCallDatabase : RoomDatabase() {
 
     abstract fun pendingCallDao(): PendingCallDao
 
+    abstract fun audioJobDao(): AudioJobDao
+
     companion object {
-        const val VERSION: Int = 1
+        /** 2 — `audio_jobs`, and the capture outcome on `pending_calls`
+         *  (2026-09-06). Version 1 shipped to no handset, but the migration is
+         *  written anyway: `fallbackToDestructiveMigration` is forbidden here,
+         *  and the thing it would destroy is a queue of calls that happened. */
+        const val VERSION: Int = 2
         const val NAME: String = "bonvicall.db"
     }
 }

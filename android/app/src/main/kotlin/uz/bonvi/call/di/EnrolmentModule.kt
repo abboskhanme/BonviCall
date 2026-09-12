@@ -13,6 +13,7 @@ import uz.bonvi.call.domain.EnrolledSubscription
 import uz.bonvi.call.domain.SimDirectory
 import uz.bonvi.call.capture.EnrolmentFacts
 import uz.bonvi.call.enrolment.AndroidDeviceFacts
+import uz.bonvi.call.enrolment.CaptureLauncher
 import uz.bonvi.call.enrolment.CaptureServiceState
 import uz.bonvi.call.enrolment.DeviceFacts
 import uz.bonvi.call.enrolment.StepTimer
@@ -20,9 +21,11 @@ import uz.bonvi.call.enrolment.StorageAccessProbe
 import uz.bonvi.call.enrolment.SubscriptionPresenceProbe
 import uz.bonvi.call.service.CallEndedListener
 import uz.bonvi.call.service.CaptureService
+import uz.bonvi.call.service.work.HeartbeatWorker
 import uz.bonvi.call.service.work.ReconcileWorker
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
 import javax.inject.Singleton
 
 /**
@@ -70,9 +73,36 @@ object EnrolmentProviders {
      */
     @Provides
     @Singleton
-    fun captureServiceState(): CaptureServiceState = CaptureServiceState {
-        CaptureService.isRunning
+    fun captureServiceState(): CaptureServiceState = object : CaptureServiceState {
+        override fun isCaptureServiceRunning(): Boolean = CaptureService.isRunning
+        override fun captureServiceType(): String? = CaptureService.activeType
     }
+
+    /**
+     * What "Tayyor" does besides say so.
+     *
+     * The service is started and a heartbeat is sent immediately, so a phone
+     * that has just finished enrolling appears in the panel as alive within
+     * seconds rather than whenever the first call, a reboot or the
+     * fifteen-minute watchdog happened to wake it. Before this existed, a
+     * correctly enrolled handset looked exactly like a failed install for as
+     * long as nobody rang it.
+     *
+     * The start cannot throw: on API 31+ the OS refuses a foreground service
+     * started from the background, and an exception on the last screen of
+     * enrolment would undo a successful install. That guarantee lives in
+     * [CaptureService.start] itself — every caller needs it, not just this one
+     * — so there is one place it is made rather than a try/catch per call
+     * site, one of which would eventually be forgotten. The watchdog covers
+     * the refusal fifteen minutes later.
+     */
+    @Provides
+    @Singleton
+    fun captureLauncher(@ApplicationContext context: Context): CaptureLauncher =
+        CaptureLauncher {
+            CaptureService.start(context)
+            HeartbeatWorker.enqueueNow(context)
+        }
 
     /**
      * A finished call schedules the reconciliation sweep.

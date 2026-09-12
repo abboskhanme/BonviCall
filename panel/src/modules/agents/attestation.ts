@@ -30,7 +30,14 @@ type FunnelStage = components['schemas']['FunnelStage']
 type EnrolmentAttempt = components['schemas']['EnrolmentAttemptResponse']
 type ReceiverStatus = components['schemas']['ReceiverStatusResponse']
 
-/** Stages at which the number is already bound; nothing to attest. */
+/**
+ * Stages at which the number is already bound; nothing to attest.
+ *
+ * ⚠️ `self_declared` is deliberately NOT here. Such a handset is active and
+ * capturing, but nobody has looked at its binding — it rests on the code alone.
+ * Offering attestation is what turns that into a queue an admin can work
+ * through, and it is the whole reason self-declaration is acceptable at all.
+ */
 const VERIFIED_STAGES: readonly FunnelStage[] = [
   'number_verified',
   'verified_by_admin',

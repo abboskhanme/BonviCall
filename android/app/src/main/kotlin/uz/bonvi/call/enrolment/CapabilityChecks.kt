@@ -80,12 +80,18 @@ class CapabilityChecks @Inject constructor(
         Capability.CALL_LOG,
         Manifest.permission.READ_CALL_LOG,
     ) {
+        // ⚠️ **No `LIMIT` in the sort order.** Android 11+ validates that
+        // argument and answers `IllegalArgumentException`, which arrives here
+        // as `granted_not_working` — a phone with a perfectly good call-log
+        // permission reported as broken, and capture blocked behind it. It cost
+        // a live Android 15 handset an evening. CallSentry never did this: it
+        // sorts and takes the first row, which is what this does now.
         context.contentResolver.query(
             CallLog.Calls.CONTENT_URI,
             arrayOf(CallLog.Calls._ID),
             null,
             null,
-            "${CallLog.Calls.DATE} DESC LIMIT 1",
+            "${CallLog.Calls.DATE} DESC",
         ).use { cursor ->
             if (cursor == null) {
                 // The provider answered null. On several OEMs this is what a
@@ -93,7 +99,10 @@ class CapabilityChecks @Inject constructor(
                 // blocking it — the exact UC-03 trap.
                 CapabilityState.GRANTED_NOT_WORKING to "call-log query returned no cursor"
             } else {
-                CapabilityState.GRANTED_WORKING to "call-log query returned ${cursor.count} row(s)"
+                // Reading one row is the exercise; an EMPTY log is still a
+                // working provider — a new handset has no calls yet.
+                val rows = if (cursor.moveToFirst()) 1 else 0
+                CapabilityState.GRANTED_WORKING to "call-log query readable ($rows row read)"
             }
         }
     }
@@ -192,10 +201,15 @@ class CapabilityChecks @Inject constructor(
 
     private suspend fun checkForegroundService(): CapabilityResult = withContext(io) {
         val running = serviceState.isCaptureServiceRunning()
+        val type = serviceState.captureServiceType()
         CapabilityResult(
             Capability.FOREGROUND_SERVICE,
             if (running) CapabilityState.GRANTED_WORKING else CapabilityState.UNKNOWN,
-            if (running) "capture service running" else "capture service not started yet",
+            if (running) {
+                "capture service running as ${type ?: "an unknown type"}"
+            } else {
+                "capture service not started yet"
+            },
         )
     }
 
@@ -251,9 +265,6 @@ class CapabilityChecks @Inject constructor(
         }
     }
 
-    private fun notApplicable(capability: Capability, why: String) =
-        CapabilityResult(capability, CapabilityState.NOT_APPLICABLE, why)
-
     /** Never `granted`. An unverifiable capability reported green is how R3
      *  stays invisible until go-live. */
     private fun unknown(capability: Capability, why: String) =
@@ -277,6 +288,39 @@ fun interface SubscriptionPresenceProbe {
 }
 
 /** Whether the capture foreground service is running and its notification is up. */
-fun interface CaptureServiceState {
+interface CaptureServiceState {
     fun isCaptureServiceRunning(): Boolean
+
+    /**
+     * Which foreground-service type the OS accepted, or null when nothing is
+     * running.
+     *
+     * Reported as the capability's `detail`, so the panel can see per handset
+     * whether it got `phoneCall|microphone` — the type that survives Android
+     * 15's `dataSync` budget and a background restart — or fell back. On a
+     * fleet of fifteen phones from four manufacturers that is a measurement,
+     * not a footnote.
+     */
+    fun captureServiceType(): String?
+}
+
+/**
+ * Starts capture the moment enrolment finishes.
+ *
+ * A seam rather than a call to `CaptureService.start`, for the same reason
+ * [CaptureServiceState] is one: `enrolment/` describes what should happen and
+ * `service/` owns the Android machinery that does it.
+ *
+ * It exists because nothing used to start the service after E6. The phone was
+ * enrolled, the panel had a row for it, and the service came up only when the
+ * first call arrived, a reboot happened, or the fifteen-minute watchdog
+ * noticed — so a freshly enrolled handset sent no heartbeat and appeared in the
+ * panel as a device that had never reported. During a rollout that is
+ * indistinguishable from an install that failed.
+ */
+fun interface CaptureLauncher {
+    /** Start the service and tell the server the phone is alive. Must never
+     *  throw: the OS refuses a background start on API 31+, and an enrolment
+     *  that crashed at the finish line is worse than one that starts late. */
+    fun onEnrolmentComplete()
 }
