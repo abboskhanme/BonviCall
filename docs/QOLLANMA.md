@@ -81,24 +81,31 @@ surati bor. Agar biror joyda to'xtab qolsangiz — **"Yordam kerak"** tugmasini
 bosing. Administrator buni darhol ko'radi va sizga qo'ng'iroq qiladi. Bu
 tugma har bir ekranda bor.
 
-## 5. Ilovani sozlash — 15 daqiqa
+## 5. Ilovani sozlash — 2-3 daqiqa
 
 Ilovani ochganingizda:
 
-1. **Kod** — havoladan avtomatik to'ldiriladi.
-2. **Ruxsatlar** — ketma-ket so'raladi. Har birining tagida nima uchun
-   kerakligi yozilgan. Masalan mikrofonsiz suhbat yozilmaydi, lekin qo'ng'iroq
-   baribir qayd etiladi.
+1. **Kod** — havoladan avtomatik to'ldiriladi. Qo'lda kiritsangiz ham bo'ladi.
+2. **Ruxsatlar** — **bitta tugma**: «Barcha ruxsatlarni berish». Telefon
+   ketma-ket bir nechta oyna ko'rsatadi, har birida «Ruxsat berish»ni
+   tanlaysiz. Har bir ruxsat nima uchun kerakligi ro'yxatda yozilgan —
+   masalan mikrofonsiz suhbat yozilmaydi, lekin qo'ng'iroq baribir qayd
+   etiladi.
    Ilova har bir ruxsatni **haqiqatan ishlayotganini tekshiradi** — shunchaki
    "ruxsat berdim" degani yetarli emas. Agar telefoningiz ruxsatni bergandek
    ko'rsatib, aslida bermayotgan bo'lsa, ilova buni aytadi va qayerdan
    yoqishni ko'rsatadi.
-3. **SIM tanlash** — ikkita SIM bo'lsa, ish raqamingiz turgan SIM kartani
-   tanlaysiz. **Diqqat qiling:** shu tanlov ilova qaysi qo'ng'iroqlarni
-   yozishini belgilaydi.
-4. **Raqamni tasdiqlash** — ilova ko'rsatgan raqamga qo'ng'iroq qilasiz.
-   Qo'ng'iroq qabul qilinmaydi va pul yechilmaydi — faqat raqamingiz
-   ko'rinishi kifoya.
+   Batareya va fayl ruxsatlari alohida tugmalar bilan ochiladi — ular oyna
+   emas, sozlamalar sahifasi.
+3. **SIM tanlash** — faqat ikkita SIM bo'lsa so'raladi. Ish raqamingiz turgan
+   SIM kartani tanlaysiz. **Diqqat qiling:** shu tanlov ilova qaysi
+   qo'ng'iroqlarni yozishini belgilaydi.
+4. **Raqamni tasdiqlash** — odatda **o'zi o'tadi, hech narsa qilmaysiz**.
+   Agar tizimda tasdiqlash raqami sozlangan bo'lsa, ilova ko'rsatgan raqamga
+   qo'ng'iroq qilishingiz mumkin (qo'ng'iroq qabul qilinmaydi va pul
+   yechilmaydi — faqat raqamingiz ko'rinishi kifoya). Buni xohlamasangiz
+   «Keyinroq tasdiqlash» tugmasini bosing — ilova baribir ishlay boshlaydi,
+   administrator raqamni keyin tasdiqlaydi.
 5. **Tayyor.**
 
 "Tayyor" yozuvi faqat hamma narsa **haqiqatan ishlayotganda** chiqadi. Agar
