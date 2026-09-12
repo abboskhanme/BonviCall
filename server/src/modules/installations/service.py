@@ -156,6 +156,67 @@ class InstallationService:
             return None
         return await self.session.get(InstallationModel, installation_id)
 
+    async def provider_installation(
+        self, number_id: uuid.UUID, agent_id: uuid.UUID, fingerprint: str
+    ) -> InstallationModel:
+        """The stand-in for a handset on a cloud-telephony line (T-MZ).
+
+        ``calls.installation_id`` is ``NOT NULL`` — every call is delivered by
+        something — and for a provider call that something is the cabinet. One
+        per registered number, created once and reused, so a restart cannot
+        split one salesperson's history across two installations.
+
+        It lives here rather than in ``telephony`` because ``installations``
+        and ``devices`` belong to this module: a second module creating rows in
+        them is exactly the layering the architecture test refuses, and it is
+        refusing it for a reason — installation creation carries the rebinding
+        and alerting rules, and a parallel creator would not.
+
+        Marked ``self_declared``: nothing about this line's number has been
+        proven to us, which is the truth and is rendered as such everywhere.
+        """
+        existing = await self.session.scalar(
+            select(InstallationModel).where(
+                InstallationModel.number_id == number_id,
+                InstallationModel.device_fingerprint_hash == fingerprint,
+            )
+        )
+        if existing is not None:
+            return existing
+
+        device = DeviceModel(
+            manufacturer="MoiZvonki",
+            model="cloud",
+            android_release="-",
+            api_level=0,
+            build_fingerprint_hash=fingerprint,
+        )
+        self.session.add(device)
+        await self.session.flush()
+
+        installation = InstallationModel(
+            number_id=number_id,
+            agent_id=agent_id,
+            device_id=device.id,
+            # Nothing ever logs in as this installation; the column requires a
+            # value and this one cannot be presented.
+            credential_hash=sha256_hex(f"moizvonki-no-credential:{number_id}"),
+            device_fingerprint_hash=fingerprint,
+            status=InstallationStatus.ACTIVE,
+            verification_method=VerificationMethod.SELF_DECLARED,
+            verified_at=clock.now(),
+            funnel_stage=FunnelStage.SELF_DECLARED,
+            funnel_changed_at=clock.now(),
+        )
+        self.session.add(installation)
+        await self.session.flush()
+        log.info(
+            "provider_installation_created",
+            installation_id=str(installation.id),
+            number_id=str(number_id),
+        )
+        return installation
+
     async def create_pending(
         self,
         number_id: uuid.UUID,
@@ -462,11 +523,14 @@ class InstallationService:
         installation.status = InstallationStatus.ACTIVE
         installation.verification_method = method
         installation.verified_at = clock.now()
-        installation.funnel_stage = (
-            FunnelStage.VERIFIED_BY_ADMIN
-            if method is VerificationMethod.ADMIN_ATTESTED
-            else FunnelStage.NUMBER_VERIFIED
-        )
+        # One stage per route, and never a stronger one than the route earns:
+        # the rollout board is where an admin decides whose binding still needs
+        # attesting, and a self-declared phone shown as `number_verified` is a
+        # phone nobody will ever go back to (SPEC §9.3).
+        installation.funnel_stage = {
+            VerificationMethod.ADMIN_ATTESTED: FunnelStage.VERIFIED_BY_ADMIN,
+            VerificationMethod.SELF_DECLARED: FunnelStage.SELF_DECLARED,
+        }.get(method, FunnelStage.NUMBER_VERIFIED)
         installation.funnel_changed_at = clock.now()
         await self.session.flush()
         log.info(

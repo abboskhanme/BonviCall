@@ -55,6 +55,28 @@ class Settings(BaseSettings):
     """A separate database, because BonviZvonki's test rows reached real users
     through a shared one (CONVENTIONS.md §13)."""
 
+    # --- MoiZvonki (cloud telephony, T-MZ) ---------------------------------
+    #
+    # The provider whose own Android app does the capturing and whose cloud
+    # holds the recording. BonviCall consumes it: a webhook per call event and
+    # a periodic ``calls.list`` sweep for whatever the webhook missed. Ported
+    # from the WunderkindLC integration, which is in production.
+    #
+    # Credentials live in the environment and NOT in ``app_settings``: the API
+    # key is a secret, and ``app_settings`` is readable by every panel admin
+    # and is rendered on a settings page (SPEC §3.8).
+    moizvonki_enabled: bool = False
+    moizvonki_domain: str = ""
+    """The cabinet's subdomain — "bonvi" for bonvi.moizvonki.ru. A value
+    containing a dot is used as-is, so a full host or a test proxy also works."""
+    moizvonki_username: str = ""
+    moizvonki_api_key: SecretStr = SecretStr("")
+    moizvonki_webhook_secret: SecretStr = SecretStr("")
+    """The secret path segment the provider posts to. It IS the authentication
+    for that endpoint — the request arrives from the provider's servers with no
+    token of ours — so it must be long and random, and a mismatch answers 404
+    rather than 401 (never confirm the endpoint exists)."""
+
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False

@@ -9,12 +9,16 @@ import pytest
 import sqlalchemy as sa
 
 from src.core.enums import (
+    AuditAction,
     EnrolmentOutcome,
+    FunnelStage,
     InstallationStatus,
     ReceiverKind,
     ReceiverStatus,
+    VerificationMethod,
 )
 from src.core.security import sha256_hex
+from src.modules.audit.models import AuditLogModel
 from src.modules.enrolment.models import CallbackReceiverModel, EnrolmentAttemptModel
 
 pytestmark = pytest.mark.asyncio
@@ -475,3 +479,188 @@ async def test_a_verified_installation_cannot_be_re_redeemed(
     again = await client.post("/api/device/v1/enrolment/redeem", json=body)
     assert again.status_code == 409
     assert again.json()["error"]["code"] == "enrolment_code_used"
+
+
+# --- Route 3: self-declared, and the status poll (§9.3) ---------------------
+#
+# These two exist because of a dead end the fleet actually sits in: route 1 is
+# empty on Uzbek SIMs, route 2 needs a receiver line nobody has provided, and
+# admin attestation could not reach the phone. Every test below fails against
+# the code as it stood before them.
+
+
+async def test_a_handset_with_no_proving_route_can_still_finish(
+    db, installation_factory, device_client_factory
+) -> None:
+    """The dead end, closed. Pending → active on the code alone."""
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    response = await device.post("/api/device/v1/enrolment/verify/self")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "self_declared"
+    assert body["tokens"]["access_token"], "without a real pair it cannot upload"
+    await db.refresh(installation)
+    assert installation.status is InstallationStatus.ACTIVE
+
+
+async def test_self_declaring_is_recorded_as_the_weakest_binding(
+    db, installation_factory, device_client_factory
+) -> None:
+    """SPEC §9.3: the identity anchor degrades visibly or not at all.
+
+    If this ever reports ``number_verified`` the panel shows an unproven
+    binding as a proven one, and nobody goes back to attest it.
+    """
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    await device.post("/api/device/v1/enrolment/verify/self")
+
+    await db.refresh(installation)
+    assert installation.verification_method is VerificationMethod.SELF_DECLARED
+    assert installation.funnel_stage is FunnelStage.SELF_DECLARED
+    assert installation.verified_at is not None
+
+    audited = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(AuditLogModel)
+        .where(
+            AuditLogModel.object_id == installation.id,
+            AuditLogModel.action == AuditAction.INSTALLATION_SELF_DECLARED,
+        )
+    )
+    assert audited == 1, "the one activation route with no proof must be auditable"
+
+
+async def test_self_declaring_is_refused_when_the_setting_is_off(
+    db, installation_factory, device_client_factory
+) -> None:
+    """A configuration answer, not a retryable one."""
+    await db.execute(
+        sa.text(
+            "UPDATE app_settings SET value = 'false'::jsonb "
+            "WHERE key = 'enrolment.allow_self_declared'"
+        )
+    )
+    await db.flush()
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    response = await device.post("/api/device/v1/enrolment/verify/self")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "self_declared_disabled"
+    await db.refresh(installation)
+    assert installation.status is InstallationStatus.PENDING
+
+
+async def test_a_revoked_handset_cannot_self_declare_its_way_back(
+    installation_factory, device_client_factory
+) -> None:
+    """UC-08: a revoked installation re-enrols with a new code, or not at all.
+
+    Refused at the token, not in the handler: the principal resolver rejects
+    both revoked states before any route sees the request. Asserted here anyway
+    because the route is new and the rule is the one that matters — a revoked
+    handset must not be able to hand itself a fresh binding.
+    """
+    installation = await installation_factory(status=InstallationStatus.REVOKED)
+    device = await device_client_factory(installation)
+
+    response = await device.post("/api/device/v1/enrolment/verify/self")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "installation_revoked"
+
+
+async def test_self_declaring_twice_re_mints_rather_than_conflicting(
+    db, installation_factory, device_client_factory
+) -> None:
+    """The lost response, on the link this app is installed over."""
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    first = await device.post("/api/device/v1/enrolment/verify/self")
+    second = await device.post("/api/device/v1/enrolment/verify/self")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["tokens"]["access_token"]
+    assert (
+        first.json()["tokens"]["refresh_token"]
+        != second.json()["tokens"]["refresh_token"]
+    ), "a fresh pair, because the phone has nothing to present"
+
+
+async def test_self_declaring_does_not_downgrade_a_proven_binding(
+    db, installation_factory, device_client_factory, agent_factory,
+    registered_number_factory
+) -> None:
+    """An already-proven installation keeps its method.
+
+    Otherwise a stray retry from a phone that verified properly would rewrite
+    its own binding as unproven — the exact silent degradation §9.3 forbids.
+    """
+    agent = await agent_factory()
+    number = await registered_number_factory(agent=agent, e164="+998901112233")
+    installation = await installation_factory(
+        agent=agent, number=number, status=InstallationStatus.PENDING
+    )
+    device = await device_client_factory(installation)
+    await device.post(
+        "/api/device/v1/enrolment/verify/msisdn",
+        json={"line1_number": "+998 90 111-22-33", "subscription_id": 2, "sim_slot": 1},
+    )
+
+    await device.post("/api/device/v1/enrolment/verify/self")
+
+    await db.refresh(installation)
+    assert installation.verification_method is VerificationMethod.SIM_MSISDN
+    assert installation.funnel_stage is FunnelStage.NUMBER_VERIFIED
+
+
+async def test_a_pending_handset_polling_status_gets_no_tokens(
+    installation_factory, device_client_factory
+) -> None:
+    """Waiting is an answer. A credential is not."""
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    response = await device.get("/api/device/v1/enrolment/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "pending"
+    assert body["tokens"] is None
+
+
+async def test_admin_attestation_reaches_the_phone_through_status(
+    db, admin, installation_factory, device_client_factory
+) -> None:
+    """The hole this endpoint was added for.
+
+    Attesting activated the installation server-side and the handset had no way
+    to find out — the real pair is minted at verification, so a phone waiting on
+    an admin waited for ever. Now its own screen completes itself.
+    """
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+    assert (await device.get("/api/device/v1/enrolment/status")).json()["tokens"] is None
+
+    attested = await admin.post(
+        f"/api/v1/installations/{installation.id}/attest",
+        json={"reason": "raqam qo'lda tekshirildi"},
+    )
+    assert attested.status_code == 200
+
+    response = await device.get("/api/device/v1/enrolment/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "attested", "weaker than proven, and rendered as such"
+    assert body["tokens"]["access_token"]
+    await db.refresh(installation)
+    assert installation.status is InstallationStatus.ACTIVE

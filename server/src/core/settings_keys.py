@@ -64,6 +64,12 @@ class SettingKey:
     ENROLMENT_CODE_TTL_HOURS: Final = "enrolment.code_ttl_hours"
     ENROLMENT_CALLBACK_WINDOW_SECONDS: Final = "enrolment.callback_window_seconds"
 
+    #: May a handset finish enrolment on the strength of the code alone, when
+    #: neither proving route is available to it? Default ``true``: with it off
+    #: and no callback receiver in service, no phone on this fleet can enrol at
+    #: all. See ``VerificationMethod.SELF_DECLARED``.
+    ENROLMENT_ALLOW_SELF_DECLARED: Final = "enrolment.allow_self_declared"
+
     @classmethod
     def all(cls) -> frozenset[str]:
         return frozenset(

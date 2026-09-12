@@ -116,11 +116,18 @@ def test_unknown_role_fails_closed() -> None:
 
 
 def test_public_routes_are_the_reconciled_list() -> None:
-    """SPEC §4.1 rule 5 lists five; two more earn their place.
+    """SPEC §4.1 rule 5 lists five; three more earn their place.
 
     ``enrolment/redeem`` (SPEC §4.2) cannot carry a token by construction, and
     ``/i/{code}/apk`` is the second half of the pair rule 5 already names —
     §8.1 gives the download its own per-agent path so it is a funnel signal.
+
+    The MoiZvonki webhook (T-MZ) is the third, and the only one whose caller is
+    not ours at all: the provider's servers hold no credential of this system,
+    so the secret in the path is the authentication. It is listed here rather
+    than given a principal because it genuinely resolves none — which is what
+    membership of this set means, and why this test is written out by hand
+    rather than derived from the routes.
     """
     assert PUBLIC_ROUTES == {
         ("GET", "/healthz"),
@@ -130,6 +137,7 @@ def test_public_routes_are_the_reconciled_list() -> None:
         ("GET", "/i/{code}/apk"),
         ("GET", "/api/v1/app/download/{version_code}"),
         ("POST", "/api/device/v1/enrolment/redeem"),
+        ("POST", "/api/telephony/moizvonki/{secret}"),
     }
 
 

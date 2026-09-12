@@ -591,6 +591,7 @@
           "enrolment_code_issued",
           "enrolment_code_revoked",
           "installation_attested",
+          "installation_self_declared",
           "installation_revoked",
           "installation_rebound",
           "command_issued",
@@ -1134,7 +1135,8 @@
         "description": "How the record reached us.",
         "enum": [
           "live_capture",
-          "call_log_recovery"
+          "call_log_recovery",
+          "provider"
         ],
         "title": "CallSource",
         "type": "string"
@@ -1237,6 +1239,7 @@
         "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
         "enum": [
           "oem_file_harvest",
+          "app_voice_call",
           "app_voice_recognition",
           "app_voice_communication",
           "app_mic",
@@ -2951,6 +2954,7 @@
           "permitted",
           "number_verified",
           "verified_by_admin",
+          "self_declared",
           "capturing",
           "needs_assisted_install",
           "install_disappeared",
@@ -4440,11 +4444,12 @@
         "type": "string"
       },
       "VerificationMethod": {
-        "description": "How we proved the phone holds the registered number (UC-04, T142).",
+        "description": "How we proved the phone holds the registered number (UC-04, T142).\n\nOrdered strongest to weakest, and the order is load-bearing: SPEC §9.3\nrequires the identity anchor to degrade visibly, so every place that\nrenders a binding renders which of these it rests on.\n\n``self_declared`` is the weakest. It says only that whoever held the\nsingle-use code an admin issued for this number typed it into this handset\n— no line was proven. It exists because on this fleet the two proving\nroutes are frequently both unavailable: Uzbek SIMs leave\n``getLine1Number()`` empty, and the callback route needs a receiver line.\nWithout it those handsets have no path to ``active`` at all, which is\nstrictly worse: an unenrolled phone reports nothing, so nobody can even see\nthat it is unverified. Governed by ``enrolment.allow_self_declared``.",
         "enum": [
           "sim_msisdn",
           "callback",
-          "admin_attested"
+          "admin_attested",
+          "self_declared"
         ],
         "title": "VerificationMethod",
         "type": "string"

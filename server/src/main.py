@@ -37,7 +37,7 @@ from fastapi.responses import JSONResponse
 # before our code runs, and catching it is what keeps the envelope universal.
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from src.api import device, panel, service
+from src.api import device, panel, service, telephony
 from src.api import health as health_api
 from src.api import install as install_api
 
@@ -238,6 +238,7 @@ def create_app() -> FastAPI:
     app.include_router(device.router)
     app.include_router(panel.router)
     app.include_router(service.router)
+    app.include_router(telephony.router)
     return app
 
 

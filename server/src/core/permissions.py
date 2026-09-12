@@ -241,6 +241,12 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/i/{code}/apk"),
         ("GET", "/api/v1/app/download/{version_code}"),
         ("POST", "/api/device/v1/enrolment/redeem"),
+        # T-MZ. MoiZvonki's servers post call events here and hold no
+        # credential of ours, so the secret in the PATH is the authentication
+        # and a mismatch answers 404 — never 401, which would confirm the
+        # endpoint exists to anyone scanning. Listed here because it genuinely
+        # resolves no principal, which is what this set means.
+        ("POST", "/api/telephony/moizvonki/{secret}"),
     }
 )
 

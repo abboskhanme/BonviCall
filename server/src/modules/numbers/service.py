@@ -57,6 +57,19 @@ class NumberService:
             raise NotFoundError()
         return number
 
+    async def by_phone_key(self, key: str) -> RegisteredNumberModel | None:
+        """The registered line whose normalised key is ``key``, or None.
+
+        Added for the cloud-telephony ingest (T-MZ), which learns a line from a
+        provider event and must resolve it to one of ours. Here rather than in
+        that module because ``registered_numbers`` belongs to this one — a
+        second module selecting from it directly is how two normalisations of
+        "the same number" appear (§2).
+        """
+        return await self.session.scalar(
+            select(RegisteredNumberModel).where(RegisteredNumberModel.phone_key == key)
+        )
+
     async def create(
         self, payload: CreateNumberRequest, actor_id: uuid.UUID, ip: str | None
     ) -> RegisteredNumberModel:

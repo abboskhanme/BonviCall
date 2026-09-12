@@ -93,6 +93,12 @@ class ErrorCode:
     NUMBER_MISMATCH = "number_mismatch"
     CALLBACK_RECEIVER_DOWN = "callback_receiver_down"
 
+    #: The handset asked to finish on the strength of its code alone and
+    #: ``enrolment.allow_self_declared`` is off. A configuration answer, not a
+    #: retryable one — the app must send the agent to an admin rather than
+    #: offer the same button again.
+    SELF_DECLARED_DISABLED = "self_declared_disabled"
+
     # --- Calls (SPEC §3.10, §4.4) -----------------------------------------
     CALL_NOT_FOUND = "call_not_found"
     CALL_IDENTITY_CONFLICT = "call_identity_conflict"

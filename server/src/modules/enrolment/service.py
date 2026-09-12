@@ -35,6 +35,7 @@ from src.core.errors import ConflictError, ErrorCode, GoneError, NotFoundError
 from src.core.logging import get_logger
 from src.core.phone import phone_key
 from src.core.security import sha256_hex
+from src.core.settings_keys import SettingKey
 from src.modules.agents.models import AgentModel
 from src.modules.audit.service import AuditService
 from src.modules.catalog.service import CatalogService
@@ -493,6 +494,78 @@ class EnrolmentService:
         await self.session.commit()
         return verification, tokens
 
+    async def complete_self_declared_verification(
+        self, installation: InstallationModel
+    ) -> DeviceTokenPair:
+        """Route 3: finish on the strength of the enrolment code alone.
+
+        ═══ What this does and does not claim ═════════════════════════════
+        It claims that whoever held the single-use code an admin issued **for
+        this one number** typed it into this handset. It does not claim a line
+        was proven, and it is recorded as ``self_declared`` everywhere — the
+        method, the funnel stage and an audit row — so the panel shows an
+        unproven binding as unproven and an admin can still attest it properly
+        later (SPEC §9.3).
+
+        It exists because on this fleet both proving routes are frequently
+        unavailable at once: Uzbek SIMs leave ``getLine1Number()`` empty and
+        the callback route needs a receiver line. Before it, such a handset had
+        no path to ``active`` at all — and an unenrolled phone reports nothing,
+        so nobody could even see that it was stuck.
+
+        Idempotent for the same reason ``verify/msisdn`` is: the response can
+        be lost on the link this app is installed over, and re-minting is what
+        rescues a handset the server already activated. An installation that is
+        already ``active`` therefore gets a fresh pair rather than a 409 —
+        including one activated by a *stronger* route, whose method is left
+        alone rather than downgraded.
+        """
+        # No revoked check here on purpose. The principal resolver already
+        # refuses both revoked states with 401 ``installation_revoked`` before
+        # a request reaches this method, so a second one would be a branch no
+        # request can take — and an unreachable guard is worse than none: it
+        # reads as the place the rule lives, so the day the real one moves
+        # nobody looks here. ``test_a_revoked_handset_cannot_self_declare_its_way_back``
+        # pins the behaviour at the wire rather than the branch.
+        if installation.status is not InstallationStatus.ACTIVE:
+            if not await self._setting_bool(SettingKey.ENROLMENT_ALLOW_SELF_DECLARED):
+                raise ConflictError(ErrorCode.SELF_DECLARED_DISABLED)
+            await self.installations.activate(
+                installation, VerificationMethod.SELF_DECLARED
+            )
+            await self.audit.record(
+                action=AuditAction.INSTALLATION_SELF_DECLARED,
+                object_type="installations",
+                object_id=installation.id,
+                actor_type=ActorType.DEVICE,
+                detail={"number_id": str(installation.number_id)},
+            )
+
+        tokens = await self.installations.issue_device_pair(installation)
+        await self.session.commit()
+        return tokens
+
+    async def enrolment_status(
+        self, installation: InstallationModel
+    ) -> tuple[InstallationModel, DeviceTokenPair | None]:
+        """What this installation is now, and its tokens once it is active.
+
+        The endpoint behind it is what makes **admin attestation reach the
+        phone**. Attesting activated the installation server-side and there was
+        no way for the handset to find out: the real token pair is minted at
+        verification, so a phone waiting on an admin held a provisional token
+        that expired while the thing it was waiting for had already happened.
+
+        Returns tokens whenever the installation is active, whatever activated
+        it, and nothing at all otherwise — a phone still ``pending`` learns
+        that and keeps waiting rather than being handed a credential.
+        """
+        if installation.status is InstallationStatus.ACTIVE:
+            tokens = await self.installations.issue_device_pair(installation)
+            await self.session.commit()
+            return installation, tokens
+        return installation, None
+
     async def report_callback_event(
         self,
         receiver: CallbackReceiverModel,
@@ -788,3 +861,6 @@ class EnrolmentService:
 
     async def _setting_int(self, key: str) -> int:
         return await SettingsService(self.session).get_int(key)
+
+    async def _setting_bool(self, key: str) -> bool:
+        return await SettingsService(self.session).get_bool(key)

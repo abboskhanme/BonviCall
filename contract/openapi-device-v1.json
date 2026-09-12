@@ -91,7 +91,8 @@
         "description": "How the record reached us.",
         "enum": [
           "live_capture",
-          "call_log_recovery"
+          "call_log_recovery",
+          "provider"
         ],
         "title": "CallSource",
         "type": "string"
@@ -132,6 +133,7 @@
         "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
         "enum": [
           "oem_file_harvest",
+          "app_voice_call",
           "app_voice_recognition",
           "app_voice_communication",
           "app_mic",
@@ -2227,11 +2229,12 @@
         "type": "object"
       },
       "VerificationMethod": {
-        "description": "How we proved the phone holds the registered number (UC-04, T142).",
+        "description": "How we proved the phone holds the registered number (UC-04, T142).\n\nOrdered strongest to weakest, and the order is load-bearing: SPEC §9.3\nrequires the identity anchor to degrade visibly, so every place that\nrenders a binding renders which of these it rests on.\n\n``self_declared`` is the weakest. It says only that whoever held the\nsingle-use code an admin issued for this number typed it into this handset\n— no line was proven. It exists because on this fleet the two proving\nroutes are frequently both unavailable: Uzbek SIMs leave\n``getLine1Number()`` empty, and the callback route needs a receiver line.\nWithout it those handsets have no path to ``active`` at all, which is\nstrictly worse: an unenrolled phone reports nothing, so nobody can even see\nthat it is unverified. Governed by ``enrolment.allow_self_declared``.",
         "enum": [
           "sim_msisdn",
           "callback",
-          "admin_attested"
+          "admin_attested",
+          "self_declared"
         ],
         "title": "VerificationMethod",
         "type": "string"
@@ -2243,7 +2246,8 @@
           "matched",
           "failed",
           "expired",
-          "attested"
+          "attested",
+          "self_declared"
         ],
         "title": "VerificationState",
         "type": "string"
@@ -2888,6 +2892,28 @@
         ]
       }
     },
+    "/api/device/v1/enrolment/status": {
+      "get": {
+        "description": "Where this installation stands, and its tokens once it is active.\n\n**This is what makes admin attestation reach the phone.** Attesting\nactivated the installation server-side, and the handset had no way to find\nout: the real token pair is minted at verification, so a phone waiting on\nan admin held a provisional token that expired while the thing it was\nwaiting for had already happened. E5 polls this, so the agent's screen\ncompletes itself the moment an admin acts.\n\nProvisional token is enough — it must be, since a phone that is not active\nyet holds nothing else — and no tokens come back until the installation is\nactive, whatever activated it.",
+        "operationId": "enrolment_status_api_device_v1_enrolment_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceVerificationStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Enrolment Status",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
     "/api/device/v1/enrolment/verify/callback/start": {
       "post": {
         "description": "Route 2 — the load-bearing one, since SMS is out of scope.\n\n409 ``callback_receiver_down`` when no receiver has checked in recently:\nraising a challenge the agent cannot possibly satisfy is worse than saying\nso, and the Uzbek message tells them to contact the admin.",
@@ -2991,6 +3017,28 @@
           }
         },
         "summary": "Verify Msisdn",
+        "tags": [
+          "Device enrolment"
+        ]
+      }
+    },
+    "/api/device/v1/enrolment/verify/self": {
+      "post": {
+        "description": "Route 3 — finish on the strength of the enrolment code alone (§9.3).\n\nThe two proving routes are frequently both unavailable on this fleet at\nonce: Uzbek SIMs leave ``getLine1Number()`` empty, and the callback route\nneeds an always-on receiver line. Before this existed such a handset had no\npath to ``active`` at all — it sat on E5 for ever and uploaded nothing,\nwhich is strictly worse than an enrolled phone with an unproven binding,\nbecause an unenrolled phone reports nothing and so nobody can see it is\nstuck.\n\nWhat it claims is narrow and is recorded as such: whoever held the\nsingle-use code an admin issued **for this one number** typed it into this\nhandset. The installation is marked ``self_declared`` in its method, its\nfunnel stage and an audit row, so the panel renders an unproven binding as\nunproven and an admin can attest it properly afterwards.\n\n409 ``self_declared_disabled`` when ``enrolment.allow_self_declared`` is\noff — a configuration answer rather than a retryable one, so the app sends\nthe agent to an admin instead of offering the same button again.",
+        "operationId": "verify_self_declared_api_device_v1_enrolment_verify_self_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceVerificationStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Verify Self Declared",
         "tags": [
           "Device enrolment"
         ]

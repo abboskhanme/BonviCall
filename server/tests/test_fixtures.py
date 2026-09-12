@@ -109,4 +109,4 @@ async def test_truncate_all_leaves_the_seeded_settings(db, truncate_all) -> None
     """Truncation must not delete the migration's seed, or every later test lies."""
     await truncate_all()
     remaining = await db.scalar(sa.text("SELECT count(*) FROM app_settings"))
-    assert remaining == 28
+    assert remaining == 29

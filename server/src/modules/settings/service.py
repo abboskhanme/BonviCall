@@ -48,6 +48,16 @@ class SettingsService:
     async def get_str(self, key: str) -> str:
         return str(await self.get(key))
 
+    async def get_bool(self, key: str) -> bool:
+        """A JSONB ``true``/``false``.
+
+        ``bool()`` of the raw value rather than a string comparison: the column
+        is JSONB, so a boolean setting arrives as a Python ``bool`` and the
+        string ``"false"`` — which is truthy — is not a value this column can
+        hold.
+        """
+        return bool(await self.get(key))
+
     async def get_list(self, key: str) -> list[Any]:
         value = await self.get(key)
         return list(value) if isinstance(value, list) else [value]

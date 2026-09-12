@@ -55,6 +55,10 @@ MESSAGES: dict[str, str] = {
     ),
     ErrorCode.REFRESH_REUSED: "Sessiya xavfsizlik uchun bekor qilindi. Qaytadan kiring.",
     ErrorCode.VERIFICATION_REQUIRED: "Avval ish raqamingizni tasdiqlang.",
+    ErrorCode.SELF_DECLARED_DISABLED: (
+        "Raqamni o'zingiz tasdiqlash bu tizimda o'chirilgan. "
+        "Administratorga murojaat qiling."
+    ),
     ErrorCode.APP_VERSION_UNSUPPORTED: (
         "Ilovaning bu versiyasi eskirgan. Yangi versiyasini o'rnating."
     ),

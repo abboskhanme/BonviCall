@@ -483,6 +483,10 @@ async def test_every_settings_key_is_seeded_with_its_documented_default(db) -> N
         "working_hours.holidays": [],
         "enrolment.code_ttl_hours": 24,
         "enrolment.callback_window_seconds": 300,
+        # Migration 006. On by default because the alternative default is a
+        # fleet that cannot enrol: both proving routes are frequently
+        # unavailable at once on these handsets.
+        "enrolment.allow_self_declared": True,
     }
     rows = await db.execute(sa.text("SELECT key, value FROM app_settings"))
     seeded = {key: value for key, value in rows}

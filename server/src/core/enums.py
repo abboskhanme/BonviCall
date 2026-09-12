@@ -93,6 +93,14 @@ class CallSource(StrEnum):
     LIVE_CAPTURE = "live_capture"
     CALL_LOG_RECOVERY = "call_log_recovery"
 
+    #: A cloud telephony provider told us, rather than a handset of ours
+    #: (T-MZ). Its own value because everything downstream reads differently
+    #: for it: there is no installation health behind the row, no capability
+    #: history, and "the app was not running" can never be the reason its audio
+    #: is missing. The gap report has to be able to tell the two populations
+    #: apart or its percentages mix a fleet we control with one we do not.
+    PROVIDER = "provider"
+
 
 class AudioMissingReason(StrEnum):
     """Why a call has no audio. Closed, ``NOT NULL`` whenever audio is absent (N5).
@@ -150,6 +158,14 @@ class CaptureRoute(StrEnum):
     """
 
     OEM_FILE_HARVEST = "oem_file_harvest"
+
+    #: `MediaRecorder.AudioSource.VOICE_CALL` — the only app-side source that
+    #: carries BOTH parties. Android refuses it to an ordinary app from
+    #: targetSdk 29, which is why the `legacy28` flavour exists and why this
+    #: value will only ever be reported by it. Ranked above the rest: a fleet
+    #: whose recordings all came from `app_mic` is half-deaf, and the M0 table
+    #: has to be able to say which handsets got the far end.
+    APP_VOICE_CALL = "app_voice_call"
     APP_VOICE_RECOGNITION = "app_voice_recognition"
     APP_VOICE_COMMUNICATION = "app_voice_communication"
     APP_MIC = "app_mic"
@@ -192,11 +208,26 @@ class InstallationStatus(StrEnum):
 
 
 class VerificationMethod(StrEnum):
-    """How we proved the phone holds the registered number (UC-04, T142)."""
+    """How we proved the phone holds the registered number (UC-04, T142).
+
+    Ordered strongest to weakest, and the order is load-bearing: SPEC §9.3
+    requires the identity anchor to degrade visibly, so every place that
+    renders a binding renders which of these it rests on.
+
+    ``self_declared`` is the weakest. It says only that whoever held the
+    single-use code an admin issued for this number typed it into this handset
+    — no line was proven. It exists because on this fleet the two proving
+    routes are frequently both unavailable: Uzbek SIMs leave
+    ``getLine1Number()`` empty, and the callback route needs a receiver line.
+    Without it those handsets have no path to ``active`` at all, which is
+    strictly worse: an unenrolled phone reports nothing, so nobody can even see
+    that it is unverified. Governed by ``enrolment.allow_self_declared``.
+    """
 
     SIM_MSISDN = "sim_msisdn"
     CALLBACK = "callback"
     ADMIN_ATTESTED = "admin_attested"
+    SELF_DECLARED = "self_declared"
 
 
 class VerificationState(StrEnum):
@@ -207,6 +238,11 @@ class VerificationState(StrEnum):
     FAILED = "failed"
     EXPIRED = "expired"
     ATTESTED = "attested"
+
+    #: No line was proven; the code was accepted as the binding. Never written
+    #: to ``number_verifications`` — there is no attempt to record — and only
+    #: ever returned to the device so its screen can say which route finished.
+    SELF_DECLARED = "self_declared"
 
 
 class FunnelStage(StrEnum):
@@ -222,6 +258,12 @@ class FunnelStage(StrEnum):
     PERMITTED = "permitted"
     NUMBER_VERIFIED = "number_verified"
     VERIFIED_BY_ADMIN = "verified_by_admin"
+
+    #: Enrolled on the strength of the code alone. Its own stage rather than
+    #: ``number_verified`` so the rollout board cannot show an unproven binding
+    #: as a proven one — an admin filters on this to know who still needs
+    #: attesting.
+    SELF_DECLARED = "self_declared"
     CAPTURING = "capturing"
     NEEDS_ASSISTED_INSTALL = "needs_assisted_install"
     INSTALL_DISAPPEARED = "install_disappeared"
@@ -380,6 +422,12 @@ class AuditAction(StrEnum):
     ENROLMENT_CODE_ISSUED = "enrolment_code_issued"
     ENROLMENT_CODE_REVOKED = "enrolment_code_revoked"
     INSTALLATION_ATTESTED = "installation_attested"
+
+    #: A handset bound itself to a number on the strength of its enrolment code
+    #: alone. Audited because it is the one activation route with no proof
+    #: behind it: if a binding is ever disputed, this is the row that says the
+    #: number was never verified and names the phone that claimed it.
+    INSTALLATION_SELF_DECLARED = "installation_self_declared"
     INSTALLATION_REVOKED = "installation_revoked"
     INSTALLATION_REBOUND = "installation_rebound"
     COMMAND_ISSUED = "command_issued"

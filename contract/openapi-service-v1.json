@@ -121,6 +121,7 @@
         "description": "Which mechanism produced the recording (S1, the M0 baseline).\n\n``NONE`` may only appear with ``has_audio = false``.",
         "enum": [
           "oem_file_harvest",
+          "app_voice_call",
           "app_voice_recognition",
           "app_voice_communication",
           "app_mic",
