@@ -22,6 +22,12 @@ enum class CaptureRoute(val wire: String) {
     /** The handset's own call recorder. Preferred — S1 showed it is what
      *  captures both voices. */
     OEM_FILE_HARVEST("oem_file_harvest"),
+
+    /** `VOICE_CALL` — the only app-side source that carries BOTH parties.
+     *  Refused to an ordinary app from targetSdk 29, so only `legacy28` can
+     *  ever report it. Its own value because a fleet whose recordings all came
+     *  from `app_mic` is half-deaf and the M0 table has to show which. */
+    APP_VOICE_CALL("app_voice_call"),
     APP_VOICE_RECOGNITION("app_voice_recognition"),
     APP_VOICE_COMMUNICATION("app_voice_communication"),
     APP_MIC("app_mic"),
@@ -66,6 +72,12 @@ enum class CallSource(val wire: String) {
     LIVE_CAPTURE("live_capture"),
     /** The recovery sweep found it afterwards (UC-13). */
     CALL_LOG_RECOVERY("call_log_recovery"),
+
+    /** A cloud telephony provider told the server, not a handset of ours
+     *  (T-MZ). The app never sends this — it is here because the enum is the
+     *  wire contract and a value the server can emit must be decodable, or a
+     *  provider call breaks the "my calls" screen. */
+    PROVIDER("provider"),
 }
 
 /** Sent on every request and stored on every call and heartbeat, so per-variant
@@ -73,4 +85,53 @@ enum class CallSource(val wire: String) {
 enum class AppVariant(val wire: String) {
     LEGACY28("legacy28"),
     MODERN34("modern34"),
+}
+
+/**
+ * What the panel asked this phone to do (SPEC §4.6, UC-16).
+ *
+ * The same five kinds arrive on the socket and over REST, and the app answers
+ * both the same way — a command delivered by one transport must be
+ * indistinguishable from the other in the panel, or a latency measurement means
+ * nothing.
+ */
+enum class CommandKind(val wire: String) {
+    /** Click-to-call. The one with a five-second bar. */
+    DIAL("dial"),
+    CONFIG("config"),
+    /** The admin is retiring this installation (UC-08). */
+    LOGOUT("logout"),
+    /** "Is this phone reachable." Answering IS the whole job. */
+    PING("ping"),
+    /** Re-run E2's capability checks and report them, so the panel can see what
+     *  a phone looks like now rather than what it looked like at enrolment. */
+    RECHECK("recheck"),
+    ;
+
+    companion object {
+        fun fromWire(value: String?): CommandKind? = entries.firstOrNull { it.wire == value }
+    }
+}
+
+/**
+ * Why a command was not carried out.
+ *
+ * **A refused command is acknowledged, never dropped.** A command with no
+ * outcome looks exactly like one that never arrived, and those are two
+ * different faults with two different fixes — one is the phone, the other is
+ * the channel.
+ */
+enum class CommandFailure(val wire: String) {
+    DEVICE_OFFLINE("device_offline"),
+    /** The permission was revoked after enrolment — `CALL_PHONE` is the one
+     *  that matters, because without it a dial fails silently. */
+    NO_PERMISSION("no_permission"),
+    OS_REFUSED("os_refused"),
+    ACK_TIMEOUT("ack_timeout"),
+    /** Arrived too late to be worth doing (2 minutes, `CommandFreshness`). */
+    DISCARDED_STALE("discarded_stale"),
+    /** This build does not implement the kind. Honest, and it tells an admin to
+     *  stop expecting it rather than leaving the command silent. */
+    UNSUPPORTED("unsupported"),
+    BUSY("busy"),
 }

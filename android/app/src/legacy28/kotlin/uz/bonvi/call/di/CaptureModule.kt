@@ -4,8 +4,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import uz.bonvi.call.capture.NoOpOemRecordingLocator
 import uz.bonvi.call.capture.OemRecordingLocator
+import uz.bonvi.call.capture.RawPathOemRecordingLocator
 import javax.inject.Singleton
 
 /**
@@ -13,37 +13,28 @@ import javax.inject.Singleton
  *
  * On targetSdk 28 the OEM recordings folder is reachable through
  * `Environment.getExternalStorageDirectory()` and plain `File` objects, so this
- * flavour binds the raw-path locator. Which locator is a CAPABILITY question
- * (`Capabilities.canReadOemRecordingsByPath()`), never a version check — the
- * capture code must not learn what a target SDK is.
- *
- * TODO(T71b): bind `LegacyPathOemRecordingLocator`. It scans, in preference
- * order, `/sdcard/Recordings/Call`, `/sdcard/Recordings/Voice Recorder`,
- * `/sdcard/Call`, `/sdcard/Sounds/Call`, `/sdcard/CallRecordings`
- * (S1-RECORDING.md), read-only, inside the time window only.
+ * flavour binds the raw-path locator.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object CaptureModule {
 
     /**
-     * ⚠️ **T71b is a change to this one function and nothing else.**
+     * **T71b, landed 2026-09-11.** Was `NoOpOemRecordingLocator`, and the seam
+     * around it was already finished — so this really was the one function the
+     * task changed, exactly as the previous comment here promised.
      *
-     * The seam around it is finished: `OemHarvestStrategy` already takes the
-     * `Decision.Capture` proof and hands it here, `CaptureRouter` already
-     * starts this route first and records which one won, the window constants
-     * and the retry are already in `OemRecordingLocator`, and
-     * `AudioPipeline` already knows never to delete what this returns
-     * (CONVENTIONS.md §8.3). When M0 decides, the work is to write the locator
-     * and change the expression below — not to redesign anything above it.
+     * It was left as a stub until a real handset could say where these files
+     * land. That handset arrived: a Redmi Note 14 on HyperOS, whose recorder
+     * writes into `MIUI/sound_recorder/call_rec` with a `.nomedia` beside it.
+     * [uz.bonvi.call.capture.OemRecordingFolders] carries that path and the
+     * equivalent for every other manufacturer in the fleet.
      *
-     * Until then it returns null, which is the FAIL-CLOSED answer. A
-     * placeholder that captured everything by default would be the exact
-     * failure this package exists to prevent, and it would be invisible: the
-     * calls would simply arrive with audio nobody had authorised.
+     * Still fail-closed: the locator returns null whenever nothing in the
+     * call's own time window qualifies, and null remains `attribution_failed`.
+     * What changed is that a file which DOES belong to this call is now found.
      */
     @Provides
     @Singleton
-    fun oemRecordingLocator(): OemRecordingLocator =
-        NoOpOemRecordingLocator("legacy28: raw-path locator lands in T71b")
+    fun oemRecordingLocator(): OemRecordingLocator = RawPathOemRecordingLocator()
 }

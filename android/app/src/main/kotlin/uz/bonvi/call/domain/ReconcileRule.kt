@@ -54,11 +54,29 @@ object ReconcileRule {
      * Both unknown counts as agreement — a withheld caller id is withheld in
      * the log too, and refusing to match there would upload every anonymous
      * call twice: once unreconciled, once by the recovery sweep.
+     *
+     * ⚠️ **A live side that knows no number matches anything.** This was
+     * `logKey == liveKey`, which is right only while the live source can see
+     * numbers — and from API 31 it cannot: `TelephonyCallback.CallStateListener`
+     * reports a state and nothing else, so the live number is *always* null on
+     * every handset in this fleet. The log has the number, so the keys never
+     * agreed and **every live-detected call failed to reconcile**, waited out
+     * the fifteen minutes and then arrived as an unreconciled duplicate of a
+     * row the recovery sweep had already written.
+     *
+     * Measured on a Xiaomi 13 Lite, 2026-09-11: the call was detected live,
+     * recorded, and still reached the server as `call_log_recovery` with
+     * `app_not_running`.
+     *
+     * Null from the live side means "we were not told", not "it was withheld",
+     * and those are different facts. Direction plus a two-second window is
+     * what identifies the call then — and `match` still takes the closest in
+     * time, so two calls inside one window pair with their own rows.
      */
     private fun sameNumber(fromLog: String?, fromLive: String?): Boolean {
-        val logKey = uz.bonvi.call.core.Phone.phoneKey(fromLog)
         val liveKey = uz.bonvi.call.core.Phone.phoneKey(fromLive)
-        return logKey == liveKey
+        if (liveKey == null) return true
+        return uz.bonvi.call.core.Phone.phoneKey(fromLog) == liveKey
     }
 
     /** §3.10 rule 2: after this long with no matching row, derive the id from

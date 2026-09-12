@@ -84,11 +84,49 @@ class ReconcileRuleTest {
     }
 
     @Test
-    fun `a withheld caller id does not match a known number`() {
+    fun `a live side that knows no number matches the log row anyway`() {
+        // ⚠️ The inverse of the test that stood here, which asserted this must
+        // NOT match. That was right only while the live source could see
+        // numbers — and from API 31 it cannot: `TelephonyCallback` reports a
+        // state and nothing else, so the live number is ALWAYS null on every
+        // handset in this fleet. The log has the number, the keys never
+        // agreed, and **every live-detected call failed to reconcile**: it
+        // waited out the fifteen minutes and arrived as an unreconciled
+        // duplicate of a row the recovery sweep had already written.
+        //
+        // Measured on a Xiaomi 13 Lite, 2026-09-11 — detected live, recorded,
+        // and still delivered as `call_log_recovery` / `app_not_running`.
+        //
+        // Null from the live side means "we were not told", not "it was
+        // withheld". Direction and a two-second window identify the call.
         val live = ReconcileRule.Candidate(10_000L, CallDirection.INCOMING, null)
         val rows = listOf(Row(10_400L, CallDirection.INCOMING, "901112233"))
 
+        assertThat(match(live, rows)).isNotNull()
+    }
+
+    @Test
+    fun `two numbers that are both known and different never match`() {
+        // The half of the old rule that must survive: when the live side DOES
+        // know a number, disagreeing with the log is still a different call,
+        // and matching them would file a conversation under the wrong person.
+        val live = ReconcileRule.Candidate(10_000L, CallDirection.OUTGOING, "901112233")
+        val rows = listOf(Row(10_400L, CallDirection.OUTGOING, "935554433"))
+
         assertThat(match(live, rows)).isNull()
+    }
+
+    @Test
+    fun `a number-less live call still takes the closest row in time`() {
+        // The safety the relaxed rule leans on: two calls inside one window
+        // pair with their own rows rather than both with the first.
+        val live = ReconcileRule.Candidate(10_000L, CallDirection.OUTGOING, null)
+        val rows = listOf(
+            Row(11_500L, CallDirection.OUTGOING, "901112233"),
+            Row(10_100L, CallDirection.OUTGOING, "935554433"),
+        )
+
+        assertThat(match(live, rows)?.number).isEqualTo("935554433")
     }
 
     @Test

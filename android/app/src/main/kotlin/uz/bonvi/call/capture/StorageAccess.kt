@@ -91,23 +91,11 @@ class OemFolderStorageAccessProbe @Inject constructor(
             false
         }
 
-    /** Whether the media store can answer at all. Used only by the modern
-     *  route's `describe()`; the harvest itself is T71b. */
-    @Suppress("unused")
-    private fun mediaStoreAnswers(): Boolean =
-        @Suppress("TooGenericExceptionCaught")
-        try {
-            context.contentResolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                arrayOf(MediaStore.Audio.Media._ID),
-                null,
-                null,
-                null,
-            ).use { it != null }
-        } catch (error: Exception) {
-            Timber.w(error, "MediaStore audio query refused")
-            false
-        }
+    // `mediaStoreAnswers()` was here, marked `@Suppress("unused")`, with a
+    // KDoc saying `describe()` used it. `describe()` did not. T71b — the
+    // modern harvest route — is the caller it was written for and that task is
+    // not built yet, so it will arrive with the code that needs it rather than
+    // waiting here with a comment that is not true.
 
     private companion object {
         /** The preference order S1 found in the prototype. Read-only, and only

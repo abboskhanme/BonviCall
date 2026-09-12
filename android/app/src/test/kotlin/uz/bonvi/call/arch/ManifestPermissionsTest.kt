@@ -109,6 +109,8 @@ class ManifestPermissionsTest {
             "FOREGROUND_SERVICE",                       // UC-05
             "FOREGROUND_SERVICE_MICROPHONE",            // UC-14
             "FOREGROUND_SERVICE_DATA_SYNC",             // UC-11
+            "FOREGROUND_SERVICE_PHONE_CALL",            // UC-05 — the type that survives doze
+            "MANAGE_OWN_CALLS",                         // UC-05 — what qualifies for it, normal
             "REQUEST_INSTALL_PACKAGES",                 // UC-02, T82 — N33, no Play
             "RECEIVE_BOOT_COMPLETED",                   // UC-05
             "WAKE_LOCK",                                // UC-05, UC-11
@@ -163,23 +165,40 @@ class ManifestPermissionsTest {
     }
 
     @Test
-    fun `the phoneCall foreground-service type is declared nowhere`() {
-        // SPEC §7.2 lists it; it is wrong, and this test is what stops it being
-        // added back from the SPEC. On API 34 the phoneCall type requires the
-        // app to be the default dialer, hold MANAGE_OWN_CALLS, or be a device
-        // owner. BonviCall is none of the three and cannot become any of them:
-        // it observes calls rather than managing them, and the handsets are the
-        // employees' own (REQUIREMENTS.md §5.7). Starting a foreground service
-        // of a type you do not qualify for throws SecurityException, so this
-        // would be a crash on every API 34 device, not a measurement.
+    fun `the phoneCall type is declared only where the app qualifies for it`() {
+        // ⚠️ This test used to say the opposite, and the reasoning it carried
+        // was right about the RULE and wrong about the app. On API 34+ the
+        // `phoneCall` type requires the default-dialer role, MANAGE_OWN_CALLS,
+        // or device ownership — and starting a service with a type you do not
+        // qualify for throws. BonviCall now holds MANAGE_OWN_CALLS, which is a
+        // NORMAL permission: granted at install, no dialog, nothing an agent
+        // sees. CallSentry qualified the same way and stayed alive on the same
+        // handsets, where this app went silent 19 minutes after the screen went
+        // off.
+        //
+        // What it buys: exemption from Android 15's six-hour `dataSync` budget,
+        // and permission to be restarted from the background — which is exactly
+        // what the watchdog does after an OEM kill.
+        val declared = declaredPermissions(manifest("main"))
         for (sourceSet in listOf("main", "legacy28", "modern34")) {
-            assertThat(declaredPermissions(manifest(sourceSet)))
-                .doesNotContain("FOREGROUND_SERVICE_PHONE_CALL")
-            // Parsed, not grepped: the modern34 manifest explains at length WHY
-            // this type is absent, and a text search would find that
-            // explanation and fail. The rule is about declarations.
-            assertThat(foregroundServiceTypes(manifest(sourceSet))).doesNotContain("phoneCall")
+            if (!foregroundServiceTypes(manifest(sourceSet)).contains("phoneCall")) continue
+            assertThat(declared).contains("FOREGROUND_SERVICE_PHONE_CALL")
+            assertThat(declared).contains("MANAGE_OWN_CALLS")
         }
+    }
+
+    @Test
+    fun `the service never assumes the OS will accept its best type`() {
+        // The manifest declares what MAY be used; the runtime decides what IS.
+        // A type the OS refuses must degrade to a lesser one, never take the
+        // service down — a phone capturing with `microphone|dataSync` is worth
+        // more than one that crashed insisting on `phoneCall`.
+        val service = TestPaths.kotlinSources().single { it.name == "CaptureService.kt" }.readText()
+        assertThat(service).contains("ServiceCompat.startForeground")
+        assertThat(service).contains("catch")
+        // And what the OS accepted is reported, so the fleet answers this
+        // question with data rather than with this comment.
+        assertThat(service).contains("activeType")
     }
 
     @Test
@@ -259,12 +278,12 @@ class ManifestPermissionsTest {
 
     @Test
     fun `the capture service declares a foreground type both flavours qualify for`() {
-        // Android 14 refuses a foreground service with no type, and throws for
-        // a type the app does not qualify for. `microphone|dataSync` is the set
-        // BonviCall actually holds the permissions for, and it is declared once
-        // in main so the two flavours cannot drift.
+        // Android 14 refuses a foreground service with no type. All three are
+        // declared once in main — the manifest cannot express "try this, then
+        // that", so it lists what is allowed and CaptureService picks — and the
+        // two flavours cannot drift because neither overrides it.
         assertThat(manifest("main").readText())
-            .contains("android:foregroundServiceType=\"microphone|dataSync\"")
+            .contains("android:foregroundServiceType=\"phoneCall|microphone|dataSync\"")
         // No flavour overrides it.
         assertThat(manifest("modern34").readText()).doesNotContain("foregroundServiceType")
         assertThat(manifest("legacy28").readText()).doesNotContain("foregroundServiceType")
@@ -284,12 +303,27 @@ class ManifestPermissionsTest {
         // incident. The example file exists so nobody has to guess the shape.
         val android = TestPaths.appDir.parentFile
         assertThat(File(android, "keystore.properties.example").isFile).isTrue()
-        assertThat(File(android, "keystore.properties").exists()).isFalse()
 
+        // ⚠️ The rule is "never COMMITTED", and it is enforced by the ignore
+        // patterns below. This used to assert the file did not EXIST, which is
+        // a different and wrong rule: the machine that cuts releases must hold
+        // one, and on 2026-09-11 — the day the project's first keystore was
+        // generated — that assertion turned a correct setup into a red build.
+        // Ignoring is the guarantee; absence is an accident of whose laptop
+        // the suite happens to be running on.
         val ignored = File(android, ".gitignore").readText()
         for (pattern in listOf("keystore.properties", "*.jks", "*.keystore")) {
             assertThat(ignored).contains(pattern)
         }
+
+        // And the key itself must never sit anywhere git is watching that the
+        // patterns do not cover.
+        val stray = android.walkTopDown()
+            .filter { it.isFile && (it.extension == "jks" || it.extension == "keystore") }
+            .filterNot { it.parentFile == android }
+            .map { it.relativeTo(android).path }
+            .toList()
+        assertThat(stray).isEmpty()
     }
 
     @Test

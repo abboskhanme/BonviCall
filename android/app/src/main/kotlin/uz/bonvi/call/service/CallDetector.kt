@@ -10,7 +10,9 @@ import timber.log.Timber
 import uz.bonvi.call.core.Clock
 import uz.bonvi.call.di.IoDispatcher
 import uz.bonvi.call.domain.CallDirection
+import uz.bonvi.call.domain.AudioMissingReason
 import uz.bonvi.call.domain.CallEvent
+import uz.bonvi.call.domain.CaptureRoute
 import uz.bonvi.call.domain.Decision
 import uz.bonvi.call.domain.ObservedCall
 import uz.bonvi.call.domain.PrivacyBoundary
@@ -43,6 +45,7 @@ class CallDetector @Inject constructor(
     private val sessions: CallSessionManager,
     private val pending: PendingCallStore,
     private val onCallEnded: CallEndedListener,
+    private val capture: CallCapture,
     @IoDispatcher private val io: CoroutineDispatcher,
 ) {
 
@@ -50,7 +53,20 @@ class CallDetector @Inject constructor(
     sealed interface Edge {
         data class Ringing(val callId: String, val remoteNumber: String?, val subscriptionId: Int?) : Edge
         data class Dialing(val callId: String, val remoteNumber: String?, val subscriptionId: Int?) : Edge
-        data class OffHook(val callId: String) : Edge
+        /**
+         * The call is connected.
+         *
+         * Carries the number and subscription because **on an outgoing call
+         * this is the FIRST edge there is**: the platform reports
+         * `IDLE → OFFHOOK → IDLE` with no `RINGING`, so if this edge cannot
+         * open a session, an outgoing call is never seen live at all. It
+         * could not, until 2026-09-11 — see [handle].
+         */
+        data class OffHook(
+            val callId: String,
+            val remoteNumber: String? = null,
+            val subscriptionId: Int? = null,
+        ) : Edge
         data class Idle(val callId: String) : Edge
     }
 
@@ -69,9 +85,39 @@ class CallDetector @Inject constructor(
             )
 
             is Edge.OffHook -> {
+                // ⚠️ An OFFHOOK with no session open is an OUTGOING call.
+                //
+                // The platform reports an outgoing call as IDLE → OFFHOOK →
+                // IDLE: there is no RINGING, and `Edge.Dialing` — the case
+                // written for this — was produced by nothing. Neither source
+                // emitted it, so `pending.get` returned null here and the
+                // branch simply returned. **Every outgoing call was invisible
+                // to live capture**, and arrived hours later from the call-log
+                // sweep with `app_not_running`, which reads as a dead app
+                // rather than a missing branch.
+                //
+                // Measured on a Xiaomi 13 Lite on 2026-09-11: three outgoing
+                // test calls, three sweep recoveries, no live session. It is
+                // also what CallSentry does — OFFHOOK without a prior RINGING
+                // is an outgoing call — and that app works on this fleet.
+                if (pending.get(edge.callId) == null) {
+                    begin(
+                        edge.callId,
+                        CallDirection.OUTGOING,
+                        edge.remoteNumber,
+                        edge.subscriptionId,
+                    )
+                }
+                // Still absent means the privacy boundary refused it, which is
+                // a decision and not a failure: fail closed, capture nothing.
                 val call = pending.get(edge.callId) ?: return
                 pending.put(call.copy(answeredAtEpochMillis = Clock.epochMillis()))
                 sessions.onEvent(edge.callId, CallEvent.Answered)
+                // Recording starts HERE, not at the first ring: an unanswered
+                // call has no conversation to record — it ships as
+                // `not_expected` — and a recorder started against a ringtone
+                // competes with the dialler for the microphone.
+                capture.start(edge.callId)
             }
 
             is Edge.Idle -> end(edge.callId)
@@ -105,6 +151,10 @@ class CallDetector @Inject constructor(
                 // visible rather than becoming uploads (SPEC §4.4).
                 pending.countDiscarded(decision.reason)
                 sessions.onEvent(callId, CallEvent.Rejected(decision.reason))
+                // Nothing was prepared, so nothing can start. Said explicitly
+                // because "the recorder is simply never asked" is the property
+                // the privacy boundary rests on.
+                capture.discard(callId)
                 Timber.i("Call discarded before capture: %s", decision.reason.wire)
             }
 
@@ -121,6 +171,10 @@ class CallDetector @Inject constructor(
                         answeredAtEpochMillis = null,
                     ),
                 )
+                // The proof travels with the call: a router can only be built
+                // from a Decision.Capture, so a call that reached here is the
+                // only kind that can ever be recorded.
+                capture.prepare(callId, decision)
                 sessions.onEvent(
                     callId,
                     if (direction == CallDirection.INCOMING) {
@@ -135,7 +189,20 @@ class CallDetector @Inject constructor(
 
     private suspend fun end(callId: String) {
         val call = pending.get(callId) ?: return
-        pending.put(call.copy(endedAtEpochMillis = Clock.epochMillis()))
+
+        // Stop first, write second. The outcome goes onto the pending row
+        // rather than into memory because the service is killed between a call
+        // ending and its audio being queued on most of this fleet — and what
+        // would be lost is the recording of a call that happened.
+        val outcome = capture.stop(callId)
+        pending.put(
+            call.copy(
+                endedAtEpochMillis = Clock.epochMillis(),
+                audioPath = outcome?.file?.path,
+                captureRoute = outcome?.route,
+                audioReason = outcome?.reason,
+            ),
+        )
         sessions.onEvent(callId, CallEvent.Hungup)
 
         // The record is not built here, and the scheduling is not done here
@@ -175,6 +242,13 @@ data class PendingCall(
     val startedElapsedMillis: Long,
     val answeredAtEpochMillis: Long?,
     val endedAtEpochMillis: Long? = null,
+    /** Where the recording is, once the call has ended. */
+    val audioPath: String? = null,
+    /** Which route produced it — it decides whether the file is ours to delete
+     *  (an OEM-harvested file never is, CONVENTIONS.md §8.3). */
+    val captureRoute: CaptureRoute? = null,
+    /** Why there is no file, from the closed enum. Never free text (N5). */
+    val audioReason: AudioMissingReason? = null,
 )
 
 /** Where in-flight calls live between edges. Keyed by call id, so call waiting

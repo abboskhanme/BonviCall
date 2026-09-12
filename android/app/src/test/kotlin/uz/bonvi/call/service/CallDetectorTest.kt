@@ -52,6 +52,7 @@ class CallDetectorTest {
         pending: FakePendingStore,
         sessions: CallSessionManager,
         enrolment: EnrolledSubscription = enrolled,
+        capture: CallCapture = FakeCapture(),
     ): CallDetector {
         val boundary = PrivacyBoundary { call -> SubscriptionRule.decide(call, enrolment) }
         return CallDetector(
@@ -60,6 +61,7 @@ class CallDetectorTest {
             sessions = sessions,
             pending = pending,
             onCallEnded = CallEndedListener { },
+            capture = capture,
             io = kotlinx.coroutines.Dispatchers.Unconfined,
         )
     }
@@ -178,6 +180,106 @@ class CallDetectorTest {
         assertThat(pending.calls).isEmpty()
     }
 
+
+    // ── The recorder is asked, and only for calls that are ours ───────────
+
+    @Test
+    fun `an answered work call is recorded, and the proof travels with it`() = runTest {
+        val pending = FakePendingStore()
+        val capture = FakeCapture()
+        val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+        detector.handle(CallDetector.Edge.Ringing("c1", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.OffHook("c1"))
+
+        // `prepare` carries the Decision.Capture, which is the only thing a
+        // router can be built from — so a recording is impossible for a call
+        // that did not pass Guard 1.
+        assertThat(capture.prepared).containsExactly("c1")
+        assertThat(capture.started).containsExactly("c1")
+    }
+
+    @Test
+    fun `a private call is never prepared for capture`() = runTest {
+        val pending = FakePendingStore()
+        val capture = FakeCapture()
+        val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+        // The employee's own SIM. Nothing about this call may reach the
+        // recorder — not a start that is later discarded, nothing at all.
+        detector.handle(CallDetector.Edge.Ringing("c9", "901112233", subscriptionId = 7))
+        detector.handle(CallDetector.Edge.OffHook("c9"))
+
+        assertThat(capture.prepared).isEmpty()
+        assertThat(capture.started).isEmpty()
+    }
+
+    @Test
+    fun `an unanswered call never starts the recorder`() = runTest {
+        val pending = FakePendingStore()
+        val capture = FakeCapture()
+        val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+        detector.handle(CallDetector.Edge.Ringing("c2", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.Idle("c2"))
+
+        // A missed call has no conversation to record. Starting a recorder
+        // against a ringtone would also take the microphone from the dialler.
+        assertThat(capture.started).isEmpty()
+        assertThat(capture.stopped).containsExactly("c2")
+    }
+
+    @Test
+    fun `what capture produced is written on the call, not held in memory`() = runTest {
+        val pending = FakePendingStore()
+        val file = java.io.File("build/tmp/c3.m4a")
+        val capture = FakeCapture(
+            outcome = CaptureOutcome(
+                file = file,
+                route = uz.bonvi.call.domain.CaptureRoute.APP_VOICE_RECOGNITION,
+                reason = null,
+            ),
+        )
+        val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+        detector.handle(CallDetector.Edge.Ringing("c3", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.OffHook("c3"))
+        detector.handle(CallDetector.Edge.Idle("c3"))
+
+        // The sweep reads this twenty seconds later, and the service is killed
+        // between those two moments on most of this fleet. In memory it would
+        // be a recording of a call that happened, lost.
+        val row = pending.calls.getValue("c3")
+        assertThat(row.audioPath).isEqualTo(file.path)
+        assertThat(row.captureRoute)
+            .isEqualTo(uz.bonvi.call.domain.CaptureRoute.APP_VOICE_RECOGNITION)
+        assertThat(row.audioReason).isNull()
+    }
+
+    @Test
+    fun `a call that produced no audio carries the reason instead`() = runTest {
+        val pending = FakePendingStore()
+        val capture = FakeCapture(
+            outcome = CaptureOutcome(
+                file = null,
+                route = uz.bonvi.call.domain.CaptureRoute.NONE,
+                reason = uz.bonvi.call.domain.AudioMissingReason.CAPTURE_RETURNED_SILENCE,
+            ),
+        )
+        val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+        detector.handle(CallDetector.Edge.Ringing("c4", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.OffHook("c4"))
+        detector.handle(CallDetector.Edge.Idle("c4"))
+
+        // N5: never free text, and never absent. A call with no audio and no
+        // reason inflates the gap report against a phone that is working.
+        val row = pending.calls.getValue("c4")
+        assertThat(row.audioPath).isNull()
+        assertThat(row.audioReason)
+            .isEqualTo(uz.bonvi.call.domain.AudioMissingReason.CAPTURE_RETURNED_SILENCE)
+    }
+
     @Test
     fun `the capture proof carries the registered number, not the dialled one`() = runTest {
         val pending = FakePendingStore()
@@ -197,4 +299,137 @@ class CallDetectorTest {
         assertThat((decision as Decision.Capture).registeredNumber).isEqualTo("+998901112233")
         assertThat(pending.calls).isEmpty()
     }
+
+    // --- Outgoing calls, found live on 2026-09-11 ---------------------------
+    //
+    // The platform reports an outgoing call as IDLE → OFFHOOK → IDLE: there is
+    // no RINGING. `Edge.Dialing` was written for this and produced by nothing,
+    // so `Edge.OffHook` found no session and returned — **every outgoing call
+    // was invisible to live capture** and arrived hours later from the
+    // call-log sweep marked `app_not_running`, which reads as a dead app
+    // rather than a missing branch. Measured on a Xiaomi 13 Lite: three
+    // outgoing test calls, three sweep recoveries, no live session.
+
+    @Test
+    fun `an OFFHOOK with no session open is an outgoing call`() = runTest {
+        val pending = FakePendingStore()
+        val sessions = CallSessionManager(FakeSessionStore())
+        val detector = detector(pending, sessions)
+
+        detector.handle(
+            CallDetector.Edge.OffHook("c1", remoteNumber = "901112233", subscriptionId = 2),
+        )
+
+        assertThat(pending.calls).hasSize(1)
+        assertThat(pending.calls.values.single().direction).isEqualTo(CallDirection.OUTGOING)
+        // Answered, because OFFHOOK is the moment an outgoing call connects.
+        assertThat(pending.calls.values.single().answeredAtEpochMillis).isNotNull()
+    }
+
+    @Test
+    fun `an OFFHOOK on a private SIM is still refused`() {
+        // The fix must not become a way past Guard 1. An outgoing call on the
+        // employee's own SIM is theirs, and opening a session from OFFHOOK
+        // must obey the boundary exactly as RINGING does.
+        runTest {
+            val pending = FakePendingStore()
+            val capture = FakeCapture()
+            val detector = detector(pending, CallSessionManager(FakeSessionStore()), capture = capture)
+
+            detector.handle(
+                CallDetector.Edge.OffHook("c1", remoteNumber = "901112233", subscriptionId = 7),
+            )
+
+            assertThat(pending.calls).isEmpty()
+            assertThat(capture.started).isEmpty()
+        }
+    }
+
+    @Test
+    fun `an OFFHOOK with an unknown SIM is refused, not guessed`() {
+        // The live TelephonyCallback reports only a state. Before the source
+        // was scoped to the enrolled subscription every edge arrived with a
+        // null id — and a boundary that guessed here would upload private
+        // calls, so it fails closed instead.
+        runTest {
+            val pending = FakePendingStore()
+            val detector = detector(pending, CallSessionManager(FakeSessionStore()))
+
+            detector.handle(CallDetector.Edge.OffHook("c1", subscriptionId = null))
+
+            assertThat(pending.calls).isEmpty()
+        }
+    }
+
+    @Test
+    fun `two calls in a row do not share a session or an audio file`() {
+        // ⚠️ The live source used a CONSTANT call id, so every call collided
+        // with the last. The capture file is named from the id, so the second
+        // call overwrote the first's recording — and the first, already
+        // queued, shipped `recording_route_unavailable` while a good recording
+        // of the wrong conversation sat on disk. Measured on a Xiaomi 13 Lite,
+        // 2026-09-11.
+        runTest {
+            val pending = FakePendingStore()
+            val sessions = CallSessionManager(FakeSessionStore())
+            val detector = detector(pending, sessions)
+
+            detector.handle(CallDetector.Edge.OffHook("live-100", subscriptionId = 2))
+            detector.handle(CallDetector.Edge.Idle("live-100"))
+            detector.handle(CallDetector.Edge.OffHook("live-200", subscriptionId = 2))
+
+            // TWO rows, not one overwritten. A finished call keeps its row
+            // until the sweep reconciles it, so the guarantee that matters is
+            // that the second call never lands on top of the first.
+            assertThat(pending.calls).hasSize(2)
+            assertThat(pending.calls.keys).containsExactly("live-100", "live-200")
+            // And the first is finished — its own ending, not the second's.
+            assertThat(pending.calls.getValue("live-100").endedAtEpochMillis).isNotNull()
+            assertThat(pending.calls.getValue("live-200").endedAtEpochMillis).isNull()
+        }
+    }
+
+    @Test
+    fun `an OFFHOOK after a RINGING keeps the incoming call it belongs to`() {
+        // The fix must not turn an answered INCOMING call into an outgoing
+        // one: the session already exists, so OFFHOOK only answers it.
+        runTest {
+            val pending = FakePendingStore()
+            val sessions = CallSessionManager(FakeSessionStore())
+            val detector = detector(pending, sessions)
+
+            detector.handle(CallDetector.Edge.Ringing("c1", "901112233", subscriptionId = 2))
+            detector.handle(CallDetector.Edge.OffHook("c1", subscriptionId = 2))
+
+            assertThat(pending.calls).hasSize(1)
+            assertThat(pending.calls.values.single().direction).isEqualTo(CallDirection.INCOMING)
+        }
+    }
+}
+
+/**
+ * Capture, without a phone.
+ *
+ * The detector's job here is the privacy boundary: a rejected call must never
+ * reach [prepare], and an answered one must. Recording it for real needs an
+ * Android runtime; recording THAT it was asked for is what these tests check.
+ */
+private class FakeCapture(private val outcome: CaptureOutcome? = null) : CallCapture {
+    val prepared = mutableListOf<String>()
+    val started = mutableListOf<String>()
+    val stopped = mutableListOf<String>()
+
+    override fun prepare(callId: String, capture: uz.bonvi.call.domain.Decision.Capture) {
+        prepared += callId
+    }
+
+    override fun start(callId: String) { started += callId }
+
+    override fun stop(callId: String): CaptureOutcome? {
+        stopped += callId
+        return outcome
+    }
+
+    override fun discard(callId: String) = Unit
+    override fun workDir(): java.io.File = java.io.File("build/tmp")
 }

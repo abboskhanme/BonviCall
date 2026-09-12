@@ -19,22 +19,20 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <!--
-      ⚠️ DO NOT ADD `FOREGROUND_SERVICE_PHONE_CALL` OR THE `phoneCall`
-      FOREGROUND-SERVICE TYPE HERE. SPEC §7.2 lists them; they are wrong, and
-      this comment exists so nobody adds them back from the SPEC.
+      The `phoneCall` foreground-service type IS used now, and it is declared
+      in src/main/AndroidManifest.xml for both flavours.
 
-      On API 34 the `phoneCall` type requires the app to be the default dialer,
-      to hold MANAGE_OWN_CALLS, or to be a device owner. BonviCall is none of
-      the three and CANNOT BECOME ANY OF THEM: it observes calls rather than
-      managing them, and the handsets are the employees' own, so device-owner
-      provisioning is out of scope (REQUIREMENTS.md §5.7). Starting a foreground
-      service of a type the app does not qualify for throws SecurityException —
-      so this is not an M0 measurement, it is a crash on every API 34 device.
+      The rule this comment used to state is still true: on API 34+ the type
+      requires the app to be the default dialer, to hold MANAGE_OWN_CALLS, or to
+      be a device owner, and starting an FGS of a type you do not qualify for
+      throws SecurityException. What changed is the app — it now declares
+      MANAGE_OWN_CALLS, a normal permission with no dialog, which is the route
+      CallSentry took on the same handsets.
 
-      This flavour therefore runs on `microphone|dataSync`, which is what
-      src/main/AndroidManifest.xml already declares. Nothing is overridden here.
-      S1-RECORDING.md's finding that "targetSdk 29+ restricts the phoneCall FGS
-      type" is the same fact, arrived at from the other direction.
-    -->
+      It is still not assumed: `CaptureService` tries `phoneCall|microphone`,
+      falls back to `microphone|dataSync`, then to no type at all, and records
+      which one the OS accepted so the panel can show it per handset. That is a
+      measurement on the fleet rather than an argument about the documentation.
+      -->
 
 </manifest>

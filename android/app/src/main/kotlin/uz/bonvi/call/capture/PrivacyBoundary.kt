@@ -163,9 +163,6 @@ class SubscriptionPrivacyBoundary @Inject constructor(
          * though two files touch the data.
          */
         val SIM_ATTRIBUTION_COLUMN: String = android.provider.CallLog.Calls.PHONE_ACCOUNT_ID
-
-        @Suppress("unused")
-        private val TELEPHONY_SERVICE_MARKER = TelephonyManager::class.java
     }
 }
 

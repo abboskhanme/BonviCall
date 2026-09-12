@@ -1,10 +1,12 @@
 package uz.bonvi.call.di
 
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import uz.bonvi.call.capture.NoOpOemRecordingLocator
+import uz.bonvi.call.capture.MediaStoreOemRecordingLocator
 import uz.bonvi.call.capture.OemRecordingLocator
 import javax.inject.Singleton
 
@@ -12,35 +14,28 @@ import javax.inject.Singleton
  * modern34 — the ONE flavour-specific Kotlin source (SPEC §7.2).
  *
  * Under scoped storage the same files are reached through `MediaStore` plus
- * All-files access, so this flavour binds the MediaStore locator. The window,
- * the size floor and the read-only rule are identical: the boundary does not
- * change with the storage API, only the way the folder is opened.
- *
- * TODO(T71b): bind `MediaStoreOemRecordingLocator`, querying
- * `MediaStore.Audio` filtered on `DATE_MODIFIED` inside the call window.
+ * All-files access. The window, the size floor and the read-only rule are
+ * identical: the boundary does not change with the storage API, only the way
+ * the folder is opened.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object CaptureModule {
 
     /**
-     * ⚠️ **T71b is a change to this one function and nothing else.**
+     * **T71b, landed 2026-09-11.** See the `legacy28` twin for the history.
      *
-     * The seam around it is finished: `OemHarvestStrategy` already takes the
-     * `Decision.Capture` proof and hands it here, `CaptureRouter` already
-     * starts this route first and records which one won, the window constants
-     * and the retry are already in `OemRecordingLocator`, and
-     * `AudioPipeline` already knows never to delete what this returns
-     * (CONVENTIONS.md §8.3). When M0 decides, the work is to write the locator
-     * and change the expression below — not to redesign anything above it.
-     *
-     * Until then it returns null, which is the FAIL-CLOSED answer. A
-     * placeholder that captured everything by default would be the exact
-     * failure this package exists to prevent, and it would be invisible: the
-     * calls would simply arrive with audio nobody had authorised.
+     * This flavour has the harder job of the two and is the weaker of them:
+     * a manufacturer that hides its recorder folder from the media scanner —
+     * Xiaomi does, with a `.nomedia` — is invisible to MediaStore, so the
+     * locator also reads the folders directly, which is legal only while
+     * All-files access is granted. An agent who declined that permission gets
+     * calls with `attribution_failed` rather than somebody else's audio, which
+     * is the correct trade and the reason `legacy28` exists at all.
      */
     @Provides
     @Singleton
-    fun oemRecordingLocator(): OemRecordingLocator =
-        NoOpOemRecordingLocator("modern34: the scoped-storage locator lands in T71b")
+    fun oemRecordingLocator(
+        @ApplicationContext context: Context,
+    ): OemRecordingLocator = MediaStoreOemRecordingLocator(context)
 }

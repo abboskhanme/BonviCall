@@ -60,10 +60,15 @@ class ArchitectureRulesTest {
         // SPEC §7.1. CallSentry let the recording code reach into /sdcard from
         // anywhere; here that is confined to one package and, more importantly,
         // to one TYPE (OemHarvestStrategy.locate(Decision.Capture, …)).
+        // The dotted forms, so the rule catches a CALL and not a class whose
+        // name merely starts with the API's. `MediaStoreOemRecordingLocator`
+        // is bound from `di/` on modern34 and naming it there is not a use of
+        // MediaStore — matching on the bare word made this rule fail for a
+        // reason that had nothing to do with what it guards.
         val forbidden = listOf(
-            "MediaStore",
-            "MediaRecorder",
-            "AudioRecord",
+            "MediaStore.",
+            "MediaRecorder.",
+            "AudioRecord(",
             "Environment.getExternalStorageDirectory",
             "getExternalStoragePublicDirectory",
         )
@@ -107,6 +112,32 @@ class ArchitectureRulesTest {
                     .map { "${source.relativePath} imports $it" }
                     .toList()
             }
+        assertThat(offenders).isEmpty()
+    }
+
+    // ── Rule 4 ────────────────────────────────────────────────────────────
+    @Test
+    fun `no content-provider query puts LIMIT in its sort order`() {
+        // Android 11+ validates the sort-order argument and answers
+        // `IllegalArgumentException` for a trailing `LIMIT`. Both of this app's
+        // call-log queries did it, and on a live Android 15 handset the result
+        // was `call_log: granted_not_working` — a working permission reported
+        // as broken, with capture blocked behind it and the recovery sweep
+        // silently finding nothing. CallSentry, on the same phone, sorted and
+        // read the first row; that is the portable form.
+        //
+        // Room's own `@Query` is SQLite and is not affected — this looks only
+        // at files that reach a ContentResolver.
+        val offenders = sources
+            .filter { it.code.contains("contentResolver.query(") }
+            .filter { source ->
+                // One line, one string literal, an SQL keyword — not the
+                // identifier `limit`, which is a parameter name all over this
+                // file and is not the bug.
+                Regex(""""[^"\n]*\bLIMIT\b[^"\n]*"""")
+                    .containsMatchIn(source.code)
+            }
+            .map { it.relativePath }
         assertThat(offenders).isEmpty()
     }
 

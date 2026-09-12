@@ -13,13 +13,46 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- UC-14: read the handset's own call recordings. READ only — the files
-         are never moved, modified or deleted (CONVENTIONS.md §8.3), so
-         WRITE_EXTERNAL_STORAGE is deliberately NOT declared even though
-         SPEC §7.2 names it. maxSdkVersion 28: above that the permission grants
-         nothing and would only add a screen. -->
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
+    <!--
+      UC-14: read the handset's own call recordings. READ only — the files are
+      never moved, modified or deleted (CONVENTIONS.md §8.3), so
+      WRITE_EXTERNAL_STORAGE stays undeclared even though SPEC §7.2 names it.
+
+      ⚠️ This carried `maxSdkVersion="28"` with the note that "above that the
+      permission grants nothing and would only add a screen". That reasoning is
+      wrong for an app whose targetSdk IS 28: such an app keeps the legacy
+      external-storage view on Android 10 and later, and THIS permission is
+      what gates it. Capping it meant the flavour built to harvest the OEM
+      folder held no storage permission at all on every handset in the fleet —
+      the locator would have found nothing on a Samsung and the failure would
+      have read as "Samsung cannot record either".
+
+      Found by a static analysis of the shipped APK, 2026-09-11, before the
+      first Samsung was tested. It would have sent the measurement the wrong
+      way.
+    -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!--
+      UC-14, the Android 11+ guarantee — and deliberately a SECOND line of
+      defence rather than the first.
+
+      Legacy storage should be enough here and costs the agent nothing; where
+      an OEM has narrowed it, this is the only route left to another app's
+      recordings folder. Which one is in force is a MEASUREMENT, not an
+      assumption: `StorageAccessProbe` exercises the folders, and E2 offers the
+      All-files screen only when that probe says they are unreachable. So on a
+      handset where legacy storage works the agent never meets the alarming
+      screen, and on one where it does not they are given the way through
+      instead of a silent failure.
+    -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!--
+      Explicit rather than implied. It defaults to true below targetSdk 29, and
+      writing it down is what stops a future target bump from silently removing
+      the legacy view that this whole flavour is built on.
+    -->
+    <application android:requestLegacyExternalStorage="true" />
 
 </manifest>

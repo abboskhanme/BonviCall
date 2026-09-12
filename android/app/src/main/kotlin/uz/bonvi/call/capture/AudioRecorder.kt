@@ -32,10 +32,26 @@ interface AudioRecorder {
 /**
  * The audio sources, in descending order of what they capture (S1).
  *
- * `VOICE_CALL` is absent on purpose: it is the best source and it is forbidden
- * to non-system apps, so trying it only costs a SecurityException per call.
+ * ⚠️ `VOICE_CALL` was absent, with the note that it "is forbidden to non-system
+ * apps, so trying it only costs a SecurityException per call". That is true at
+ * targetSdk 29 and above — and **`legacy28` targets 28 exactly so it can ask**.
+ * Leaving it out meant the flavour built to capture both parties never tried
+ * the one source that carries both. CallSentry, which works on these handsets,
+ * probes it first for the same reason.
+ *
+ * The cost of being wrong is one caught exception during
+ * [MediaRecorderStrategy]'s probe, which already tries each source in turn and
+ * moves on; the cost of leaving it out is every conversation recorded
+ * half-deaf.
  */
 enum class AudioSource(val platformValue: Int, val route: CaptureRoute) {
+
+    /** Both parties. Granted only where the platform still allows it — which
+     *  is what [preferenceOrder]'s flag decides, and what M0 measures. */
+    VOICE_CALL(
+        MediaRecorder.AudioSource.VOICE_CALL,
+        CaptureRoute.APP_VOICE_CALL,
+    ),
     /** Captures the OTHER PARTY on Samsung and some others. The reason this
      *  route has its own `capture_route` value: a fleet where every recording
      *  came from MIC is half-deaf, and the per-model table has to show it. */
@@ -70,9 +86,9 @@ enum class AudioSource(val platformValue: Int, val route: CaptureRoute) {
          */
         fun preferenceOrder(canUseVoiceRecognition: Boolean): List<AudioSource> =
             if (canUseVoiceRecognition) {
-                listOf(VOICE_RECOGNITION, VOICE_COMMUNICATION, MIC)
+                listOf(VOICE_CALL, VOICE_RECOGNITION, VOICE_COMMUNICATION, MIC)
             } else {
-                listOf(VOICE_COMMUNICATION, MIC)
+                listOf(VOICE_CALL, VOICE_COMMUNICATION, MIC)
             }
     }
 }

@@ -23,17 +23,24 @@ class GraphCompletenessTest {
         File(TestPaths.appDir, "src/$flavour/kotlin/uz/bonvi/call/di/CaptureModule.kt")
 
     @Test
-    fun `the two flavours differ in exactly one Kotlin file`() {
-        // SPEC §7.2: the ONLY flavour-specific source is di/CaptureModule.kt,
-        // plus the two manifests. A second one is where the two builds start
-        // silently diverging, which is the thing M0's comparison cannot survive.
-        for (flavour in listOf("legacy28", "modern34")) {
+    fun `the two flavours differ in exactly the capture module and its locator`() {
+        // SPEC §7.2's rule was "one file", and T71b is the change that rule was
+        // written in anticipation of: each flavour now also carries the locator
+        // the module binds, because reaching the same folder through raw paths
+        // and through MediaStore is genuinely different code. TWO files, named,
+        // and a third is still where the builds start silently diverging —
+        // which is the thing M0's comparison cannot survive.
+        val expected = mapOf(
+            "legacy28" to setOf("CaptureModule.kt", "RawPathOemRecordingLocator.kt"),
+            "modern34" to setOf("CaptureModule.kt", "MediaStoreOemRecordingLocator.kt"),
+        )
+        for ((flavour, files) in expected) {
             val root = File(TestPaths.appDir, "src/$flavour")
             val kotlinFiles = root.walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .map { it.name }
-                .toList()
-            assertThat(kotlinFiles).containsExactly("CaptureModule.kt")
+                .toSet()
+            assertThat(kotlinFiles).isEqualTo(files)
         }
     }
 
@@ -41,19 +48,31 @@ class GraphCompletenessTest {
     fun `both flavours bind an OemRecordingLocator`() {
         for (flavour in listOf("legacy28", "modern34")) {
             val source = flavourSource(flavour).readText()
-            assertThat(source).contains("fun oemRecordingLocator(): OemRecordingLocator")
+            assertThat(source).contains("OemRecordingLocator")
+            assertThat(source).contains("@Provides")
         }
     }
 
     @Test
-    fun `T71b is still a NoOp, and says so`() {
-        // Not a failure — it is correct until M0 decides which route wins. What
-        // matters is that it fails CLOSED and that the next person knows the
-        // change is one expression.
-        for (flavour in listOf("legacy28", "modern34")) {
-            val source = flavourSource(flavour).readText()
-            assertThat(source).contains("NoOpOemRecordingLocator")
-            assertThat(source).contains("T71b")
+    fun `T71b is built, and neither flavour is a NoOp any more`() {
+        // The inverse of the test that stood here. It asserted the placeholder
+        // was still in place, which was correct until a real handset could say
+        // where these files land; a Redmi Note 14 on HyperOS answered that on
+        // 2026-09-11 and the locators were written against it.
+        //
+        // Kept rather than deleted, and inverted: a reversed decision keeps its
+        // test. If either flavour ever falls back to the NoOp, the fleet goes
+        // half-deaf silently — every call would ship `attribution_failed` and
+        // look exactly like a handset whose recorder is switched off.
+        val bindings = listOf("legacy28", "modern34").associateWith {
+            flavourSource(it).readText()
+        }
+        assertThat(bindings.getValue("legacy28")).contains("RawPathOemRecordingLocator()")
+        assertThat(bindings.getValue("modern34")).contains("MediaStoreOemRecordingLocator(")
+        for ((_, source) in bindings) {
+            // The BINDING, not the word: both files still name the placeholder
+            // in their history note, and that note is worth keeping.
+            assertThat(source).doesNotContain("= NoOpOemRecordingLocator(")
         }
     }
 

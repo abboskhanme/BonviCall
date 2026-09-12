@@ -53,11 +53,14 @@ class MediaRecorderStrategyTest {
 
     @Test
     fun `the best available source is used and reported as its own route`() {
+        // On a handset that grants it, VOICE_CALL is the best rung and the one
+        // that carries both parties. Everything below is a degradation and the
+        // route says which, because that is what the M0 table is built on.
         val strategy = strategy()
 
         strategy.start(file)
 
-        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_RECOGNITION)
+        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_CALL)
         assertThat(strategy.stop()).isEqualTo(file)
     }
 
@@ -66,7 +69,13 @@ class MediaRecorderStrategyTest {
         // The distinction the M0 table is built on. Reporting the preferred
         // source when the fallback ran would say the far end was captured when
         // it was not — the one lie this data set cannot afford.
-        val strategy = strategy(failOn = setOf(AudioSource.VOICE_RECOGNITION, AudioSource.VOICE_COMMUNICATION))
+        val strategy = strategy(
+            failOn = setOf(
+                AudioSource.VOICE_CALL,
+                AudioSource.VOICE_RECOGNITION,
+                AudioSource.VOICE_COMMUNICATION,
+            ),
+        )
 
         strategy.start(file)
 
@@ -75,7 +84,9 @@ class MediaRecorderStrategyTest {
 
     @Test
     fun `the middle source is reported as its own route too`() {
-        val strategy = strategy(failOn = setOf(AudioSource.VOICE_RECOGNITION))
+        val strategy = strategy(
+            failOn = setOf(AudioSource.VOICE_CALL, AudioSource.VOICE_RECOGNITION),
+        )
 
         strategy.start(file)
 
@@ -87,7 +98,10 @@ class MediaRecorderStrategyTest {
         // Asked as a capability, never as a version. Skipping it is not a loss:
         // it would return the near side only and be REPORTED as
         // app_voice_recognition, which would corrupt the per-model table.
-        val strategy = strategy(canUseVoiceRecognition = false)
+        val strategy = strategy(
+            failOn = setOf(AudioSource.VOICE_CALL),
+            canUseVoiceRecognition = false,
+        )
 
         strategy.start(file)
 
@@ -126,7 +140,7 @@ class MediaRecorderStrategyTest {
         assertThat(strategy.lastFailure()).isEqualTo(AudioMissingReason.CAPTURE_RETURNED_SILENCE)
         // The route stays as the source that WAS recording: "app_mic produced
         // silence" is a different fact from "no route was available".
-        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_RECOGNITION)
+        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_CALL)
     }
 
     @Test
@@ -134,7 +148,7 @@ class MediaRecorderStrategyTest {
         // A leaked MediaRecorder holds the mic and the NEXT call captures
         // nothing — a failure that shows up one call later than its cause.
         val recorders = mutableListOf<FakeRecorder>()
-        val strategy = strategy(failOn = setOf(AudioSource.VOICE_RECOGNITION), recorders = recorders)
+        val strategy = strategy(failOn = setOf(AudioSource.VOICE_CALL), recorders = recorders)
 
         strategy.start(file)
 
@@ -142,17 +156,41 @@ class MediaRecorderStrategyTest {
     }
 
     @Test
-    fun `the source order is best-first and never tries VOICE_CALL`() {
-        // VOICE_CALL is the best source and is forbidden to non-system apps, so
-        // trying it costs a SecurityException per call and gains nothing.
+    fun `the source order is best-first and VOICE_CALL is tried first`() {
+        // ⚠️ The inverse of the test that stood here, which asserted VOICE_CALL
+        // was never tried "because it is forbidden to non-system apps". That is
+        // true from targetSdk 29 — and the `legacy28` flavour targets 28
+        // precisely so it can ask. The old rule meant the one build made to
+        // capture both parties never tried the one source that carries both.
+        // CallSentry, which works on these handsets, probes it first.
+        //
+        // Being wrong costs one caught exception inside the probe below, which
+        // already walks the list; being right is the difference between a
+        // recording of a conversation and a recording of one person talking.
         assertThat(AudioSource.preferenceOrder(canUseVoiceRecognition = true))
             .containsExactly(
+                AudioSource.VOICE_CALL,
                 AudioSource.VOICE_RECOGNITION,
                 AudioSource.VOICE_COMMUNICATION,
                 AudioSource.MIC,
             )
             .inOrder()
-        assertThat(AudioSource.entries.map { it.name }).doesNotContain("VOICE_CALL")
+        assertThat(AudioSource.preferenceOrder(canUseVoiceRecognition = false))
+            .containsExactly(
+                AudioSource.VOICE_CALL,
+                AudioSource.VOICE_COMMUNICATION,
+                AudioSource.MIC,
+            )
+            .inOrder()
+    }
+
+    @Test
+    fun `VOICE_CALL is reported as its own route, never as another`() {
+        // The M0 table's whole purpose is to say which handsets got the far
+        // end. Filing a VOICE_CALL recording under `app_voice_recognition`
+        // would make it claim a source captured something it cannot.
+        assertThat(AudioSource.VOICE_CALL.route)
+            .isEqualTo(uz.bonvi.call.domain.CaptureRoute.APP_VOICE_CALL)
     }
 
     @Test
