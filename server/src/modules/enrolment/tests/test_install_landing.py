@@ -170,3 +170,73 @@ async def test_the_page_needs_no_token(db, client, enrolment_code_factory) -> No
     code = await enrolment_code_factory()
     assert "authorization" not in {k.lower() for k in client.headers}
     assert (await client.get(f"/i/{code.code}")).status_code == 200
+
+
+async def test_the_deep_link_carries_the_server_the_page_was_served_from(
+    db, client, enrolment_code_factory
+) -> None:
+    """Without this the app has no way to learn its own server.
+
+    A release build refuses a typed address on purpose, so the deep link is the
+    only channel there is. It carried the code alone for the whole of release 1,
+    which pinned every release APK to the host compiled into it and left the
+    app's own `?server=` reader with nothing to read.
+    """
+    await _publish_apk(db)
+    code = await enrolment_code_factory()
+    response = await client.get(
+        f"/i/{code.code}",
+        headers={
+            "User-Agent": ANDROID_13_UA,
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": "call.bonvi.uz",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "bonvicall://enrol?code=" in response.text
+    assert "server=https%3A%2F%2Fcall.bonvi.uz" in response.text
+
+
+async def test_the_deep_link_prefers_the_forwarded_host_over_the_internal_one(
+    db, client, enrolment_code_factory
+) -> None:
+    """Behind a reverse proxy the app server's own view of the URL is useless.
+
+    It sees cleartext HTTP on an internal name; handing that to the phone is an
+    address that resolves nowhere and that the client's network config refuses
+    for being cleartext before it is even tried.
+    """
+    await _publish_apk(db)
+    code = await enrolment_code_factory()
+    response = await client.get(
+        f"/i/{code.code}",
+        headers={
+            "User-Agent": ANDROID_13_UA,
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Host": "call.bonvi.uz",
+        },
+    )
+
+    link = response.text.split("bonvicall://")[1].split('"')[0]
+    # Stated positively. Written as two "not in" assertions this passed with no
+    # `server=` parameter at all — a test that holds because the thing it
+    # guards is absent is the quiet lie this repository keeps finding.
+    assert "server=https%3A%2F%2Fcall.bonvi.uz" in link
+    assert "backend" not in link
+    assert "server=http%3A%2F%2F" not in link
+
+
+async def test_without_a_proxy_the_deep_link_uses_the_address_actually_used(
+    db, client, enrolment_code_factory
+) -> None:
+    """A LAN or tunnel install has no forwarded headers and must still work."""
+    await _publish_apk(db)
+    code = await enrolment_code_factory()
+    response = await client.get(
+        f"/i/{code.code}",
+        headers={"User-Agent": ANDROID_13_UA, "Host": "192.168.1.23:8020"},
+    )
+
+    assert "server=" in response.text
+    assert "192.168.1.23" in response.text

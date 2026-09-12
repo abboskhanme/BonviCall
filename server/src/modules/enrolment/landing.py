@@ -18,6 +18,7 @@ useful to somebody guessing codes, and only one of them is entitled to it.
 from __future__ import annotations
 
 from html import escape
+from urllib.parse import quote
 
 from src.core.messages_uz import INSTALL_PAGE as TEXT
 from src.modules.enrolment.rules import display_number
@@ -72,8 +73,19 @@ def render_invitation(
     code: str,
     user_agent: str | None,
     apk_available: bool,
+    server_base: str | None = None,
 ) -> str:
-    """The page an agent opens from the link their admin sent them."""
+    """The page an agent opens from the link their admin sent them.
+
+    ``server_base`` is the origin this page was served from, and it is carried
+    into the deep link as ``&server=``. The app reads that parameter and it is
+    the ONLY way a release build can be pointed at a server: a typed address is
+    refused there on purpose (``ServerAddress`` — a field that repoints a
+    salesperson's handset would send every call they make elsewhere). Omitting
+    it left every release build pinned to the compiled-in production host,
+    which is a deployment that cannot be moved and an app whose deep-link
+    reader had nothing to read.
+    """
     bucket = _android_bucket(user_agent)
     hint = TEXT[HINT_KEYS[bucket]]
     other = TEXT[HINT_KEYS["8-12" if bucket == "13+" else "13+"]]
@@ -83,6 +95,12 @@ def render_invitation(
         if apk_available
         else f'<p class="muted">{escape(TEXT["apk_not_ready_short"])}</p>'
     )
+    # The code is the secret and the server is an address; both are query
+    # values, so both are percent-encoded rather than trusted to be URL-safe.
+    deep_link = f"bonvicall://enrol?code={quote(code, safe='')}"
+    if server_base:
+        deep_link += f"&server={quote(server_base, safe='')}"
+
     # The boundary bullets carry <b> from the catalogue, so they are inserted
     # as markup; everything derived from data is escaped.
     body = (
@@ -102,7 +120,7 @@ def render_invitation(
         f"<p>{escape(TEXT['play_protect_body'])}</p>"
         f"<h2>{escape(TEXT['step_code'])}</h2>"
         f'<p class="code">{escape(code)}</p>'
-        f'<p><a href="bonvicall://enrol?code={escape(code)}">'
+        f'<p><a href="{escape(deep_link)}">'
         f"{escape(TEXT['deep_link'])}</a></p>"
         f'<p class="muted">{escape(TEXT["stuck"])}</p>'
     )

@@ -36,6 +36,26 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def _public_origin(request: Request) -> str:
+    """The address this page was reached on, as the phone would have to type it.
+
+    It goes into the deep link as ``&server=``, and that parameter is the ONLY
+    way a release build can be pointed at a server — a typed address is refused
+    there on purpose (``ServerAddress``), because a field that repoints a
+    salesperson's handset would send every call they make somewhere else.
+
+    Read from the forwarded headers first: behind Caddy the app server sees
+    plain HTTP on an internal name, and handing the phone ``http://backend:8000``
+    is an address that resolves nowhere and, being cleartext, is refused by the
+    client's own network config before it is even tried.
+    """
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
+    forwarded_host = request.headers.get("X-Forwarded-Host", "").split(",")[0].strip()
+    scheme = forwarded_proto or request.url.scheme
+    host = forwarded_host or request.headers.get("Host") or request.url.netloc
+    return f"{scheme}://{host}"
+
+
 @router.get("/i/{code}", response_class=HTMLResponse)
 async def install_page(code: str, request: Request, session: SessionDep) -> HTMLResponse:
     """The agent-facing install page. Works with JavaScript off."""
@@ -51,6 +71,7 @@ async def install_page(code: str, request: Request, session: SessionDep) -> HTML
             code=normalised_code,
             user_agent=request.headers.get("User-Agent"),
             apk_available=version_code is not None,
+            server_base=_public_origin(request),
         )
     )
 

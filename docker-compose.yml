@@ -24,9 +24,31 @@ services:
     volumes:
       - ./server:/app
       - ./contract:/contract
+      # Read-only, and only so `test_compose_wiring.py` can assert that every
+      # storage root this app writes to is on a volume. That test exists
+      # because `/data/releases` was not, and the symptom was a published APK
+      # that 404'd after the next `compose up`.
+      - ./docker-compose.yml:/compose/docker-compose.yml:ro
       - audio:/data/audio
+      # The published APKs (LocalFsReleaseStore, /data/releases). It had NO
+      # volume, so every build an admin uploaded lived in the container's
+      # writable layer: the row survived in Postgres, the bytes did not, and
+      # the next `compose up` left the install page offering a 404 to every
+      # salesperson. Separate from `audio` deliberately — audio is customer
+      # data under a retention sweep, a release is an artefact that sweep must
+      # never be able to eat (core/storage.py says so; nothing mounted it).
+      - releases:/data/releases
     depends_on:
       postgres: {condition: service_healthy}
+    environment:
+      # The comment below said reload MUST poll and nothing made it. WatchFiles
+      # was left on inotify, which a Docker bind mount does not deliver on
+      # macOS (virtiofs) OR on Windows — so `--reload` silently did nothing and
+      # an edited file kept serving the old code until somebody restarted the
+      # container. Found 2026-09-12 by a landing-page change that "did not
+      # work" and was in fact never loaded.
+      WATCHFILES_FORCE_POLLING: "true"
+      WATCHFILES_POLL_DELAY_MS: "1000"
     # macOS + Docker: virtiofs does not forward inotify events, so reload
     # MUST poll. Do not remove --reload-dir; raise the interval if it is noisy.
     command: >
@@ -64,3 +86,4 @@ services:
 volumes:
   pgdata:
   audio:
+  releases:
