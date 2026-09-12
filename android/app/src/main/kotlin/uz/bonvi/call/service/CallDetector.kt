@@ -132,6 +132,30 @@ class CallDetector @Inject constructor(
     ) {
         if (pending.get(callId) != null) return // a repeated edge, not a new call
 
+        // ═══ Two sources, one call ═══════════════════════════════════════════
+        // The live callback names a call `live-<n>` and the manifest receiver
+        // names the same call `sub-<id>`; both deliver every edge. Once the
+        // receiver could attribute an edge (2026-09-12) the same call opened
+        // TWO sessions, started two recorders, harvested the OEM file twice
+        // and reconciled twice — the queue deduplicated the record, but the
+        // handset did the work double. Whichever source saw a call first owns
+        // it, and its own source will deliver its end.
+        //
+        // But call waiting is real (R5): a second INCOMING call can ring while
+        // the first is active, and that is a second call. The two cases differ
+        // by phase: a RINGING edge is a duplicate only while the in-flight
+        // call is itself still unanswered (one SIM cannot ring twice at once),
+        // whereas an OFFHOOK edge with no session of its own is always the
+        // duplicate — a second call taken during a first never produces a
+        // fresh OFFHOOK, the line was off the hook already. Bounded in time so
+        // a session whose end was lost cannot shadow the SIM for ever.
+        val duplicate = subscriptionId != null &&
+            inFlightOn(subscriptionId, unansweredOnly = direction == CallDirection.INCOMING)
+        if (duplicate) {
+            Timber.d("Edge %s is for the call already in flight on the SIM; not a second call", callId)
+            return
+        }
+
         sessions.onEvent(callId, CallEvent.Detected)
 
         // Guard 1, before anything is written. An unidentifiable subscription
@@ -218,12 +242,26 @@ class CallDetector @Inject constructor(
         onCallEnded.onCallEnded()
     }
 
+    private suspend fun inFlightOn(subscriptionId: Int, unansweredOnly: Boolean): Boolean {
+        val now = Clock.epochMillis()
+        return pending.all().any {
+            it.subscriptionId == subscriptionId &&
+                it.endedAtEpochMillis == null &&
+                (!unansweredOnly || it.answeredAtEpochMillis == null) &&
+                now - it.startedAtEpochMillis < LONGEST_CALL_MS
+        }
+    }
+
     /** The current call state, for the `phone_state` capability check. */
     fun currentCallState(): Int =
         @Suppress("DEPRECATION")
         context.getSystemService(TelephonyManager::class.java)?.callState
             ?: TelephonyManager.CALL_STATE_IDLE
 }
+
+/** No call lasts this long; a pending row older than this with no end is a
+ *  row whose end edge was lost, and it must not shadow the next call. */
+private const val LONGEST_CALL_MS = 3 * 60 * 60 * 1000L
 
 /**
  * A call in flight, with everything needed to build its record once it ends.

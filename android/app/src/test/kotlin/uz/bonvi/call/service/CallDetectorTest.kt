@@ -405,6 +405,75 @@ class CallDetectorTest {
             assertThat(pending.calls.values.single().direction).isEqualTo(CallDirection.INCOMING)
         }
     }
+
+    @Test
+    fun `the other source reporting the same in-flight call does not open a second call`() = runTest {
+        // The live callback and the manifest receiver both see every call and
+        // name it differently. Both attributed the CEO's 16:27 call (2026-09-12):
+        // two sessions, two recorders, two harvests of one file.
+        val pending = FakePendingStore()
+        val sessions = CallSessionManager(FakeSessionStore())
+        val detector = detector(pending, sessions)
+
+        detector.handle(CallDetector.Edge.OffHook("live-1", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.OffHook("sub-2", "901112233", subscriptionId = 2))
+
+        assertThat(pending.calls.keys).containsExactly("live-1")
+        assertThat(sessions.stateOf("sub-2")).isEqualTo(CallState.IDLE)
+    }
+
+    @Test
+    fun `a second incoming call during an active one is still a second call`() = runTest {
+        // Call waiting (R5). The same-SIM rule must not swallow it: the first
+        // call is ANSWERED when the second one rings, and one SIM cannot be
+        // ringing twice, so this RINGING edge is a new call.
+        val pending = FakePendingStore()
+        val sessions = CallSessionManager(FakeSessionStore())
+        val detector = detector(pending, sessions)
+
+        detector.handle(CallDetector.Edge.Ringing("live-1", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.OffHook("live-1", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.Ringing("live-2", "909998877", subscriptionId = 2))
+
+        assertThat(pending.calls.keys).containsExactly("live-1", "live-2")
+        assertThat(sessions.stateOf("live-2")).isEqualTo(CallState.RINGING)
+    }
+
+    @Test
+    fun `the receiver's copy of a ringing call is not a second call`() = runTest {
+        val pending = FakePendingStore()
+        val sessions = CallSessionManager(FakeSessionStore())
+        val detector = detector(pending, sessions)
+
+        detector.handle(CallDetector.Edge.Ringing("live-1", "901112233", subscriptionId = 2))
+        detector.handle(CallDetector.Edge.Ringing("sub-2", "901112233", subscriptionId = 2))
+
+        assertThat(pending.calls.keys).containsExactly("live-1")
+    }
+
+    @Test
+    fun `a stale in-flight row does not shadow the next call on the SIM`() = runTest {
+        val pending = FakePendingStore()
+        val sessions = CallSessionManager(FakeSessionStore())
+        val detector = detector(pending, sessions)
+        pending.put(
+            PendingCall(
+                callId = "lost-end",
+                direction = CallDirection.OUTGOING,
+                remoteNumber = "901112233",
+                registeredNumber = "+998901112233",
+                subscriptionId = 2,
+                // Four hours ago: its end edge was lost with the process.
+                startedAtEpochMillis = uz.bonvi.call.core.Clock.epochMillis() - 4 * 60 * 60 * 1000L,
+                startedElapsedMillis = 0L,
+                answeredAtEpochMillis = null,
+            ),
+        )
+
+        detector.handle(CallDetector.Edge.OffHook("live-2", "901112233", subscriptionId = 2))
+
+        assertThat(pending.calls.keys).containsExactly("lost-end", "live-2")
+    }
 }
 
 /**

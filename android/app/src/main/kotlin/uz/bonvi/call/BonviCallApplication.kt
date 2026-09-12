@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import uz.bonvi.call.core.FileLogTree
 import uz.bonvi.call.core.RedactingTree
 import javax.inject.Inject
 
@@ -29,7 +30,13 @@ class BonviCallApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        Timber.plant(RedactingTree(Timber.DebugTree()))
+        Timber.plant(RedactingTree())
+        if (BuildConfig.DEBUG) {
+            // A debug build keeps its own copy of the log where `run-as` can
+            // read it, because a handset in the field has no logcat reader
+            // attached. Never in a release build -- see FileLogTree.
+            Timber.plant(FileLogTree(java.io.File(filesDir, FileLogTree.RELATIVE_PATH)))
+        }
         Timber.i("BonviCall %s (%s) starting", BuildConfig.VERSION_NAME, BuildConfig.APP_VARIANT)
     }
 

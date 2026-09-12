@@ -18,10 +18,12 @@ import java.io.File
  */
 class MediaRecorderStrategyTest {
 
-    /** Fails on every source in [failOn], succeeds otherwise. */
+    /** Fails on every source in [failOn], succeeds otherwise. A source in
+     *  [forbidOn] throws SecurityException (barred, never worth a retry). */
     private class FakeRecorder(
         private val failOn: Set<AudioSource>,
         private val produces: File?,
+        private val forbidOn: Set<AudioSource> = emptySet(),
     ) : AudioRecorder {
         var startedWith: AudioSource? = null
             private set
@@ -29,6 +31,7 @@ class MediaRecorderStrategyTest {
             private set
 
         override fun start(source: AudioSource, target: File) {
+            if (source in forbidOn) throw SecurityException("source forbidden: $source")
             if (source in failOn) error("source unavailable: $source")
             startedWith = source
         }
@@ -39,17 +42,26 @@ class MediaRecorderStrategyTest {
 
     private val file = File("call.m4a")
 
+    /** How many times the connect-window sleep was invoked in the last run. */
+    private var sleeps = 0
+
     private fun strategy(
         failOn: Set<AudioSource> = emptySet(),
+        forbidOn: Set<AudioSource> = emptySet(),
         produces: File? = file,
         canUseVoiceRecognition: Boolean = true,
         microphoneAvailable: Boolean = true,
         recorders: MutableList<FakeRecorder> = mutableListOf(),
-    ) = MediaRecorderStrategy(
-        recorderFactory = { FakeRecorder(failOn, produces).also(recorders::add) },
-        canUseVoiceRecognition = { canUseVoiceRecognition },
-        microphoneAvailable = { microphoneAvailable },
-    )
+    ): MediaRecorderStrategy {
+        sleeps = 0
+        return MediaRecorderStrategy(
+            recorderFactory = { FakeRecorder(failOn, produces, forbidOn).also(recorders::add) },
+            canUseVoiceRecognition = { canUseVoiceRecognition },
+            microphoneAvailable = { microphoneAvailable },
+            // No real waiting in a unit test.
+            sleeper = { sleeps++ },
+        )
+    }
 
     @Test
     fun `the best available source is used and reported as its own route`() {
@@ -196,5 +208,51 @@ class MediaRecorderStrategyTest {
     @Test
     fun `each source maps to its own capture_route value`() {
         assertThat(AudioSource.entries.map { it.route }).containsNoDuplicates()
+    }
+
+    @Test
+    fun `VOICE_CALL is retried through the ring and wins once the line connects`() {
+        // The whole reason this fleet shipped app_voice_communication instead
+        // of app_voice_call: on an outgoing call VOICE_CALL is refused while the
+        // line rings, and a single attempt settled for the near side. It has to
+        // be waited for. Here it fails the first three attempts (still ringing)
+        // and then connects.
+        var attempts = 0
+        val strategy = MediaRecorderStrategy(
+            recorderFactory = {
+                object : AudioRecorder {
+                    override fun start(source: AudioSource, target: File) {
+                        if (source == AudioSource.VOICE_CALL && attempts++ < 3) {
+                            error("still ringing")
+                        }
+                        if (source != AudioSource.VOICE_CALL) error("not this one")
+                    }
+                    override fun stop(): File = file
+                    override fun release() {}
+                }
+            },
+            canUseVoiceRecognition = { true },
+            microphoneAvailable = { true },
+            sleeper = { sleeps++ },
+        )
+
+        strategy.start(file)
+
+        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_CALL)
+        assertThat(attempts).isEqualTo(4) // three rings, then connected
+        assertThat(sleeps).isEqualTo(3) // one wait between each failed attempt
+    }
+
+    @Test
+    fun `a forbidden VOICE_CALL is not retried and the near side is taken at once`() {
+        // A handset that BARS VOICE_CALL to apps (SecurityException) can never
+        // be waited into working, and blocking the connect window would only
+        // delay the near-side recording that is the honest fallback there.
+        val strategy = strategy(forbidOn = setOf(AudioSource.VOICE_CALL))
+
+        strategy.start(file)
+
+        assertThat(strategy.route).isEqualTo(CaptureRoute.APP_VOICE_RECOGNITION)
+        assertThat(sleeps).isEqualTo(0) // no waiting on a source that is barred
     }
 }

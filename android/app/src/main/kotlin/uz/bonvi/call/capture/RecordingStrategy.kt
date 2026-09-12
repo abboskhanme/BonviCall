@@ -58,4 +58,14 @@ interface RecordingStrategy {
 
     /** Set when [stop] returned null or [isSupported] returned false. */
     fun lastFailure(): AudioMissingReason?
+
+    /**
+     * True for a strategy that records nothing itself and only LOOKS for a
+     * file at [stop] — the OEM harvest. The router stops the live recorders
+     * first, because a microphone left running while a post-hoc strategy
+     * polls for the handset's file records the employee after the call has
+     * ended (six seconds of their voice on the first real handset,
+     * 2026-09-12).
+     */
+    val postHoc: Boolean get() = false
 }

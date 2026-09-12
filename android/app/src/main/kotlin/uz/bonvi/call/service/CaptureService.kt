@@ -22,7 +22,11 @@ import uz.bonvi.call.core.Capabilities
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.os.SystemClock
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import uz.bonvi.call.data.repository.CallQueueRepository
+import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.service.work.CallUploadWorker
 import uz.bonvi.call.service.work.HeartbeatWorker
 import uz.bonvi.call.service.work.ReconcileWorker
@@ -52,6 +56,9 @@ class CaptureService : Service() {
     @Inject @IoDispatcher lateinit var io: CoroutineDispatcher
 
     @Inject lateinit var callStateSource: TelephonyCallbackSource
+
+    /** The enrolled SIM, as a flow — see the registration block in [onCreate]. */
+    @Inject lateinit var session: SessionStore
 
     /** UC-16's five-second bar. Held open for as long as this service lives. */
     @Inject lateinit var realtime: RealtimeChannel
@@ -90,6 +97,21 @@ class CaptureService : Service() {
         // case where this process is not running; both are needed, because a
         // phone that has not been opened since a reboot still takes calls.
         callStateSource.register(scope)
+
+        // ⚠️ And AGAIN whenever the enrolled SIM becomes known or changes.
+        // The call above runs before SessionStore has read its DataStore, so
+        // on a fresh process it usually finds no SIM and declines — which,
+        // with nothing to call it back, left the live source off for the
+        // life of the process and every call to a receiver whose broadcast
+        // names no subscription (2026-09-12). The id is passed from the
+        // emission itself so the snapshot's own timing cannot matter, and
+        // `register` is idempotent for the id it already holds.
+        scope.launch {
+            session.simSubscriptionId
+                .filterNotNull()
+                .distinctUntilChanged()
+                .collect { subscriptionId -> callStateSource.register(scope, subscriptionId) }
+        }
 
         // The command channel. A dial expires after two minutes, so the
         // fifteen-minute heartbeat can only ever collect one too late to ring —

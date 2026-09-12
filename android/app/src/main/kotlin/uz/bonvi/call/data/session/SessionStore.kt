@@ -3,6 +3,7 @@ package uz.bonvi.call.data.session
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -124,6 +125,19 @@ class SessionStore @Inject constructor(
      */
     suspend fun saveAuthState(state: String) = edit { it[KEY_AUTH_STATE] = state }
 
+    /**
+     * The newest call-log row the recovery sweep has already handled.
+     *
+     * Without it every sweep re-queued every row in its two-day lookback as a
+     * `call_log_recovery` call — and because `source` and `audio_missing_reason`
+     * are correctable server-side, a call the live path had captured minutes
+     * earlier was rewritten as `app_not_running` half an hour later, on a panel
+     * whose whole point is saying which calls have audio (2026-09-12).
+     */
+    suspend fun saveRecoveryWatermark(epochMillis: Long) = edit {
+        it[KEY_RECOVERY_WATERMARK] = epochMillis
+    }
+
     fun authStateSnapshot(): uz.bonvi.call.domain.DeviceAuthState =
         uz.bonvi.call.domain.DeviceAuthState.entries
             .firstOrNull { it.wire == snapshot.authState }
@@ -168,6 +182,8 @@ class SessionStore @Inject constructor(
         /** [uz.bonvi.call.domain.DeviceAuthState]'s wire value. Read
          *  synchronously by the OkHttp authenticator and by the heartbeat. */
         val authState: String = "active",
+        /** See [saveRecoveryWatermark]. Zero before the first sweep. */
+        val recoveryWatermarkEpochMillis: Long = 0L,
     )
 
     init {
@@ -186,6 +202,7 @@ class SessionStore @Inject constructor(
                         registeredNumberE164 = prefs[KEY_NUMBER_E164],
                         refreshToken = prefs[KEY_REFRESH_TOKEN],
                         authState = prefs[KEY_AUTH_STATE] ?: "active",
+                        recoveryWatermarkEpochMillis = prefs[KEY_RECOVERY_WATERMARK] ?: 0L,
                     )
                 }
                 .collect()
@@ -211,5 +228,6 @@ class SessionStore @Inject constructor(
         private val KEY_BASE_URL = stringPreferencesKey("base_url")
         private val KEY_SUBSCRIPTION_ID = intPreferencesKey("sim_subscription_id")
         private val KEY_AUTH_STATE = stringPreferencesKey("auth_state")
+        private val KEY_RECOVERY_WATERMARK = longPreferencesKey("recovery_watermark_epoch_ms")
     }
 }

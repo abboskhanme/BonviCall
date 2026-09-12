@@ -14,10 +14,29 @@ import timber.log.Timber
  *
  * `RedactingTreeTest` asserts a token does not survive a round trip.
  */
-class RedactingTree(private val delegate: Timber.Tree) : Timber.Tree() {
+class RedactingTree : Timber.DebugTree() {
 
+    /**
+     * ⚠️ A SUBCLASS of `DebugTree`, not a wrapper around one — and the reason
+     * is the single most expensive line this project has had.
+     *
+     * The previous shape was `class RedactingTree(delegate: Timber.Tree)` whose
+     * `log` called `delegate.log(priority, tag, redact(message), t)`. That
+     * reads as the protected four-argument hook. It is not: Kotlin cannot
+     * reach a protected member through a receiver of the base type, so the
+     * call bound to the PUBLIC `log(priority, message, vararg args)` overload
+     * with `tag` in the message slot — and `tag` is null at that point, so
+     * Timber's `prepareLog` swallowed the line as "empty message, no
+     * throwable". Every `Timber.i/w/e` on every handset went nowhere. It was
+     * read as "MIUI suppresses third-party logs" and a day of field diagnosis
+     * ran on `dumpsys` instead. A JVM test that plants a tree and reads back
+     * the line (`FileLogTreeTest`) is what caught it, on 2026-09-12.
+     *
+     * `super.log` is the protected hook on THIS instance, which is exactly the
+     * access Kotlin allows.
+     */
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        delegate.log(priority, tag, redact(message), t)
+        super.log(priority, tag, redact(message), t)
     }
 
     companion object {

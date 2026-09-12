@@ -33,6 +33,7 @@ object CallRecordBuilder {
         captureReason: AudioMissingReason?,
         source: CallSource,
         reconciledStartedAtEpochMillis: Long? = null,
+        contactName: String? = null,
     ): CallRecord {
         val answered = call.answeredAtEpochMillis != null
         val duration = if (answered) {
@@ -76,6 +77,7 @@ object CallRecordBuilder {
             deviceTimezone = Clock.timezoneId(),
             captureRoute = captureRoute,
             audioMissingReason = reasonFor(answered, captureRoute, captureReason),
+            contactName = contactName,
         )
     }
 

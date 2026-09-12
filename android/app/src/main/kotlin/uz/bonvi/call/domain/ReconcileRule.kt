@@ -83,4 +83,28 @@ object ReconcileRule {
      *  the live start time and set `reconciled_with_call_log = false`. */
     fun deadlinePassed(callEndedAtEpochMillis: Long, nowEpochMillis: Long): Boolean =
         nowEpochMillis - callEndedAtEpochMillis >= ClientCallId.RECONCILE_DEADLINE_MS
+
+    /**
+     * When the call was answered, once the call log has had its say.
+     *
+     * ═══ OFFHOOK is not "answered" ═════════════════════════════════════════
+     * On an OUTGOING call the platform reports OFFHOOK the moment dialling
+     * starts, and the live path records that as the answer time because it is
+     * the only edge there is. A call the customer never picked up therefore
+     * reached the server as `answered` with `duration_sec = 0`, which the
+     * schema refuses (`ck_calls_answered_has_duration`) — measured 2026-09-12:
+     * a 0-second outgoing call parked with `validation_error`, its recording
+     * of the ring tone queued behind it for ever.
+     *
+     * The call log is the authority: `DURATION` is the connected time, so a
+     * zero means nobody answered, whatever the live edges looked like. Where
+     * it is positive the live answer time is kept when known (it is the
+     * closer measurement), and the log's own start stands in otherwise.
+     */
+    fun answeredAt(
+        liveAnsweredAtEpochMillis: Long?,
+        logStartedAtEpochMillis: Long,
+        logDurationSec: Int,
+    ): Long? =
+        if (logDurationSec > 0) liveAnsweredAtEpochMillis ?: logStartedAtEpochMillis else null
 }

@@ -82,7 +82,11 @@ class GraphCompletenessTest {
         // error at build time; a MISSING one is what this catches, because the
         // failure mode is a module that compiles and a graph that does not.
         val modules = TestPaths.kotlinSources()
-            .filter { it.path.contains("/di/") }
+            // `invariantSeparatorsPath` throughout this file: a `/`-written path
+            // fragment matches nothing against Windows' `\`, so these filters
+            // returned EMPTY — and an empty scan makes a completeness test pass
+            // vacuously wherever it is not guarded by an `isNotEmpty()`.
+            .filter { it.invariantSeparatorsPath.contains("/di/") }
             .joinToString("\n") { it.readText() }
 
         val seams = listOf(
@@ -100,7 +104,7 @@ class GraphCompletenessTest {
         val network = TestPaths.kotlinSources()
             .single { it.name == "NetworkModule.kt" }.readText()
         val apis = TestPaths.kotlinSources()
-            .filter { it.path.contains("/remote/api/") }
+            .filter { it.invariantSeparatorsPath.contains("/remote/api/") }
             .map { it.nameWithoutExtension }
 
         val unprovided = apis.filterNot { network.contains("$it::class.java") }
@@ -114,7 +118,7 @@ class GraphCompletenessTest {
         // silence rather than an error.
         val all = TestPaths.kotlinSources().joinToString("\n") { it.readText() }
         val workers = TestPaths.kotlinSources()
-            .filter { it.path.contains("/work/") && it.name.endsWith("Worker.kt") }
+            .filter { it.invariantSeparatorsPath.contains("/work/") && it.name.endsWith("Worker.kt") }
             .map { it.nameWithoutExtension }
 
         assertThat(workers).isNotEmpty()

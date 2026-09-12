@@ -64,4 +64,28 @@
       full phone as healthy.
     -->
     <issue id="UsableSpace" severity="informational" />
+
+    <!--
+      `Instantiatable` fires on ALL FIVE manifest components in the RELEASE
+      variant only, and every one of them is a false positive. Each class is
+      `@HiltAndroidApp`/`@AndroidEntryPoint`, so the Hilt plugin rewrites it to
+      extend a generated base; R8 then merges that base away and renames the
+      AndroidX supertypes, and lint's release analysis can no longer follow the
+      chain to `android.app.Application` and friends.
+
+      NOT taken on trust — read out of the shipped DEX (2026-09-12,
+      `apkanalyzer dex code`):
+
+        BonviCallApplication  .super android/app/Application
+        CaptureService        .super android/app/Service
+        PhoneStateReceiver    .super android/content/BroadcastReceiver
+        BootReceiver          .super android/content/BroadcastReceiver
+        MainActivity          .super b.m  ->  .super android/app/Activity
+
+      Downgraded rather than ignored, and only this issue: the DEBUG lint run
+      has no minification and still enforces the real rule, so a component that
+      genuinely is abstract or lacks a no-arg constructor is still caught before
+      it ships. Re-check this entry whenever AGP, R8 or Hilt moves.
+    -->
+    <issue id="Instantiatable" severity="informational" />
 </lint>

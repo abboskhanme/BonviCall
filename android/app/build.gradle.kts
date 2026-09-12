@@ -39,6 +39,22 @@ val devBaseUrl: String? = (project.findProperty("bonvicall.devBaseUrl") as Strin
         }.getProperty("bonvicall.devBaseUrl")
     }.getOrNull()
 
+/**
+ * Every address a phone on a development network may reach this laptop on.
+ *
+ * `bonvicall.devHost=10.31.219.102,192.168.1.23,100.69.139.120` - the hotspot,
+ * the office Wi-Fi and the VPN, so moving between them costs nothing. The
+ * FIRST entry is the one a debug build points at by default.
+ *
+ * It was a single host, and the field test moved from an office Wi-Fi to a
+ * phone hotspot in one afternoon: a new subnet, and with it a rebuild, a file
+ * transfer and a re-install before anybody could make a call again. The
+ * network security config accepts literal addresses only - there is no CIDR -
+ * so the fix is to name every address we might be reached on.
+ */
+val devHosts: List<String>
+    get() = (devHost ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
 val devHost: String? = (project.findProperty("bonvicall.devHost") as String?)
     ?: runCatching {
         Properties().apply {
@@ -60,6 +76,7 @@ val generateDebugNetworkConfig by tasks.registering {
     val output = layout.buildDirectory.file("generated/res/devhost/xml/network_security_config.xml")
     inputs.file(template)
     inputs.property("devHost", devHost ?: "")
+    inputs.property("devHosts", devHosts.joinToString(","))
     outputs.file(output)
 
     doLast {
@@ -68,16 +85,17 @@ val generateDebugNetworkConfig by tasks.registering {
         // fatal — correctly, since a duplicated host is a config nobody has
         // read.
         val alreadyListed = setOf("10.0.2.2", "127.0.0.1", "localhost")
-        val host = devHost?.trim()?.takeIf { it.isNotEmpty() && it !in alreadyListed }
+        val hosts = devHosts.filterNot { it in alreadyListed }.distinct()
 
         val rendered = template.asFile.readLines()
-            .mapNotNull { line ->
+            .flatMap { line ->
                 when {
-                    !line.contains("__DEV_HOST__") -> line
-                    host != null -> line.replace("__DEV_HOST__", host)
+                    !line.contains("__DEV_HOST__") -> listOf(line)
+                    // One <domain> element per address, at the same indent.
+                    hosts.isNotEmpty() -> hosts.map { line.replace("__DEV_HOST__", it) }
                     // No LAN host configured: drop the line entirely rather
                     // than shipping a placeholder as a domain name.
-                    else -> null
+                    else -> emptyList()
                 }
             }
             .joinToString("\n", postfix = "\n")
@@ -123,8 +141,8 @@ android {
         // paths, so it is a build variant that M0 settles with measurements,
         // not a constant someone edits at 2 a.m.
 
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 8
+        versionName = "1.0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -208,7 +226,7 @@ android {
             // exactly what the first real handset hit. Falling back to the
             // production domain there produces "no internet" on a phone that
             // is on perfectly good wifi.
-            val debugHost = devHost?.trim()?.takeIf { it.isNotEmpty() } ?: "10.0.2.2"
+            val debugHost = devHosts.firstOrNull() ?: "10.0.2.2"
             val debugBase = devBaseUrl?.trim()?.takeIf { it.isNotEmpty() }
                 ?: "http://$debugHost:8020"
             buildConfigField("String", "DEFAULT_BASE_URL", "\"$debugBase\"")
@@ -258,6 +276,14 @@ android {
                 // quiet lie as everything else this project has found.
                 providers.systemProperty("bonvicall.liveServer").orNull
                     ?.let { url -> it.systemProperty("bonvicall.liveServer", url) }
+
+                // Same reason, for the account those tests log in with. The
+                // seeded password is a default, not a constant: rotating it in
+                // the panel must not turn the live suite red.
+                for (key in listOf("bonvicall.liveAdminEmail", "bonvicall.liveAdminPassword")) {
+                    providers.systemProperty(key).orNull
+                        ?.let { value -> it.systemProperty(key, value) }
+                }
             }
         }
     }

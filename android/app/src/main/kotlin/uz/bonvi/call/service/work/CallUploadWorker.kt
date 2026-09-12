@@ -93,8 +93,29 @@ class CallUploadWorker @AssistedInject constructor(
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        /** Called when a call is queued. Replaces any pending one-shot, so
-         *  five calls in a row produce one drain rather than five. */
+        /**
+         * Called when a call is queued. Replaces any pending one-shot, so
+         * five calls in a row produce one drain rather than five.
+         *
+         * ⚠️ `REPLACE`, and it was briefly `APPEND_OR_REPLACE` on 2026-09-12 —
+         * both measured on the same handset the same afternoon:
+         *
+         *  • REPLACE cancels a running pass. That was harmless until the
+         *    transcoder hung and ignored the cancellation (fixed there, not
+         *    here: the pump now runs under `runInterruptible` and unwinds
+         *    through `finally`). A cancelled pass loses nothing: jobs already
+         *    uploaded are marked done, a chunked upload resumes, a transcode
+         *    is redone from an untouched source.
+         *  • APPEND_OR_REPLACE chains the new pass BEHIND the existing one —
+         *    including one sitting in `Result.retry()` backoff. With one job
+         *    answering 409 on every pass, the parent retried with exponential
+         *    backoff (attempt 6: sixteen minutes), three appended passes sat
+         *    `BLOCKED` behind it, and the CEO's freshly queued call reached
+         *    nobody while Moi Zvonki showed the same call in seconds.
+         *
+         * "A call was queued" means "drain NOW", and REPLACE is the policy
+         * that does that.
+         */
         fun enqueueNow(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONE_SHOT,

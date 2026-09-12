@@ -42,8 +42,9 @@ class AudioPipeline @Inject constructor(
     sealed interface Outcome {
         data class Uploaded(val audioId: String, val bytes: Long) : Outcome
 
-        /** Try again later — network, or a partial upload to resume. */
-        data class Retry(val uploadedBytes: Long) : Outcome
+        /** Try again later — network, or a partial upload to resume. [code]
+         *  carries the server's answer when the session could not be opened. */
+        data class Retry(val uploadedBytes: Long, val code: String? = null) : Outcome
 
         /** The call ships with this reason and the audio is not retried. */
         data class NoAudio(val reason: AudioMissingReason, val detail: String?) : Outcome
@@ -87,7 +88,7 @@ class AudioPipeline @Inject constructor(
                 Outcome.Uploaded(result.audioId, result.bytes)
             }
 
-            is AudioUploader.Result.Interrupted -> Outcome.Retry(result.uploadedBytes)
+            is AudioUploader.Result.Interrupted -> Outcome.Retry(result.uploadedBytes, result.code)
 
             is AudioUploader.Result.Refused -> {
                 if (result.deleteLocal) {

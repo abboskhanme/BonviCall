@@ -117,7 +117,21 @@ fun HomeScreen(
                     Text(stringResource(R.string.home_queue_safe))
                 }
 
-                if (state.authState == DeviceAuthState.REVOKED) {
+                // AUTH_EXPIRED as well as REVOKED. It was REVOKED alone, and
+                // that left the one state a person can actually be rescued
+                // from with no way out of this screen: a refused refresh means
+                // the server no longer knows this installation, the app skips
+                // E1 because an installation id and a refresh token are both
+                // still on disk, and the agent sees a home screen with no code
+                // field. The only remaining move is to clear the app's data --
+                // which deletes the held queue, i.e. calls that happened. N25
+                // exists to stop exactly that, so the escape hatch has to be
+                // reachable here. Redeeming a code clears the old auth state
+                // and keeps the queue, which is why this is the safe route and
+                // clearing storage is not.
+                if (state.authState == DeviceAuthState.REVOKED ||
+                    state.authState == DeviceAuthState.AUTH_EXPIRED
+                ) {
                     Button(onClick = onReEnrol, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.home_re_enrol))
                     }

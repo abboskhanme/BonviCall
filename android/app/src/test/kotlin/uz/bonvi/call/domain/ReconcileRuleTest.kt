@@ -145,4 +145,30 @@ class ReconcileRuleTest {
         assertThat(ReconcileRule.deadlinePassed(ended, ended + 15 * 60_000L)).isTrue()
         assertThat(ClientCallId.RECONCILE_DEADLINE_MS).isEqualTo(15 * 60 * 1000L)
     }
+
+    // ── answeredAt: the log decides whether anybody picked up ─────────────
+
+    @Test
+    fun `a zero-duration row means nobody answered, whatever the live path saw`() {
+        // OFFHOOK on an outgoing call is dialling, and the live path recorded
+        // it as the answer. Sent as `answered` with duration 0 the server
+        // refused the call by constraint (2026-09-12).
+        assertThat(
+            ReconcileRule.answeredAt(
+                liveAnsweredAtEpochMillis = 10_500L,
+                logStartedAtEpochMillis = 10_000L,
+                logDurationSec = 0,
+            ),
+        ).isNull()
+    }
+
+    @Test
+    fun `an answered row keeps the live answer time when there is one`() {
+        assertThat(ReconcileRule.answeredAt(10_500L, 10_000L, 40)).isEqualTo(10_500L)
+    }
+
+    @Test
+    fun `an answered row without a live answer time falls back to the log start`() {
+        assertThat(ReconcileRule.answeredAt(null, 10_000L, 40)).isEqualTo(10_000L)
+    }
 }

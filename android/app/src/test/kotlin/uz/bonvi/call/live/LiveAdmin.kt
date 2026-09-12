@@ -16,8 +16,20 @@ import org.json.JSONObject
  */
 object LiveAdmin {
 
-    private const val EMAIL = "admin@bonvi.uz"
-    private const val PASSWORD = "Bonvi2026!"
+    private val EMAIL: String =
+        System.getProperty("bonvicall.liveAdminEmail") ?: "admin@bonvi.uz"
+
+    /**
+     * The seeded password, overridable.
+     *
+     * It was a `const` and the whole live suite went red the day somebody
+     * changed the admin password in the panel — twenty tests reporting a
+     * broken wire contract when the only broken thing was a credential. A test
+     * that cannot be told which account to use will eventually be testing an
+     * account that no longer exists.
+     */
+    private val PASSWORD: String =
+        System.getProperty("bonvicall.liveAdminPassword") ?: "Bonvi2026!"
 
     private val client = OkHttpClient.Builder().build()
     private val json = "application/json".toMediaType()

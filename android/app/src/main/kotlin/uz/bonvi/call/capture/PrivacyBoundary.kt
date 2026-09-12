@@ -75,7 +75,7 @@ class SubscriptionPrivacyBoundary @Inject constructor(
         if (extra != SubscriptionManager.INVALID_SUBSCRIPTION_ID) return extra
 
         val slot = intent.getIntExtra(EXTRA_SLOT_INDEX, INVALID_SLOT)
-        if (slot == INVALID_SLOT) return null
+        if (slot == INVALID_SLOT) return onlyActiveSubscription()
 
         // A slot index is not a subscription id. Resolving one to the other is
         // the only inference allowed here, and only because the mapping is the
@@ -97,6 +97,22 @@ class SubscriptionPrivacyBoundary @Inject constructor(
 
     /** The call log's own attribution column, used by the reconciliation pass
      *  (UC-13) when the live broadcast carried nothing. */
+    /**
+     * The one subscription a handset has, when it has exactly one.
+     *
+     * The overall `PHONE_STATE` broadcast carries no subscription. On a
+     * handset with a SINGLE active subscription that is not a gap in the
+     * evidence: the OS's own list says there is nothing else the call could
+     * be on. This is the only inference besides the slot mapping, it is made
+     * from the OS's list and never from a preference, and a dual-SIM handset
+     * still gets null here — fail-closed, as SPEC §9.1 requires.
+     */
+    private fun onlyActiveSubscription(): Int? = runCatching {
+        val manager = context.getSystemService(SubscriptionManager::class.java)
+        @Suppress("MissingPermission")
+        manager?.activeSubscriptionInfoList?.singleOrNull()?.subscriptionId
+    }.getOrNull()
+
     fun subscriptionIdFromCallLogAccount(phoneAccountId: String?): Int? =
         phoneAccountId?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
 

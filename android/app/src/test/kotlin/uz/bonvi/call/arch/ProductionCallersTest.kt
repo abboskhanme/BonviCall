@@ -86,6 +86,12 @@ class ProductionCallersTest {
             "WatchdogWorker.kt", "WatchdogWorker.schedule(",
             "an OEM battery manager stops the service and nothing restarts it (UC-05)",
         ),
+        Triple(
+            "ContactNameResolver.kt", "contactNames.resolve(",
+            "every call ships with contact_name = null: the panel shows a raw " +
+                "number instead of the name the employee gave the customer, which " +
+                "is the Moi Zvonki defect this product was built to fix",
+        ),
     )
 
     @Test

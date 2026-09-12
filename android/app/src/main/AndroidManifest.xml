@@ -183,6 +183,12 @@
             android:exported="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.PHONE_STATE" />
+                <!-- The per-subscription form of the same broadcast, and the
+                     only one that carries the subscription id. Without it the
+                     receiver only ever saw the device-wide edge, which names
+                     no SIM, and Guard 1 correctly refused every one of them
+                     (2026-09-12). Same permission gate as PHONE_STATE. -->
+                <action android:name="android.intent.action.SUBSCRIPTION_PHONE_STATE" />
             </intent-filter>
         </receiver>
 

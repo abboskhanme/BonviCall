@@ -21,7 +21,12 @@ import java.io.File
 class ArchitectureRulesTest {
 
     private data class Source(val file: File, val text: String) {
-        val relativePath: String = file.path.substringAfter("src/")
+        // `invariantSeparatorsPath`, not `path`: every rule below matches a
+        // path FRAGMENT written with `/`, and on Windows `path` comes back with
+        // `\` — so `substringAfter("src/")` returned the whole absolute path and
+        // the `filterNot` exclusions below never matched their own allowed file.
+        // The rules then failed on the one file each of them exists to permit.
+        val relativePath: String = file.invariantSeparatorsPath.substringAfter("src/")
 
         val pkg: String = Regex("""^package\s+([\w.]+)""", RegexOption.MULTILINE)
             .find(text)?.groupValues?.get(1).orEmpty()

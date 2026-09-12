@@ -32,6 +32,11 @@ data class CallRecord(
     val deviceEpochMillis: Long,
     val deviceTimezone: String,
     val captureRoute: CaptureRoute,
+    /** The contact's display name, resolved FRESH from the phone at upload
+     *  time and never cached (N28) -- so a renamed contact shows its new name
+     *  on the next call, which is the Moi Zvonki defect this product was built
+     *  to avoid. Null when there is no match or CONTACTS was not granted. */
+    val contactName: String? = null,
     /** Never null: "we do not know" is a value, not an absence (N5). */
     val audioMissingReason: AudioMissingReason,
 )

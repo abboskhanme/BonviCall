@@ -216,4 +216,34 @@ class CaptureRouterTest {
 
         assertThat(NoOpOemRecordingLocator("test").locate(proof)).isNull()
     }
+
+    @Test
+    fun `live recorders are stopped before the post-hoc harvest polls, and preference still picks the winner`() {
+        // The microphone must stop at hang-up; the harvest may take seconds
+        // to find the handset's file. Stopped in that order, the winner is
+        // still the preferred (harvest) route.
+        val order = mutableListOf<String>()
+        class Ordered(
+            private val name: String,
+            override val postHoc: Boolean,
+            private val nominal: CaptureRoute,
+            private val produces: File?,
+        ) : RecordingStrategy {
+            override val route: CaptureRoute get() = nominal
+            override fun isSupported(): Boolean = true
+            override fun start(target: File) = Unit
+            override fun stop(): File? { order += name; return produces }
+            override fun lastFailure(): AudioMissingReason? = null
+        }
+        val router = router(
+            Ordered("oem", postHoc = true, CaptureRoute.OEM_FILE_HARVEST, oemFile),
+            Ordered("mic", postHoc = false, CaptureRoute.APP_MIC, appFile),
+        )
+
+        val outcome = router.runCall()
+
+        assertThat(order).containsExactly("mic", "oem").inOrder()
+        assertThat(outcome.route).isEqualTo(CaptureRoute.OEM_FILE_HARVEST)
+        assertThat(outcome.file).isEqualTo(oemFile)
+    }
 }

@@ -1,6 +1,8 @@
 package uz.bonvi.call.service
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import uz.bonvi.call.data.repository.AudioJobRepository
@@ -41,7 +43,23 @@ class AudioDrain @Inject constructor(
      *  sent is not a retry, it is a call that shipped with a reason. */
     data class Outcome(val uploaded: Int, val unfinished: Int, val waiting: Int)
 
-    suspend fun drainOnce(): Outcome = withContext(io) {
+    /**
+     * One pass at a time, process-wide.
+     *
+     * The one-shot and the periodic `CallUploadWorker` are separate unique
+     * works, so WorkManager will happily run both at once — and both then
+     * take the same jobs, transcode the same source into the SAME work file,
+     * and one of them hashes a file the other is still rewriting. Measured
+     * the moment the transcoder stopped hanging (2026-09-12): two upload
+     * sessions for one call a second apart, the first refused
+     * `checksum_mismatch`. A refusal with that code discards the job, so the
+     * race does not merely waste data; it can lose a recording.
+     */
+    private val onePassAtATime = Mutex()
+
+    suspend fun drainOnce(): Outcome = onePassAtATime.withLock { drainLocked() }
+
+    private suspend fun drainLocked(): Outcome = withContext(io) {
         // The same rule the metadata queue follows (N25): a device that cannot
         // send HOLDS its recordings. Nothing is ever deleted here to make room.
         if (!session.authStateSnapshot().canSend) return@withContext Outcome(0, 0, 0)
@@ -73,9 +91,32 @@ class AudioDrain @Inject constructor(
                     uploaded++
                 }
 
-                // Network, or a partial upload to resume. The row stays and the
-                // server already holds the bytes that got through.
-                is AudioPipeline.Outcome.Retry -> {
+                // The server has no call to hang this recording on. Coming
+                // back sooner cannot help — the call's own metadata has to
+                // land first, and it is the metadata drain, not this one, that
+                // decides when. So it is NOT counted as unfinished (which
+                // would make the worker retry with backoff), and it is
+                // bounded: a call the server has refused for good — an
+                // unanswered outgoing call sent as `answered`, before that
+                // was fixed — held one job in 409 on every pass, the worker in
+                // exponential backoff, and every later recording behind it
+                // (2026-09-12). After enough passes the recording is given up
+                // with a reason; an OEM file is never deleted, ours is.
+                is AudioPipeline.Outcome.Retry -> if (outcome.code == CALL_NOT_FOUND) {
+                    jobs.failed(job.clientCallId, outcome.code)
+                    if (job.attempts + 1 >= MAX_PASSES_WITHOUT_CALL) {
+                        Timber.w(
+                            "Audio for %s: the server never received its call in %d passes; giving up",
+                            job.clientCallId, MAX_PASSES_WITHOUT_CALL,
+                        )
+                        if (job.captureRoute != uz.bonvi.call.domain.CaptureRoute.OEM_FILE_HARVEST) {
+                            job.file.delete()
+                        }
+                        jobs.done(job.clientCallId)
+                    }
+                } else {
+                    // Network, or a partial upload to resume. The row stays
+                    // and the server already holds the bytes that got through.
                     jobs.failed(job.clientCallId, "interrupted")
                     unfinished++
                 }
@@ -104,4 +145,12 @@ class AudioDrain @Inject constructor(
         Outcome(uploaded, unfinished, waiting)
     }
 
+    private companion object {
+        const val CALL_NOT_FOUND = "call_not_found"
+
+        /** Twelve passes — three hours at the periodic cadence — is long past
+         *  any metadata parking policy; a call still absent by then is one the
+         *  server has refused for good. */
+        const val MAX_PASSES_WITHOUT_CALL = 12
+    }
 }

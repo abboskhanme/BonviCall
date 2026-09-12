@@ -49,8 +49,17 @@ fun interface OemRecordingLocator {
         /** Below this a file is a stub the OEM writer has not filled yet. */
         const val MIN_FILE_BYTES: Long = 2_048L
 
-        /** The OEM writer flushes late, so the match is retried. */
-        const val RETRY_COUNT: Int = 4
+        /**
+         * The OEM writer flushes late, so the match is retried (polled).
+         *
+         * `RETRY_COUNT * RETRY_INTERVAL_MS` is the total wait, and it must
+         * cover the handset's flush delay: measured at +6..+7 s on a Xiaomi 13
+         * Lite (HyperOS, 2026-09-12), so 10 s of polling catches it with
+         * margin. `OemHarvestStrategy.stop()` blocks the IO thread for up to
+         * this long; the foreground service holds a wake lock across it. CallSentry
+         * used 4 -- its recorder flushed faster; ours must survive HyperOS.
+         */
+        const val RETRY_COUNT: Int = 10
         const val RETRY_INTERVAL_MS: Long = 1_000L
     }
 }

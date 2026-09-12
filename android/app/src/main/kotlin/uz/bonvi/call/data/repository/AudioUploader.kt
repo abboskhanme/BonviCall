@@ -81,8 +81,9 @@ class AudioUploader @Inject constructor(
         data class Committed(val audioId: String, val bytes: Long) : Result
 
         /** Interrupted. The bytes the server has are kept; the next pass
-         *  continues from there. */
-        data class Interrupted(val uploadedBytes: Long) : Result
+         *  continues from there. [code] is the server's answer where there was
+         *  one — `call_not_found` is the one the drain treats differently. */
+        data class Interrupted(val uploadedBytes: Long, val code: String? = null) : Result
 
         /** Never going to succeed. Park it and report it; delete the local file
          *  when [deleteLocal] — the server has refused to hold it. */
@@ -106,7 +107,7 @@ class AudioUploader @Inject constructor(
                     AudioUploadPolicy.shouldDeleteLocalAudio(failure.code),
                 )
             } else {
-                Result.Interrupted(0)
+                Result.Interrupted(0, failure.code)
             }
         }
 

@@ -47,6 +47,16 @@ class ReconcileWorker @AssistedInject constructor(
         if (result.reconciled > 0 || result.recovered > 0) {
             CallUploadWorker.enqueueNow(applicationContext)
         }
+        if (result.stillWaiting > 0) {
+            // A finished call whose call-log row has not appeared yet. Come
+            // back in seconds, not in thirty minutes: the row is written by
+            // the platform within a second or two of hang-up, and the first
+            // sweep is deliberately early. The delay escalates (4, 8, 16, 32,
+            // then 60 s) so a row that never comes costs a few sweeps an hour
+            // until the fifteen-minute deadline ships the call on its live id.
+            val attempt = inputData.getInt(KEY_ATTEMPT, 0) + 1
+            enqueueAfterCall(applicationContext, attempt)
+        }
         return Result.success()
     }
 
@@ -65,17 +75,38 @@ class ReconcileWorker @AssistedInject constructor(
 
         private const val PERIOD_MINUTES = 30L
 
-        /** Called after a call ends. The delay lets the call-log row appear —
-         *  it is written by the platform after the call, not during it. */
-        fun enqueueAfterCall(context: Context) {
+        /**
+         * Called after a call ends (attempt 0), and by the worker itself while
+         * a finished call is still waiting for its call-log row.
+         *
+         * A call end REPLACES whatever is pending — the newest call is the one
+         * to serve. A retry APPENDS behind the running worker instead, so it
+         * cannot cancel the pass that scheduled it.
+         */
+        fun enqueueAfterCall(context: Context, attempt: Int = 0) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 ONE_SHOT,
-                ExistingWorkPolicy.REPLACE,
+                if (attempt == 0) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE,
                 OneTimeWorkRequestBuilder<ReconcileWorker>()
-                    .setInitialDelay(POST_CALL_DELAY_SECONDS, TimeUnit.SECONDS)
+                    .setInitialDelay(delaySeconds(attempt), TimeUnit.SECONDS)
+                    .setInputData(androidx.work.Data.Builder().putInt(KEY_ATTEMPT, attempt).build())
                     .build(),
             )
         }
+
+        /**
+         * How long to wait before sweep number [attempt] for one call.
+         *
+         * Attempt 0 is the sweep after hang-up. It was 20 s — "the platform
+         * writes the row after the call, on some OEMs a few seconds after" —
+         * and those 20 s were the larger part of the metadata's delay on a
+         * fleet where the row appears within about two seconds (measured
+         * 2026-09-12). Four seconds covers that with margin; a late row is
+         * retried on the escalating schedule rather than paid for on every
+         * call.
+         */
+        fun delaySeconds(attempt: Int): Long =
+            if (attempt <= 0) FIRST_DELAY_SECONDS else minOf(FIRST_DELAY_SECONDS shl attempt.coerceAtMost(5), MAX_RETRY_DELAY_SECONDS)
 
         fun schedulePeriodic(context: Context) {
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -86,9 +117,8 @@ class ReconcileWorker @AssistedInject constructor(
             )
         }
 
-        /** The platform writes the call-log row after the call ends; on some
-         *  OEMs a few seconds after. Waiting is cheaper than an unreconciled
-         *  record that has to be corrected later. */
-        private const val POST_CALL_DELAY_SECONDS = 20L
+        private const val KEY_ATTEMPT = "attempt"
+        const val FIRST_DELAY_SECONDS = 4L
+        const val MAX_RETRY_DELAY_SECONDS = 60L
     }
 }

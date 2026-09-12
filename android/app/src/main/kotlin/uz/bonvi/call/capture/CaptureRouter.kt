@@ -119,7 +119,12 @@ class CaptureRouter(private val strategies: List<RecordingStrategy>) {
         var winnerFile: File? = null
         var winnerRoute: CaptureRoute? = null
 
-        for (strategy in running) {
+        // LIVE recorders stop first. A post-hoc strategy polls for seconds at
+        // stop(); a microphone still running through that poll records the
+        // employee after the call. `sortedBy` is stable, so the preference
+        // order among the live ones is kept.
+        val produced = LinkedHashMap<RecordingStrategy, File?>()
+        for (strategy in running.sortedBy { it.postHoc }) {
             @Suppress("TooGenericExceptionCaught")
             val file = try {
                 strategy.stop()
@@ -130,6 +135,7 @@ class CaptureRouter(private val strategies: List<RecordingStrategy>) {
                 Timber.w(error, "Strategy %s failed to stop", strategy.route.wire)
                 null
             }
+            produced[strategy] = file
             attempts += Attempt(
                 route = strategy.route,
                 started = true,
@@ -140,12 +146,15 @@ class CaptureRouter(private val strategies: List<RecordingStrategy>) {
                     null
                 },
             )
-            // Preference order is the order of `strategies`, and `running`
-            // preserves it, so the first file found is the preferred one.
-            if (file != null && winnerFile == null) {
-                winnerFile = file
-                winnerRoute = strategy.route
-            }
+        }
+        // The WINNER is still chosen in preference order — the order of
+        // `strategies`, which `running` preserves — whatever order they were
+        // stopped in.
+        for (strategy in running) {
+            val file = produced[strategy] ?: continue
+            winnerFile = file
+            winnerRoute = strategy.route
+            break
         }
 
         val allAttempts = orderAttempts(attempts + skipped)

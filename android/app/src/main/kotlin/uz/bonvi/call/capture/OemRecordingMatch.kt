@@ -112,9 +112,28 @@ object OemRecordingMatch {
      * attaching nothing. The post-buffer is two minutes for exactly that
      * flush lateness on this call's own file.
      */
-    fun windowFor(capture: Decision.Capture): LongRange =
-        (capture.answeredAtEpochMillis - OemRecordingLocator.PRE_BUFFER_MS)..
-            (capture.endedAtEpochMillis + OemRecordingLocator.POST_BUFFER_MS)
+    fun windowFor(capture: Decision.Capture): LongRange {
+        val start = capture.answeredAtEpochMillis - OemRecordingLocator.PRE_BUFFER_MS
+        // ⚠️ SATURATING, not plain addition. A LIVE call reaches the router
+        // before it has ended, so its decision carries `Long.MAX_VALUE` as a
+        // provisional end (`CaptureCoordinator.prepare`). `MAX_VALUE + 120 s`
+        // wraps negative, the range collapses to nothing, and every file --
+        // this call's own included -- fails `in window`. That one overflow is
+        // why the OEM harvest matched NOTHING on the first real handset
+        // (Xiaomi 13 Lite, 2026-09-12): 51 clean both-voices files in the
+        // folder, ten polls per call, zero matches, and the near-side mic
+        // recording won every time.
+        //
+        // `OemHarvestStrategy.stop()` bounds the end to the stop time, which
+        // is the tighter boundary; this guard is what keeps the silent
+        // empty-range failure from coming back through another caller.
+        val end = if (capture.endedAtEpochMillis > Long.MAX_VALUE - OemRecordingLocator.POST_BUFFER_MS) {
+            Long.MAX_VALUE
+        } else {
+            capture.endedAtEpochMillis + OemRecordingLocator.POST_BUFFER_MS
+        }
+        return start..end
+    }
 
     /** Is this candidate eligible at all? */
     fun <T> matches(candidate: RecordingCandidate<T>, window: LongRange): Boolean {

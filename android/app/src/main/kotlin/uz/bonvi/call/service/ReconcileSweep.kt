@@ -51,6 +51,16 @@ class ReconcileSweep @Inject constructor(
     private val audioJobs: uz.bonvi.call.data.repository.AudioJobRepository,
     private val session: SessionStore,
     private val moshi: Moshi,
+    /** Resolves the remote number to a contact name FRESH, per call. Injected
+     *  here rather than called at capture time so the name reflects the phone
+     *  book as it stands when the record is built -- the whole reason this
+     *  product exists (Moi Zvonki cached the first name and never updated it). */
+    private val contactNames: uz.bonvi.call.capture.ContactNameResolver,
+    /** The handset's own recordings, for a call the live path missed — see
+     *  [harvestForRecovered]. The same locator, behind the same proof, that
+     *  the live route uses. */
+    private val oemRecordings: uz.bonvi.call.capture.OemRecordingLocator,
+    private val captureCapabilities: uz.bonvi.call.capture.CaptureCapabilityChecker,
 ) {
 
     data class Result(val reconciled: Int, val recovered: Int, val stillWaiting: Int)
@@ -81,11 +91,26 @@ class ReconcileSweep @Inject constructor(
             when {
                 match != null -> {
                     matchedEntries += match.startedAtEpochMillis
+                    // The log decides whether anybody ANSWERED. The live path
+                    // took OFFHOOK for the answer, and on an outgoing call
+                    // OFFHOOK is dialling: a 0-second call shipped as
+                    // `answered`, the server refused it by constraint, and its
+                    // ring-tone recording sat in the queue behind the refusal.
+                    val answeredAt = ReconcileRule.answeredAt(
+                        liveAnsweredAtEpochMillis = call.answeredAtEpochMillis,
+                        logStartedAtEpochMillis = match.startedAtEpochMillis,
+                        logDurationSec = match.durationSec,
+                    )
+                    val logged = call.copy(
+                        remoteNumber = call.remoteNumber ?: match.remoteNumber,
+                        answeredAtEpochMillis = answeredAt,
+                    )
                     enqueue(
-                        call = call.copy(remoteNumber = call.remoteNumber ?: match.remoteNumber),
+                        queued = if (answeredAt == null) withoutRecording(logged) else logged,
                         endedAt = match.endedAtEpochMillis,
                         reconciledStartedAt = match.startedAtEpochMillis,
                         source = CallSource.LIVE_CAPTURE,
+                        durationSec = match.durationSec,
                     )
                     reconciled++
                 }
@@ -95,7 +120,7 @@ class ReconcileSweep @Inject constructor(
                     // derived from the live time (§3.10 rule 2) — a call is
                     // never dropped because the log was slow.
                     enqueue(
-                        call = call,
+                        queued = call,
                         endedAt = call.endedAtEpochMillis ?: now,
                         reconciledStartedAt = null,
                         source = CallSource.LIVE_CAPTURE,
@@ -108,11 +133,32 @@ class ReconcileSweep @Inject constructor(
         }
 
         // ── 2. Calls the app never saw ────────────────────────────────────
+        //
+        // ⚠️ Once. A row this sweep has already handled — matched to a live
+        // call, or recovered — is never handled again, and the WATERMARK is
+        // what remembers that across sweeps. Without it every run re-queued
+        // every row in the two-day lookback as `call_log_recovery`, and since
+        // `source` and `audio_missing_reason` are correctable server-side, a
+        // call the live path had captured (audio job queued, `pending_upload`)
+        // was rewritten as `app_not_running` half an hour later. Three of the
+        // day's five recorded calls read that way on the panel (2026-09-12).
+        // The re-sends also cost data on every sweep and were the source of
+        // the REPLACE that cancelled running upload passes.
+        //
+        // The watermark advances only over rows the app has actually handled,
+        // so a row Guard 1 refuses is looked at again (cheap) and a row for a
+        // call still in flight cannot be skipped: its row does not exist yet.
         val registeredKey = Phone.phoneKey(registered)
+        val watermark = session.snapshot.recoveryWatermarkEpochMillis
+        var handledUpTo = watermark
         var recovered = 0
         for (entry in entries) {
-            if (entry.startedAtEpochMillis in matchedEntries) continue
+            if (entry.startedAtEpochMillis in matchedEntries) {
+                handledUpTo = maxOf(handledUpTo, entry.startedAtEpochMillis)
+                continue
+            }
             if (finished.any { it.startedAtEpochMillis == entry.startedAtEpochMillis }) continue
+            if (entry.startedAtEpochMillis <= watermark) continue
 
             // Guard 1 again. The call log holds the employee's private calls;
             // a sweep that queued everything would upload what the live path
@@ -137,18 +183,20 @@ class ReconcileSweep @Inject constructor(
                 endedAtEpochMillis = entry.endedAtEpochMillis,
             )
             enqueue(
-                call = recoveredCall,
+                queued = recoveredCall,
                 endedAt = entry.endedAtEpochMillis,
                 reconciledStartedAt = entry.startedAtEpochMillis,
                 source = CallSource.CALL_LOG_RECOVERY,
                 // There was never any audio to capture: the app was not
                 // running. Naming it correctly is what stops the gap report
                 // blaming the handset's recorder.
-                reason = AudioMissingReason.APP_NOT_RUNNING,
+                recoveryReason = AudioMissingReason.APP_NOT_RUNNING,
                 durationSec = entry.durationSec,
             )
             recovered++
+            handledUpTo = maxOf(handledUpTo, entry.startedAtEpochMillis)
         }
+        if (handledUpTo > watermark) session.saveRecoveryWatermark(handledUpTo)
 
         Timber.i(
             "Sweep: %d reconciled, %d recovered, %d still waiting for a log row",
@@ -157,19 +205,87 @@ class ReconcileSweep @Inject constructor(
         return Result(reconciled, recovered, waiting)
     }
 
+    /**
+     * The handset's own recording of a call the app did not see live.
+     *
+     * ═══ Why this is allowed, and what bounds it ═══════════════════════════
+     * The live route is `OemHarvestStrategy`, which only ever scans behind a
+     * [uz.bonvi.call.domain.Decision.Capture]. A recovered call has passed the
+     * same Guard 1 (the recovery pass filtered it by subscription against the
+     * call log's own attribution column), so the same proof can be built and
+     * the same locator asked — the window is the call's own log row, not a
+     * live edge, and it is exactly as narrow. Nothing here writes to, moves or
+     * deletes the file (CONVENTIONS.md §8.3); `AudioPipeline` never deletes an
+     * OEM-route file either.
+     *
+     * Measured need (2026-09-12): the live source was down after an update,
+     * the CEO's test call was discarded, the sweep recovered it as
+     * `app_not_running` — and the handset's own both-voices recording of it
+     * sat in `MIUI/sound_recorder/call_rec`, unread.
+     */
+    private fun harvestForRecovered(call: PendingCall, endedAt: Long): java.io.File? {
+        val answeredAt = call.answeredAtEpochMillis ?: return null // nobody answered: no conversation
+        if (!captureCapabilities.oemRecorderReachable()) return null
+        @Suppress("TooGenericExceptionCaught")
+        return try {
+            oemRecordings.locate(
+                uz.bonvi.call.domain.Decision.Capture(
+                    subscriptionId = call.subscriptionId,
+                    registeredNumber = call.registeredNumber,
+                    answeredAtEpochMillis = answeredAt,
+                    endedAtEpochMillis = endedAt,
+                ),
+            )
+        } catch (error: Exception) {
+            // A refused listing is a call without audio, never a lost call.
+            Timber.w(error, "OEM harvest for a recovered call refused")
+            null
+        }
+    }
+
+    /**
+     * A call nobody answered has no conversation, so its recording is the
+     * ring tone (the app's own mic, started at dialling) and is discarded
+     * here — ours to delete, never an OEM file (CONVENTIONS.md §8.3), and the
+     * handset's recorder does not write one for an unanswered call anyway.
+     */
+    private fun withoutRecording(call: PendingCall): PendingCall {
+        val path = call.audioPath
+        if (path != null && call.captureRoute != CaptureRoute.OEM_FILE_HARVEST) {
+            java.io.File(path).delete()
+        }
+        return call.copy(audioPath = null, captureRoute = null, audioReason = null)
+    }
+
     @Suppress("LongParameterList")
     private suspend fun enqueue(
-        call: PendingCall,
+        queued: PendingCall,
         endedAt: Long,
         reconciledStartedAt: Long?,
         source: CallSource,
-        reason: AudioMissingReason? = null,
+        recoveryReason: AudioMissingReason? = null,
         durationSec: Int? = null,
     ) {
         // What capture actually produced, written onto the pending row when the
         // call ended. `NONE` with the recorder's own reason is the honest
-        // answer for a call that produced nothing — and for a recovered call,
-        // which never had a recorder running at all.
+        // answer for a call that produced nothing.
+        //
+        // A RECOVERED call never had the app's recorder running — but on a
+        // handset whose own recorder is on, the file is in the folder anyway,
+        // and the OEM route is post-hoc by nature. So it is asked for here,
+        // behind the same proof as the live route, and a call the live path
+        // missed still arrives with both voices rather than `app_not_running`.
+        val harvested = if (source == CallSource.CALL_LOG_RECOVERY) harvestForRecovered(queued, endedAt) else null
+        val call = if (harvested != null) {
+            queued.copy(
+                audioPath = harvested.path,
+                captureRoute = CaptureRoute.OEM_FILE_HARVEST,
+                audioReason = null,
+            )
+        } else {
+            queued
+        }
+        val reason = if (harvested != null) null else recoveryReason
         val captured = call.audioPath?.let { java.io.File(it) }?.takeIf { it.isFile }
         val record = CallRecordBuilder.build(
             call = call,
@@ -184,6 +300,19 @@ class ReconcileSweep @Inject constructor(
             captureReason = reason ?: call.audioReason,
             source = source,
             reconciledStartedAtEpochMillis = reconciledStartedAt,
+            // FRESH, every time. The call already passed Guard 1 (it is in
+            // `pending`, or it was filtered by subscription in the recovery
+            // pass), so reconstructing the proof here is legitimate -- and the
+            // resolver refuses to look up a name without it (N28).
+            contactName = contactNames.resolve(
+                capture = uz.bonvi.call.domain.Decision.Capture(
+                    subscriptionId = call.subscriptionId,
+                    registeredNumber = call.registeredNumber,
+                    answeredAtEpochMillis = call.answeredAtEpochMillis ?: call.startedAtEpochMillis,
+                    endedAtEpochMillis = endedAt,
+                ),
+                remoteNumber = call.remoteNumber,
+            ),
         )
         val payload = moshi.adapter(DeviceCallIn::class.java).toJson(record.toWire())
         queue.enqueue(record.clientCallId, payload)
@@ -223,6 +352,7 @@ class ReconcileSweep @Inject constructor(
         endedAt = java.time.OffsetDateTime.parse(Clock.toWire(endedAtEpochMillis)),
         durationSec = durationSec,
         remoteNumber = remoteNumber,
+        contactName = contactName,
         audioExpected = audioMissingReason == AudioMissingReason.PENDING_UPLOAD,
         audioMissingReason = wireReason(audioMissingReason),
         captureRoute = wireRoute(captureRoute),

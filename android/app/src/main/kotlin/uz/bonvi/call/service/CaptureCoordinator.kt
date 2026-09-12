@@ -78,11 +78,13 @@ class CaptureCoordinator @Inject constructor(
      * Remember that this call may be captured.
      *
      * ⚠️ The decision's `endedAtEpochMillis` is not known yet — the call is
-     * still ringing — so it is the provisional bound the detector's guard used.
-     * `OemHarvestStrategy` passes it to the locator as the harvest window, and
-     * **T71b must bound that window itself** rather than trusting the upper
-     * end. Nothing depends on it today: `NoOpOemRecordingLocator` returns null,
-     * which is the fail-closed answer.
+     * still ringing — so it is the provisional `Long.MAX_VALUE` the detector's
+     * guard used. `OemHarvestStrategy.stop()` bounds it to the stop time before
+     * it reaches the locator, and `OemRecordingMatch.windowFor` saturates
+     * rather than overflows. Both exist because the unbounded value did not
+     * widen the window, it WRAPPED it: `MAX_VALUE + 120 s` is negative, the
+     * range was empty, and the harvest matched nothing on a handset that had
+     * recorded every call (2026-09-12).
      */
     override fun prepare(callId: String, capture: Decision.Capture) {
         prepared[callId] = capture

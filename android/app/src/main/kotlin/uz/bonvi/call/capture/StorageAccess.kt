@@ -39,8 +39,8 @@ class OemFolderStorageAccessProbe @Inject constructor(
     // so lint understands these branches are API-guarded without a raw SDK_INT
     // appearing outside core/Capabilities.kt.
 
-    override fun describe(): String =
-        if (Capabilities.requiresAllFilesAccess()) {
+    override fun describe(): String {
+        val access = if (Capabilities.requiresAllFilesAccess()) {
             if (hasAllFilesAccess()) "all-files access granted" else "all-files access not granted"
         } else {
             if (canReadLegacyFolder()) {
@@ -48,6 +48,36 @@ class OemFolderStorageAccessProbe @Inject constructor(
             } else {
                 "no readable recordings folder"
             }
+        }
+        return access + folderReport()
+    }
+
+    /**
+     * Which OEM recording folders exist on this handset and how many files
+     * each one lists — COUNTS only, never a name (N26).
+     *
+     * This is the measurement the whole OEM route depends on, taken by the
+     * app itself and reported through the `storage_access` capability, so it
+     * can be read off the server for a phone nobody can `adb` into. It exists
+     * because the question "can the app list `MIUI/sound_recorder/call_rec`?"
+     * was answered wrongly once with `run-as` (a different SELinux domain and
+     * a different storage view from the app's own process), and that wrong
+     * answer stood for a day as "MIUI bars the folder".
+     */
+    private fun folderReport(): String =
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            @Suppress("DEPRECATION")
+            val root = Environment.getExternalStorageDirectory()
+            OemRecordingFolders.CANDIDATES
+                .map { relative -> relative to java.io.File(root, relative) }
+                .filter { (_, dir) -> dir.exists() }
+                .joinToString(separator = "") { (relative, dir) ->
+                    val count = dir.listFiles()?.size
+                    "; $relative: " + (count?.let { "$it file(s)" } ?: "unreadable")
+                }
+        } catch (error: Exception) {
+            "; folder probe failed (${error.javaClass.simpleName})"
         }
 
     /**
@@ -83,7 +113,7 @@ class OemFolderStorageAccessProbe @Inject constructor(
         try {
             @Suppress("DEPRECATION")
             val root = Environment.getExternalStorageDirectory()
-            CANDIDATE_FOLDERS.any { relative ->
+            OemRecordingFolders.CANDIDATES.any { relative ->
                 java.io.File(root, relative).let { it.isDirectory && it.canRead() }
             }
         } catch (error: Exception) {
@@ -97,15 +127,8 @@ class OemFolderStorageAccessProbe @Inject constructor(
     // not built yet, so it will arrive with the code that needs it rather than
     // waiting here with a comment that is not true.
 
-    private companion object {
-        /** The preference order S1 found in the prototype. Read-only, and only
-         *  ever tested for readability here. */
-        val CANDIDATE_FOLDERS = listOf(
-            "Recordings/Call",
-            "Recordings/Voice Recorder",
-            "Call",
-            "Sounds/Call",
-            "CallRecordings",
-        )
-    }
+    // `CANDIDATE_FOLDERS` was a private five-entry list here, older than
+    // `OemRecordingFolders` and missing every Xiaomi path, so on an API 26-29
+    // Xiaomi the probe answered "no readable recordings folder" for a folder
+    // the locator would have scanned. One list now, the locator's own.
 }

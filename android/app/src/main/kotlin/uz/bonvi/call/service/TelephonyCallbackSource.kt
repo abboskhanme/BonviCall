@@ -38,8 +38,54 @@ class TelephonyCallbackSource @Inject constructor(
 
     private var registered: Any? = null
 
-    fun register(scope: CoroutineScope) {
-        if (registered != null) return
+    /** Which subscription [registered] is scoped to, so a change forces a
+     *  re-registration rather than being silently ignored. */
+    private var registeredSubscriptionId: Int? = null
+
+    /**
+     * Register the live source, or decline to.
+     *
+     * ═══ Why this refuses to register without an enrolled SIM ══════════════
+     * The callback API reports a STATE and nothing else, so the subscription
+     * an edge belongs to can only come from the registration being scoped to
+     * it. Two things followed from getting that wrong, and both were measured
+     * on a Xiaomi 13 Lite on 2026-09-12:
+     *
+     *  • `CaptureService` starts DURING enrolment, before E4 has saved the
+     *    SIM, so the scoping fell through to the unscoped manager and the id
+     *    handed to the callback was null. `register()` then returned early for
+     *    the life of the process, so it was never re-read. Six outgoing calls,
+     *    six SUBSCRIPTION_UNKNOWN discards, on a handset that had recorded all
+     *    six.
+     *  • Labelling an UNSCOPED stream with the enrolled id would be worse than
+     *    the bug: on a dual-SIM handset it attributes the employee's private
+     *    calls to the work SIM and uploads them. So an unscoped registration is
+     *    refused outright rather than made to guess.
+     *
+     * ═══ And why it takes the id as a parameter ════════════════════════════
+     * Declining was only safe if something called again once the SIM was
+     * known, and nothing did: the one caller was `CaptureService.onCreate`,
+     * which runs before `SessionStore` has loaded its DataStore snapshot, so
+     * `enrolledSubscription()` answered null on every process start, the
+     * source declined, and no retry ever came. Measured 2026-09-12 after an
+     * update: `dumpsys telephony.registry` showed ZERO registrations for the
+     * app, every call fell to the manifest receiver, and on this handset the
+     * receiver's broadcast carries no subscription — so the CEO's test call
+     * was discarded `subscription_unknown` on a phone that had captured the
+     * previous one. The service now re-registers from the SIM flow itself and
+     * passes the id it just observed, so the snapshot's timing no longer
+     * decides whether calls are captured.
+     */
+    @Synchronized
+    fun register(scope: CoroutineScope, enrolledSubscriptionId: Int? = enrolledSubscription()) {
+        val enrolled = enrolledSubscriptionId
+        if (enrolled == null) {
+            Timber.i("Live call source: no enrolled SIM yet, not registering")
+            return
+        }
+        if (registered != null && registeredSubscriptionId == enrolled) return
+        if (registered != null) unregister()
+
         val telephony = context.getSystemService(TelephonyManager::class.java) ?: return
 
         @Suppress("TooGenericExceptionCaught")
@@ -53,21 +99,24 @@ class TelephonyCallbackSource @Inject constructor(
             //
             // Scoping the registration is what makes the id knowable: the
             // callback can only be about the SIM it was registered for.
-            val scoped = enrolledSubscription()?.let { subscriptionId ->
-                @Suppress("TooGenericExceptionCaught")
-                try {
-                    telephony.createForSubscriptionId(subscriptionId)
-                } catch (error: Exception) {
-                    Timber.w(error, "Could not scope telephony to the enrolled SIM")
-                    null
-                }
-            } ?: telephony
+            val scoped = @Suppress("TooGenericExceptionCaught") try {
+                telephony.createForSubscriptionId(enrolled)
+            } catch (error: Exception) {
+                Timber.w(error, "Could not scope telephony to the enrolled SIM")
+                null
+            }
+            if (scoped == null) {
+                // Unscoped would mean labelling another SIM's calls as ours.
+                // The receiver path remains; this one stays off.
+                return
+            }
 
             registered = if (Capabilities.supportsTelephonyCallback()) {
-                registerModern(scoped, scope)
+                registerModern(scoped, scope, enrolled)
             } else {
-                registerLegacy(scoped, scope)
+                registerLegacy(scoped, scope, enrolled)
             }
+            registeredSubscriptionId = enrolled
         } catch (error: Exception) {
             // Broad, and the specific failure is a SecurityException from an
             // OEM privacy manager that granted READ_PHONE_STATE and refuses the
@@ -83,16 +132,24 @@ class TelephonyCallbackSource @Inject constructor(
      *  `@ChecksSdkIntAtLeast` — so lint is satisfied without a raw `SDK_INT`
      *  appearing outside core/Capabilities.kt. */
     @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.S)
-    private fun registerModern(telephony: TelephonyManager, scope: CoroutineScope): Any {
+    private fun registerModern(
+        telephony: TelephonyManager,
+        scope: CoroutineScope,
+        subscriptionId: Int,
+    ): Any {
         val executor = Executor { it.run() }
-        val callback = ModernCallStateCallback(detector, scope, enrolledSubscription())
+        val callback = ModernCallStateCallback(detector, scope, subscriptionId)
         telephony.registerTelephonyCallback(executor, callback)
         return callback
     }
 
     @Suppress("DEPRECATION")
-    private fun registerLegacy(telephony: TelephonyManager, scope: CoroutineScope): Any {
-        val listener = LegacyCallStateListener(detector, scope, enrolledSubscription())
+    private fun registerLegacy(
+        telephony: TelephonyManager,
+        scope: CoroutineScope,
+        subscriptionId: Int,
+    ): Any {
+        val listener = LegacyCallStateListener(detector, scope, subscriptionId)
         telephony.listen(listener, android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
         return listener
     }
@@ -101,6 +158,7 @@ class TelephonyCallbackSource @Inject constructor(
     private fun enrolledSubscription(): Int? =
         enrolment.current().subscriptionId?.takeIf { it >= 0 }
 
+    @Synchronized
     fun unregister() {
         val current = registered ?: return
         val telephony = context.getSystemService(TelephonyManager::class.java)
@@ -123,6 +181,7 @@ class TelephonyCallbackSource @Inject constructor(
             Timber.w(error, "Could not unregister the call-state source")
         }
         registered = null
+        registeredSubscriptionId = null
     }
 }
 
@@ -131,14 +190,19 @@ class TelephonyCallbackSource @Inject constructor(
 private class ModernCallStateCallback(
     private val detector: CallDetector,
     private val scope: CoroutineScope,
-    private val subscriptionId: Int?,
+    /** The subscription this callback's registration is SCOPED to, so
+     *  labelling every edge with it is a fact rather than a guess. */
+    private val subscriptionId: Int,
 ) : android.telephony.TelephonyCallback(),
     android.telephony.TelephonyCallback.CallStateListener {
 
     private val calls = LiveCallIds()
 
     override fun onCallStateChanged(state: Int) {
-        detector.onEdge(state.toEdge(calls.idFor(state), subscriptionId = subscriptionId), scope)
+        detector.onEdge(
+            state.toEdge(calls.idFor(state), subscriptionId = subscriptionId),
+            scope,
+        )
     }
 }
 
@@ -147,13 +211,17 @@ private class ModernCallStateCallback(
 private class LegacyCallStateListener(
     private val detector: CallDetector,
     private val scope: CoroutineScope,
-    private val subscriptionId: Int?,
+    /** Scoped, as on [ModernCallStateCallback]. */
+    private val subscriptionId: Int,
 ) : android.telephony.PhoneStateListener() {
 
     private val calls = LiveCallIds()
 
     override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-        detector.onEdge(state.toEdge(calls.idFor(state), phoneNumber, subscriptionId), scope)
+        detector.onEdge(
+            state.toEdge(calls.idFor(state), phoneNumber, subscriptionId),
+            scope,
+        )
     }
 }
 
