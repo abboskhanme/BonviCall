@@ -754,3 +754,293 @@ app on one of them. Everything below is an observation, not an inference.
   RSA 4096, 10 000 days). It did not before, and nothing had been distributed —
   which is the only moment generating one is free. **If it is lost, no future
   build can install over an installed one.**
+
+### The first signed release, and what it took (2026-09-12)
+
+- [2026-09-12] **The fleet's APK predated every fix that makes recording work.** `versionCode` was still `1` and `RawPathOemRecordingLocator` had landed the same morning (`d054ef4`), so the phones in the field were running a build whose OEM harvest was `NoOpOemRecordingLocator` — it returned null for every call — and whose `legacy28` manifest still capped `READ_EXTERNAL_STORAGE` at `maxSdkVersion="28"`. The symptom reported from the field ("recording stops the moment the customer answers, nothing is uploaded") is what that build does: the harvest finds nothing, `MediaRecorderStrategy` falls back, and Android's audio policy takes the microphone away when telephony goes active. Now `versionCode = 2`, `versionName = 1.0.1`, both flavours signed.
+- [2026-09-12] **A new release keystore was generated** (`android/bonvicall-release.jks`, RSA 4096, 10 000 days, alias `bonvicall`). The one ASSUMPTIONS records for 2026-09-11 is not in this clone and is not anywhere on this machine — correctly gitignored, and therefore not recoverable from the repository. Nothing had been distributed as a release build, so this was still free. It is not free a second time: **every handset that installs 1.0.1 can only ever be updated by builds signed with this key.** Backed up alongside the APKs in `D:\BonviCall-release\`.
+- [2026-09-12] **`bonvicall://enrol` carried the code and not the server, so a release build could never be pointed at one.** `MainActivity.applyDeepLinkServer` reads `?server=`, `ServerAddressRepository.saveFromDeepLink` writes it, and `SessionStore.saveBaseUrl` refuses a MANUAL address outside a debug build — every piece finished except the one that emits the parameter, which is this repository's own recurring failure shape. `render_invitation` now takes `server_base` and `install_page` passes the request's public origin, preferring `X-Forwarded-Proto`/`X-Forwarded-Host` because behind a proxy the app server's own view of the URL is an internal cleartext name the phone can neither resolve nor, under `network_security_config`, be allowed to call. Three tests, each verified by removing the argument and watching it fail.
+- [2026-09-12] **Six architecture tests were passing nothing on Windows.** `ArchitectureRulesTest` computed `file.path.substringAfter("src/")` and `GraphCompletenessTest` filtered on `path.contains("/di/")`; with `\` separators the first returns the whole absolute path (so each rule's own allow-list never matched and the rule failed on the one file it exists to permit) and the second returns an empty set (so a completeness check passes vacuously wherever no `isNotEmpty()` guards it). Both now use `invariantSeparatorsPath`. The assertions are untouched — only the harness's assumption about the machine it runs on.
+- [2026-09-12] **`LiveAdmin`'s password was a `const`**, so rotating the admin password in the panel turned all 41 live tests red at once and reported a broken wire contract when the only broken thing was a credential. Overridable through `-Dbonvicall.liveAdminPassword`, forwarded from Gradle exactly as `bonvicall.liveServer` already was; the seeded value stays as the default.
+- [2026-09-12] **`Instantiatable` fires on all five manifest components in the release variant, and all five are false positives.** Hilt rewrites each class to extend a generated base, R8 merges that base away and renames the AndroidX supertypes, and lint's release analysis cannot follow the chain. Read out of the shipped DEX rather than assumed: `BonviCallApplication → android/app/Application`, `CaptureService → android/app/Service`, both receivers → `android/content/BroadcastReceiver`, `MainActivity → b.m → android/app/Activity`. Downgraded to informational in `app/lint.xml` with that evidence; the debug lint run has no minification and still enforces the real rule.
+- [2026-09-12] The OEM folder constants survive minification — `MIUI/sound_recorder/call_rec`, `Recordings/Call`, `Sounds/CallRecord`, `Record/PhoneRecord` and the rest are all present in the shipped `classes.dex`. Checked because R8 folding a `listOf` of unused-looking strings would disable the preferred capture route silently, on a build nobody would think to re-test.
+- [2026-09-12] **A release build refuses cleartext outright** (`network_security_config.xml`, no debug override), so the field test needs the server behind real, publicly trusted TLS. There is no Caddyfile in `infra/` yet — the deployment is the open item, not the app.
+
+### Clearing the field-test path (2026-09-12, later)
+
+- [2026-09-12] **`/data/releases` had no volume.** `LocalFsReleaseStore`'s own docstring explains why it sits beside the audio store rather than inside it; `docker-compose.yml` then mounted `audio` and not `releases`. An uploaded APK therefore lived in the container's writable layer: the row survived in Postgres, the bytes did not, and from the next `compose up` the install page answered every salesperson with a 404 while the panel still listed the build as published. Volume added. `tests/test_compose_wiring.py` now asserts every storage root in `Settings` is covered by a backend mount and that the two roots stay disjoint — the compose file is mounted read-only into the container so a Python test can see it. Verified by deleting the volume line and watching it fail.
+- [2026-09-12] **`--reload` never reloaded anything on Windows.** The compose comment said reload MUST poll because virtiofs does not forward inotify; nothing actually made it poll, and a Docker bind mount does not deliver inotify on Windows either. So an edited file kept serving the old code until somebody restarted the container — which cost an hour chasing a landing-page fix that was correct and simply never loaded. `WATCHFILES_FORCE_POLLING=true` with a 1 s delay. Verified by touching a file and watching the reloader log the change.
+- [2026-09-12] Windows Firewall blocks inbound 8020, so no handset could reach the stack over the LAN. A rule scoped to the **Private** profile only, named `BonviCall dev API 8020 (LAN test)`. Remove it with `Remove-NetFirewallRule -DisplayName "BonviCall dev API 8020 (LAN test)"` when the field test is over.
+- [2026-09-12] `PyYAML` was undeclared in `requirements.txt` and present only transitively. The new wiring test depends on it, so it is declared now: a transitive dependency that a test imports is a test that breaks on the next unrelated upgrade.
+- [2026-09-12] The fleet is **Xiaomi 12** (`2201123G`, MIUI Global 14.0.5, Android 13) and **Galaxy S21 5G** (`SM-G991N`, One UI 7.0, **Android 15**, Korean KTC firmware). Both have a manufacturer dialer with call recording, and both of their folders are already in `OemRecordingFolders.CANDIDATES`. The Xiaomi is the first test because legacy external storage is settled there; on Android 15 whether a `targetSdk 28` app still gets the legacy view is a MEASUREMENT — `MANAGE_EXTERNAL_STORAGE` is the declared fallback and `StorageAccessProbe` decides which is in force.
+
+### The real handset finally recorded — and why nothing arrived (2026-09-12)
+
+Ilyoshon's Xiaomi 13 Lite (HyperOS/MIUI V140, Android 13, `2210129SG`), read live over wireless ADB. The handset's own recorder had written every call into `MIUI/sound_recorder/call_rec` (51 files, the folder first in `OemRecordingFolders.CANDIDATES`), Moi Zvonki showed the same recordings, and BonviCall shipped nothing. The app's own Room database named the cause without ambiguity: `discard_counters` held one row, `subscription_unknown = 6`. Six outgoing calls, six fail-closed rejections at Guard 1, on a phone that had recorded all six.
+
+- [2026-09-12] **`PhoneStateReceiver` dropped the subscription (and the number) on OFFHOOK.** The `when` built `Ringing(callId, number, subscriptionId)` but `OffHook(callId)` — both fields discarded. An OUTGOING call is reported `IDLE → OFFHOOK → IDLE` with no RINGING, so OFFHOOK is its only edge; every outgoing call therefore reached `SubscriptionRule` with `subscriptionId = null` → `SUBSCRIPTION_UNKNOWN`. The data was in hand (`boundary.subscriptionIdFrom(intent)` resolved it to 1, matching the enrolled SIM and the call log) and thrown away one line later. `TelephonyCallbackSource` was given this exact fix on 2026-09-11; the receiver sibling was missed — STATUS.md's "go looking for its siblings" rule, written down and not followed.
+- [2026-09-12] **The live source captured the enrolled subscription once, at registration, when it was still null.** `CaptureService` starts DURING enrolment, before E4 saves the SIM, so `enrolledSubscription()` returned null; the registration fell through to the unscoped `TelephonyManager` and the callback was handed `subscriptionId = null` for the life of the process. `register()` returns early while `registered != null`, so it was never re-read — and a process restart during enrolment is exactly what does not happen. Confirmed on the wire: `dumpsys telephony.registry` showed our listener at `subId=2147483647` (default), identical to Moi Zvonki's own registration. Fixed by **refusing to register until a SIM is enrolled** and re-registering when it changes (`registeredSubscriptionId`): an unscoped stream is never labelled with the enrolled id, because on a dual-SIM handset that would attribute the employee's private calls to the work SIM and upload them. After the fix and an app restart the listener re-registered at `subId=1`.
+- [2026-09-12] **Both `subscriptionIdFromCallLogAccount` (recovery from the call log's own `PHONE_ACCOUNT_ID`) and the fixes above are needed together.** The live path now attributes an outgoing call correctly; the sweep already reads the call log's subscription column, so a call the live path still misses is recovered — as metadata, `app_not_running`, no audio. The audio path itself was never in question: the folder, the files, the window rule and the all-files permission were all verified present.
+- [2026-09-12] **Moi Zvonki is the same architecture, confirmed from the installed app** (`com.cloudoftechnologies.mycalls`): `targetSdk`-legacy behaviour, a plain `PhoneStateListener` at the default subscription, no per-SIM scoping. Where it works, the handset's own recorder writes the file and the app harvests it — there is no capture magic to copy. The difference was never the recorder; it was two places where our subscription id was dropped between the OS and Guard 1.
+
+### Why the OEM harvest never won, and reading Moi Zvonki to be sure (2026-09-12)
+
+After the subscription fixes, the first live-captured call finally reached the server with audio — but as `app_voice_communication` (near side only), not `oem_harvest` (both voices). The customer's half of a sales call is the entire point, so this mattered.
+
+- [2026-09-12] **The OEM harvest scanned once, at call-end, before the file existed.** The handset's own recorder flushes its file a few seconds AFTER the call ends: measured +6 s and +7 s on Ilyoshon's Xiaomi 13 Lite (`stat` on `MIUI/sound_recorder/call_rec/*.mp3` vs the call-log end time). `RawPathOemRecordingLocator` did a single scan and returned null, so `MediaRecorderStrategy`'s live mic recording (VOICE_COMMUNICATION) won every time. The `RETRY_COUNT`/`RETRY_INTERVAL_MS` constants existed *for exactly this* and nothing used them. `OemHarvestStrategy.stop()` now polls up to `RETRY_COUNT` times (10 × 1 s), which does not widen the boundary — the window is fixed by the call, so a later scan can only match this call's own file. Verified by two tests (a late file is found after N scans; give-up after RETRY_COUNT with no trailing sleep).
+- [2026-09-12] **Why VOICE_CALL (the both-sides mic source) lost too, and why we didn't chase it.** `MediaRecorderStrategy` tries `VOICE_CALL` first, but `capture.start()` fires at OFFHOOK — which on an OUTGOING call is dialing, before the remote answers and before the voice path exists — so `VOICE_CALL` throws and we fall through to `VOICE_COMMUNICATION` in one shot, with no retry. Read off the **installed Moi Zvonki APK** (`com.cloudoftechnologies.mycalls`, "Save My Call", targetSdk 28) to confirm the mechanism: its `VoiceRecorder.a(I)I` maps recording-mode 0 → `AudioSource.VOICE_CALL` (4) for SDK ≥ 23, and its caller retries start on failure (`SystemClock.sleep(100)` loop). So Moi Zvonki gets both sides by *retrying VOICE_CALL until the call connects*. We could adopt that, but on this fleet the OEM recorder is on and writes a cleaner both-sides file than any mic source can — so fixing the harvest timing is the lower-risk win and is the app's own preferred route. The VOICE_CALL retry is the fallback improvement for handsets whose own recorder is off (noted, not yet built).
+- [2026-09-12] Moi Zvonki confirmed to have **no capture mechanism we lack**: same targetSdk-28 legacy model, `PhoneStateListener` at the default subscription (`subId=2147483647`, identical to our pre-fix state), MediaRecorder with VOICE_CALL, and OEM-file harvest. It is not scoped per-SIM because it is a consumer recorder with no privacy boundary — it records every call. Our two bugs were the subscription being dropped between the OS and Guard 1; the recorder was never the difference.
+
+### The contact name was never sent, and why audio is slower than Moi Zvonki (2026-09-12)
+
+- [2026-09-12] **`ContactNameResolver.resolve()` had no caller in production — the FOURTH instance of this failure shape on this project.** The resolver was correct and careful (single `PhoneLookup` row, no cache, takes a `Decision.Capture` as proof), `CallRecord` had no `contactName` field, `CallRecordBuilder` never set one, and `ReconcileSweep.toWire()` never put one on the wire. So every call shipped `contact_name = null` and the panel showed a raw number. This is worse than the Moi Zvonki defect the product was built to fix: theirs showed a STALE name, ours showed NO name. Wired end to end — the sweep now reconstructs the capture proof (it already had to, for the boundary) and resolves the name at record-build time. **Resolution is per call and uncached by construction**, so renaming a contact to `K00213 Diljahon aka` shows the new name on the next call. The server already treated `contact_name` as a `MUTABLE_FIELD`, so a re-ingest of the same `client_call_id` updates it — that half was ready and waiting. `ProductionCallersTest` now carries the row that would have caught it.
+- [2026-09-12] **Why our audio reaches the server minutes after Moi Zvonki's.** Measured against the competitor's own code: its `MainService` has no post-call wait at all — it uploads with an id it generates itself. Ours waits, by design, in three places that add up: `ReconcileWorker.POST_CALL_DELAY_SECONDS` (20 s) because `client_call_id` is derived from the call log's DATE (§3.10 rule 1) and the platform writes that row after the call; the new OEM harvest poll (up to 10 s) because HyperOS flushes its recording ~7 s late; and a WorkManager hop between `ReconcileWorker` and `CallUploadWorker`. The phone is not being throttled — `dumpsys jobscheduler` shows our jobs `Standby bucket: EXEMPTED`, `readyNotRestrictedInBg: true`, and the app is in the doze whitelist, so none of this is an OEM battery manager. The 20 s is the biggest single lever and the only one that can be cut without losing something; cutting it needs the measured call-log-row latency on this fleet, not a guess.
+
+### The OEM folder is barred on MIUI — both voices come from VOICE_CALL instead (2026-09-12)
+
+- [2026-09-12] **MIUI bars other apps from `MIUI/sound_recorder/call_rec`, even with MANAGE_EXTERNAL_STORAGE granted.** `adb shell run-as uz.bonvi.call ls /sdcard/MIUI/sound_recorder/call_rec/` returns `Permission denied` while `appops get uz.bonvi.call MANAGE_EXTERNAL_STORAGE` is `allow`. The folder is `media_rw`-group, `rw-rw----`, and MIUI does not remap it for a third-party holder of all-files access. So the OEM harvest — the app's documented preferred route — cannot read the file on this fleet's phones, and `oemRecorderReachable()` (now a real probe) correctly returns false, skipping the strategy. The harvest-poll fix from earlier today is still correct for handsets where the folder IS readable; it is simply moot here.
+- [2026-09-12] **Moi Zvonki does not harvest the folder either — it records VOICE_CALL itself.** Confirmed from the installed APK: it holds no MANAGE_EXTERNAL_STORAGE (so on Android 13 it cannot raw-read the MIUI folder any more than we can), and its `VoiceRecorder.a(I)I` selects `AudioSource.VOICE_CALL` (4) for SDK ≥ 23, with the caller retrying start on failure (`SystemClock.sleep(100)` loop). VOICE_CALL carries both parties and is permitted to a targetSdk-28 app on these Xiaomis; the recorder is not the difference between the two products.
+- [2026-09-12] **Our VOICE_CALL lost because we start at dialing and never retried.** `capture.start()` fires at the OFFHOOK edge, which on an outgoing call is dialing — VOICE_CALL is refused until the line CONNECTS, so a single attempt threw and `MediaRecorderStrategy` settled for VOICE_COMMUNICATION (near side) for the whole call. It now retries VOICE_CALL across a 15 s ring-to-answer window (`CONNECT_RETRIES`), and **only where the platform reports it UNAVAILABLE, never FORBIDDEN** — a `SecurityException` (a handset that bars the source to apps) breaks out immediately so the near-side fallback is not delayed, while an `IllegalStateException` (still ringing) is waited through. `stopRequested` cuts the wait the instant the call ends. Runs on the live call-state path, which carries no broadcast budget. Three tests, including the retry-then-connect and the forbidden-no-retry cases.
+
+### Second session, same phone: the two handoff problems had different causes (2026-09-12, evening)
+
+Everything below was measured on Ilyoshon's Xiaomi 13 Lite over wireless ADB, with
+Moi Zvonki 1.1.66 installed beside BonviCall 1.0.6 (code 7). The handoff's two open
+problems — *both voices never win* and *audio upload is stuck* — were both real, and
+both had a cause other than the one the handoff suspected. The previous section's
+three claims are corrected here, with the measurement that overturns each.
+
+- [2026-09-12] **The app's own microphone recording is SILENT for the whole call on
+  Android 10+, so "near-side audio uploads" was never true.** `dumpsys audio` keeps the
+  recording history: every one of our `VOICE_COMMUNICATION` sessions is flagged
+  `silenced` from start until telecom sets `MODE_NORMAL`, and flips to `not silenced`
+  only after hang-up (e.g. 15:27:00 start silenced → 15:27:32 not silenced → 15:27:41
+  stop). ffmpeg on the pulled file of the 15:26 call: 0–31.7 s digital silence
+  (`RMS_level=-inf`), then six seconds of the employee's voice AFTER the call — the ten
+  seconds the mic keeps running while the OEM poll waits. This is the platform's
+  concurrent-capture policy (an ordinary app is silenced during a phone call; only the
+  dialer, accessibility services on `VOICE_RECOGNITION`, and holders of
+  `CAPTURE_AUDIO_OUTPUT` are not), not an OEM quirk. Consequences: `app_voice_communication`
+  and `app_mic` recordings on any Android 10+ handset are silence, `VOICE_CALL` is refused
+  to every third-party app by `AudioPolicyService` (it needs `CAPTURE_AUDIO_OUTPUT`, a
+  signature|privileged permission) and surfaces as a non-Security exception, so the
+  15 s retry window added in 1.0.6 only delays a silent fallback. The "near-side +
+  contact name is still a product" fallback in the handoff does not exist on this fleet.
+  The handset's own recorder is the ONLY source of a conversation.
+- [2026-09-12] **Moi Zvonki never opens the microphone on this phone — it harvests the
+  MIUI folder, by plain `File` path.** Two independent measurements: `appops get
+  com.cloudoftechnologies.mycalls` shows no RECORD_AUDIO usage at all across today's
+  calls (ours shows every one), and the `dumpsys audio` record history holds no session
+  for its uid. Its decompiled `SystemHelper` (jadx, `C.java`) maps `xiaomi` →
+  `MIUI/sound_recorder/call_rec`; its `needsSaf()` returns false below targetSdk 30, so
+  with targetSdk 28 it reads the folder directly, and `dumpsys activity permissions`
+  confirms it holds no persisted document-tree grant. The previous claim "MIUI bars the
+  folder even with MANAGE_EXTERNAL_STORAGE" rested on `adb shell run-as ... ls`, which
+  runs in the `runas_app` SELinux domain with the shell's storage view — not the app's.
+  Moi Zvonki reading the same folder with the same legacy-storage grant is the proof the
+  app's own process can. The `storage_access` capability now reports the file COUNT of
+  every OEM folder it can list, so this is measured by the app itself from now on.
+- [2026-09-12] **Why our harvest matched nothing: the window overflowed.** `CallDetector`
+  evaluates a ringing call with `endedAtEpochMillis = Long.MAX_VALUE`; `decide()` copies it
+  into `Decision.Capture` unchanged; `OemRecordingMatch.windowFor` added the 120 s
+  post-buffer to it, which wraps negative, so the range was empty and every file failed
+  `in window`. The strategy DID run — the mic recording stopped 9–10 s after each call,
+  which is the ten polls — and reported `attribution_failed` ten times per call on a
+  handset with 51 clean files in the folder. `CaptureCoordinator.prepare`'s own KDoc had
+  warned "T71b must bound that window itself". Fixed twice over: `OemHarvestStrategy.stop()`
+  bounds the end to the stop time (the tighter, honest boundary — a later call's file can
+  never fall inside it), and `windowFor` saturates instead of overflowing so no other
+  caller can reintroduce the silent-empty-range failure. A match is also taken only once
+  its size holds still across two consecutive scans, because the OEM writer grows the
+  file during the call. Four new tests, including one that pins `endedAt = MAX_VALUE`.
+- [2026-09-12] **Why audio was "stuck": the transcoder hung, and each new pass cancelled
+  the last.** `audio_jobs` held five rows, all `attempts = 0` — no pass ever finished OR
+  failed a job. `MediaCodecAudioTranscoder.signalEncoderEnd` handed the encoder its
+  end-of-stream marker with a single `dequeueInputBuffer` and dropped it when that
+  returned -1 (the encoder's input queue was full, because the loop drained one output
+  per decoded frame and one AAC frame becomes three Opus frames); the encoder then never
+  signalled its own end and `while (!sawEncoderEnd)` spun. `feedEncoder` likewise dropped
+  the remainder of a buffer when the queue was full. Logcat showed `CallUploadWorker ...
+  was cancelled` every ~5 min (`ExistingWorkPolicy.REPLACE` from the sweep's re-enqueue),
+  the cancellation was never observed by the blocking loop, and `top -H` showed four
+  `MediaCodec_loop` and two `OggWriter` threads: two zombie transcodes holding codecs.
+  Fixed: the encoder is drained fully on every iteration and whenever an input slot is
+  missing; the end marker is retried, never dropped; a loop with no buffer movement for
+  30 s fails THAT job (`capture_returned_silence`) so the queue moves on; the pump runs
+  under `runInterruptible` and checks for interruption, so a cancelled worker releases its
+  codecs; and `enqueueNow` is `APPEND_OR_REPLACE`, so a running pass completes. The 09:07
+  upload that did succeed earlier shows the hang was timing-dependent, not universal.
+- [2026-09-12] **The two `validation_error` rows were unanswered outgoing calls sent as
+  `answered`.** The server's log names the constraint: `ck_calls_answered_has_duration`.
+  On an outgoing call the platform reports OFFHOOK at dialling and the live path takes
+  that as the answer, so a call nobody picked up (call-log duration 0) shipped
+  `disposition=answered, duration_sec=0` and was refused; its recording of the ring tone
+  sat in `audio_jobs` behind the parked metadata. `ReconcileRule.answeredAt` now lets the
+  call log decide: duration 0 means nobody answered, the call ships `no_answer` /
+  `not_expected`, and the app's own dial-tone recording is deleted (an OEM file never is).
+  The parked rows were not blocking the queue — the drain skips parked rows — so the
+  handoff's "poison row" hypothesis was not the stuck cause.
+- [2026-09-12] **The recovery sweep re-sent every call in its two-day lookback on every
+  run, and rewrote live calls as `app_not_running`.** Section 2 of `ReconcileSweep` skipped
+  only rows matched to calls still in `pending`; a live call already enqueued and removed
+  from `pending` was "never seen" on the next sweep and re-queued as `call_log_recovery`
+  with `audio_missing_reason = app_not_running`. Both fields are `MUTABLE_FIELDS`
+  server-side, so the correction was applied: on the panel the 14:09, 14:37 and 15:04
+  calls — all live-captured, all with an audio job waiting — read `app_not_running` /
+  `call_log_recovery`. The same re-sends cost data every 30 minutes and were what kept
+  re-enqueuing (and cancelling) the upload pass. A recovery WATERMARK (`SessionStore`,
+  `recovery_watermark_epoch_ms`) now records the newest call-log row the sweep has
+  handled; rows at or below it are never handled again. It advances only over rows that
+  were matched or recovered, so a row Guard 1 refuses is re-examined and a call still in
+  flight cannot be skipped (its row does not exist yet). Overlapping calls (call waiting)
+  are the one case a row can be passed over; it is accepted and noted here.
+- [2026-09-12] **Timber lines never reach `adb logcat` on this MIUI build**, which is why
+  a day of diagnosis ran on `dumpsys`. Debug builds now also plant a `FileLogTree`
+  (behind `RedactingTree`, rotated at 1 MB) writing `files/logs/bonvicall.log`, readable
+  with `run-as`. Never in a release build (N26).
+- [2026-09-12] `OemFolderStorageAccessProbe` kept its own five-entry folder list from
+  before `OemRecordingFolders` existed, without any Xiaomi path, so on an API 26–29
+  Xiaomi it would have answered "no readable recordings folder". One list now.
+- [2026-09-12] Not changed, recorded for the next decision: (a) the `VOICE_CALL` retry in
+  `MediaRecorderStrategy` costs 15 s per call for nothing on Android 10+ and the mic
+  fallback there produces silence; the honest next step is to detect
+  `AudioRecordingConfiguration.isClientSilenced()` and report `capture_returned_silence`
+  instead of uploading silence, and to skip the mic route entirely where the OEM route
+  produced a file; (b) on handsets with NO manufacturer recorder, an Android 10+ third-party
+  app cannot record a call at all without an accessibility-service trick — that is a
+  fleet-policy decision for the CEO, not a code change; (c) `POST_CALL_DELAY_SECONDS`
+  (20 s) stays until the call-log row latency is measured here — today's rows appeared
+  within 2 s of hang-up.
+
+### The same phone, one hour later: three more causes under the first ones (2026-09-12, evening, continued)
+
+- [2026-09-12] **`RedactingTree` dropped every log line the app ever wrote — on every
+  handset, not only MIUI.** It was `class RedactingTree(delegate: Timber.Tree)` whose
+  `log` called `delegate.log(priority, tag, redact(message), t)`. Kotlin cannot reach a
+  protected member through a receiver of the base type, so that call bound to Timber's
+  PUBLIC `log(priority, message, vararg args)` overload with the tag in the message slot;
+  the tag is null at that point and `prepareLog` swallows an empty message with no
+  throwable. Found by the first JVM test that planted a tree and read the line back
+  (`FileLogTreeTest`): it failed with the file never created. The handoff's "MIUI
+  suppresses our Timber logs" was this bug. `RedactingTree` is now a `DebugTree`
+  subclass calling `super.log` (the protected hook on its own instance, which Kotlin
+  allows); `FileLogTree` redacts for itself. Verified on the handset: `files/logs/
+  bonvicall.log` filled from the next start, and the same lines now appear in logcat.
+- [2026-09-12] **The live call-state source never registered after a process restart.**
+  `CaptureService.onCreate` was its only caller and runs before `SessionStore` has read
+  its DataStore, so `enrolledSubscription()` answered null, the source declined
+  ("no enrolled SIM yet") and nothing ever called it again — the KDoc's "retried on
+  every heartbeat and E6" named callers that did not exist. `dumpsys telephony.registry`
+  after the 16:02 update: zero registrations for the app. The 15:23 install had won the
+  race by luck. The service now also collects `SessionStore.simSubscriptionId` and
+  re-registers with the emitted id (`register(scope, subscriptionId)`); `register` and
+  `unregister` are `@Synchronized` because two callers now exist. Verified: `subId=1
+  phoneId=0 events=[6]` within five seconds of the next restart.
+- [2026-09-12] **The manifest receiver could never attribute a call on this handset.**
+  `dumpsys activity broadcasts` shows every `PHONE_STATE` broadcast MIUI sent today with
+  extras `{state, incoming_number}` and nothing else — no subscription, no slot — and no
+  `SUBSCRIPTION_PHONE_STATE` broadcast at all. So every receiver-delivered edge reached
+  Guard 1 as unknown and was discarded (`subscription_unknown = 22` by 16:10); with the
+  live source down, that was the CEO's 16:08 call, lost live and recovered later without
+  audio. Three changes: the receiver also listens for `android.intent.action.
+  SUBSCRIPTION_PHONE_STATE` (the per-subscription form, which carries the id where a ROM
+  sends it); an edge with no subscription is neither handled nor counted (the labelled
+  sibling or the live source owns the call — counting it was the "cosmetic double count"
+  that hid the loss); and `SubscriptionPrivacyBoundary.subscriptionIdFrom` resolves an
+  unlabelled edge to the ONE active subscription when the OS lists exactly one — a fact
+  from the OS's own list, not a preference, and a dual-SIM handset still gets null.
+- [2026-09-12] **A recovered call now harvests the handset's own recording.** The OEM
+  route is post-hoc by nature; a call the live path missed has passed the same Guard 1
+  (filtered by the call log's attribution column) so the same `Decision.Capture` can be
+  built from its log row and the same locator asked. Before this, every recovered call was
+  `app_not_running` on a phone whose recorder had written the conversation. Bounded by
+  the log row's own window, never writes or deletes (CONVENTIONS.md §8.3).
+- [2026-09-12] **Two upload passes ran at once and raced on one work file.** The one-shot
+  and the periodic `CallUploadWorker` are separate unique works; the moment the transcoder
+  stopped hanging, two sessions opened for one call a second apart and the first commit
+  was refused `checksum_mismatch` (a permanent refusal that discards the job). `AudioDrain`
+  now runs one pass at a time behind a `Mutex`.
+- [2026-09-12] Left on the test phone, on purpose: two parked `queued_calls` rows
+  (`3436e808`, `8086e498`) and the ring-tone audio job for `8086e498`, which answers 409
+  `call_not_found` on every pass. They predate today's fixes and cannot be written from
+  the host without pushing a WAL-mode database back; clearing the app's data before the
+  next enrolment removes them. The 16:08 call stands on the server as `app_not_running`
+  from the pre-fix sweep; a re-ingest cannot lower it, and the recording is still in the
+  MIUI folder if it is ever wanted.
+
+### The first both-voices recording, and the four things it exposed (2026-09-12, 16:27–16:40)
+
+The CEO's 16:27 call was the first one captured end to end on this fleet: the
+app's log shows `OEM harvest: 58 candidate file(s) in range, one matched`, the
+server holds it as `live_capture`, `has_audio = t`, `capture_route =
+oem_file_harvest`. On the way it exposed four more defects, each fixed the same
+hour.
+
+- [2026-09-12] **The recording arrived three times too long.** The handset's
+  recorder writes 48 kHz mono MP3; the transcoder decoded it and handed the
+  samples to an encoder configured for 16 kHz mono with no conversion between,
+  so a 36 s call became a 1 min 48 s file at a third of the pitch (ffprobe on
+  both files). The file's own header had promised "decode → resample → encode"
+  and the middle step did not exist; the app's own recordings never showed it
+  because `MediaRecorderAudioRecorder` records at the encoder's rate exactly.
+  `PcmResampler` (linear interpolation, channel averaging, the last frame of
+  each buffer carried into the next) is built from the decoder's actual output
+  format; four JVM tests pin the arithmetic, including 48 kHz → 16 kHz across
+  uneven buffer boundaries. The 16:27 recording on the server is the stretched
+  one and stays as evidence; the next call is the verification.
+- [2026-09-12] **`APPEND_OR_REPLACE` was a regression and is reverted.** With
+  one audio job answering 409 `call_not_found` on every pass (the ring-tone job
+  of the unanswered 15:04 call, whose metadata the server will never accept),
+  `CallUploadWorker` returned `Result.retry()` and sat in exponential backoff
+  (attempt 6: sixteen minutes; the periodic worker at attempt 8: over two
+  hours). APPEND chained every new one-shot BEHIND that backoff — WorkManager's
+  database showed three `bonvicall.upload.now` rows `BLOCKED` — so the freshly
+  queued 16:27 call waited while Moi Zvonki showed it in seconds. `REPLACE` is
+  back: a cancelled pass now unwinds cleanly (the transcoder fix), loses nothing
+  that was already uploaded, and "a call was queued" means "drain now". Two
+  further changes so a poisoned job cannot do this again: `call_not_found` is
+  reported through `Interrupted.code` and is NOT counted as unfinished (no
+  retry backoff — only the metadata drain can change it), and after twelve such
+  passes the job is given up with a log line; the app's own file is deleted, an
+  OEM file never is. A forced `cmd jobscheduler run` does not bypass
+  WorkManager's own backoff, for the record.
+- [2026-09-12] **One call, two sessions.** Once the receiver could attribute an
+  edge (the single-active-SIM rule), the live callback (`live-<n>`) and the
+  receiver (`sub-<id>`) each opened a session for the same call: two recorders
+  started, the OEM file was located twice, both reconciled to the same log row
+  and the queue deduplicated the record. `CallDetector.begin` now treats an
+  edge for a SIM that already has a call in flight as that call's edge from the
+  other source, bounded to three hours so a session whose end edge was lost
+  cannot shadow the SIM. Two tests.
+- [2026-09-12] `dumpsys activity broadcasts` confirmed why the receiver was
+  ever unattributed here: MIUI's `PHONE_STATE` extras are `{state,
+  incoming_number}` only, and no `SUBSCRIPTION_PHONE_STATE` broadcast is sent
+  at all. On this handset the single-active-SIM rule is the whole receiver path.
+- [2026-09-12] Left as is, noted: `CallSessionManager` reports "Resuming 7 call
+  session(s)" on every start — `ENDED` rows are not deleted because `ENDED` is
+  not marked terminal in `CallStateMachine`. Cosmetic; it should be looked at
+  before the fleet grows a year of rows.
+- [2026-09-12] **Verified end to end at 16:43.** One session (`live-…` only —
+  the same-SIM rule held), `OEM harvest: 59 candidate file(s), one matched`,
+  server row `live_capture` / `has_audio = t`, `call_audio.capture_route =
+  oem_file_harvest`, `duration_ms = 35560` for a 35 s call (the resampler),
+  metadata 28 s after hang-up, audio 68 s after. The 16:27 recording remains
+  the stretched one. On this Xiaomi the product now does what Moi Zvonki does,
+  by the same mechanism, plus the panel's routes and reasons.
+- [2026-09-12] **The CEO's question "is the problem in the APK?" — yes, all of
+  it.** Every defect found today lived in the app; the server rejected only
+  what it should have. Cloning Moi Zvonki's APK with our server address is not
+  a shortcut: its server (`https://www.moizvonki.ru/api/v1/`) is hard-coded
+  with no setting, its upload protocol is its own, and repackaging a
+  proprietary app is a licence problem before it is a technical one. The
+  legitimate form of that idea already exists as `T-MZ` (`server/src/modules/
+  telephony/`): keep Moi Zvonki on the handsets and pull calls into the panel
+  through its official API with the cabinet's credentials. Whether recordings
+  are reachable through that API is unmeasured; it is a CEO decision between a
+  dependency on Moi Zvonki's subscription and the app that now works.
+- [2026-09-12] **The resampler is verified good on the wire.** The 16:45 call
+  (76 s) uploaded as `oem_file_harvest`, `duration_ms = 76220`, and the ogg on
+  the server plays 1:16.22 with voice across the whole call — the pitch and
+  length are right, the 3× stretch is gone. The 16:43 call (35 s → 35560 ms)
+  agrees. Three consecutive both-voices captures at correct duration; the chain
+  is stable on this Xiaomi.
