@@ -12,6 +12,15 @@
 # Let's Encrypt rate-limits how often that may happen. Back it up or keep it.
 {
 	email {$BONVICALL_ACME_EMAIL}
+
+	# A client connecting to a bare IP sends NO SNI — the TLS extension carries
+	# host NAMES, and an address literal is not one. With more than one site
+	# defined, Caddy then has no way to choose a certificate and the handshake
+	# fails before any of this is reached. This names the one to fall back on.
+	#
+	# It only applies when SNI is absent, so it changes nothing for a browser
+	# opening call.bonvi.uz. It goes away with the IP block below.
+	default_sni {$BONVICALL_SERVER_IP:127.0.0.1}
 }
 
 # The site body, defined once. The domain serves it with a real certificate;
