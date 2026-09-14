@@ -1684,7 +1684,7 @@ forget to update.
 | `/numbers` | Registered numbers | `numbers:read` | Number, operator, SIM owner (company/employee — R10), current holder, active installation, history. Assign modal surfaces 409 by **naming the current holder** |
 | `/devices` | Device health | `devices:read` | Online/offline, last contact, app version + variant, OS, battery, battery-optimisation exemption, **capability matrix (one column per capability, colour = state)**, recording route + whether it currently works, queue depth (records and MB), clock skew in seconds, cellular MB this month. `install_disappeared` rendered distinctly from `offline` |
 | `/devices/:installationId` | Device detail | `devices:read` \| `devices:read:own` | The above plus capability transition history, command history with `latency_ms`, call-log delta per day, "Re-check now" (`recheck` command), "Dial" (`commands:dial`), "Revoke" (admin) |
-| `/calls` | Call list | `calls:read` \| `calls:read:own` | Filters of §4.7, 1000-row pages, inline audio button. `sales` sees its own rows and the agent column is hidden |
+| `/calls` | Call list | `calls:read` \| `calls:read:own` | Filters of §4.7, **fixed 50-row keyset pages** (the page-size picker was withdrawn at the client's request — `docs/ASSUMPTIONS.md`, 2026-09-13; the endpoint still accepts `limit` up to 1000), inline audio button. `sales` sees its own rows and the agent column is hidden |
 | `/calls/:id` | Call detail | same | All metadata, capture route, why audio is missing (in Uzbek), player, note (`calls:note`), audit trail of who listened (admin) |
 | `/reports/gap` | **Gap report** | `reports:read` | Calls without audio grouped by reason × agent × device model, totals and % of answered; per-device call-log delta; per-model regression flag vs the M0 baseline. Totals reconcile exactly with `/calls?has_audio=false` — the same filter builder produces both |
 | `/reports/storage` | Storage & data | `reports:read` | GB now, 30-day growth, projection against the 250 GB provision; per-device cellular MB against the 1 GB cap |
@@ -2748,7 +2748,9 @@ done on any other basis.
 - [ ] `viewer` never receives a full remote number in any payload (server-side
       masking asserted in the response, not the DOM).
 - [ ] A filtered page of 1000 rows renders < 2 s; API p95 < 500 ms at 500k rows
-      (UC-19).
+      (UC-19). **Measured against the endpoint** — `GET /calls?limit=1000` at
+      500k rows — because the panel now renders a fixed 50 per page
+      (`docs/ASSUMPTIONS.md`, 2026-09-13) and can no longer be asked for 1000.
 
 **Field gates (no machine can close these)**
 - [ ] **N40: 3 of 3 unaided salespeople reach `capturing` in under 15 minutes

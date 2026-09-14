@@ -1044,3 +1044,100 @@ hour.
   length are right, the 3× stretch is gone. The 16:43 call (35 s → 35560 ms)
   agrees. Three consecutive both-voices captures at correct duration; the chain
   is stable on this Xiaomi.
+- [2026-09-13] **The call list's page size is now a fixed 50, which contradicts
+  SPEC §5.2's "1000-row pages" and UC-19.** The client asked for the
+  "Sahifadagi qatorlar" picker to go; nobody had ever moved it off 50, and it
+  was a seventh box in a filter bar the same request was trying to calm down.
+  Paging is keyset, so "read further" is the next-page button rather than a
+  bigger number, and the CSV export (UC-22) is still the answer for anyone who
+  wants all the rows at once. `PAGE_SIZE` in `panel/src/modules/calls/api.ts`
+  is the one place to change if 1000 is ever wanted back; the server still
+  accepts up to 1000.
+- [2026-09-13] **The calls page has one search box over two server parameters,
+  behind its own URL parameter `search`.** `q` (contact name) and
+  `remote_number` both remain on the server and unchanged; the panel decides
+  which one the typed text becomes (`panel/src/modules/calls/search.ts`: no
+  letters and at least one digit → `remote_number`, otherwise → `q`). One digit
+  is the threshold because the server's `remote_number` filter has TWO
+  branches — the 9-digit key, and an exact raw match for anything `phone_key`
+  refuses, which is how PBX extensions (`700`, `*700`) are found. The cost,
+  accepted: a contact-name search for pure digits no longer works. The URL
+  parameter is NOT called `q`, because `?q=901112233` would then travel to the
+  server as `remote_number` and the URL would be lying about what it holds;
+  an old `?q=` or `?remote_number=` link is still READ as the search text, so a
+  saved link keeps its filter, and the first use of the box rewrites the URL to
+  `search`. An old `limit=` is ignored.
+- [2026-09-13] **The call list holds the last total across pages.** Only the
+  first page asks for `with_total` (SPEC §4.0) and that stays; with 50-row
+  pages instead of 1000, a reader reaches page two twenty times sooner and the
+  count turning into a dash reads as a number that was lost. The held value is
+  stored with the filter it belongs to and dropped the moment any filter
+  changes — a count from the previous filter is worse than no count.
+- [2026-09-13] **The customer's name is a column on `/calls`, not a suffix in
+  the number cell** (`calls.colContact`, "Mijoz ismi"), at the client's
+  request: it is what people scan the list for. Truncated with a `title` so it
+  cannot widen the table, and shown to every role that can read the list,
+  including own-scope `sales`.
+- [2026-09-13] **The `/calls` "Turi" filter offers Ichki and Tashqi only —
+  `unknown` was withdrawn from the option list at the client's request**
+  (`CALL_TYPE_FILTER_LABEL` in `panel/src/modules/calls/labels.ts`). The value
+  itself is untouched everywhere else: SPEC §10.2 keeps it as the mandatory
+  default for a call the line directory cannot classify, the call detail page
+  still badges it, and the server still accepts `call_type=unknown`. Known
+  consequence, stated so it surprises nobody later: with the line directory as
+  sparse as it is today, most calls in this database are almost certainly
+  `unknown`, so both remaining options return very few rows and the panel can
+  no longer ask "which calls could we not classify?" — that question now needs
+  the API or the gap report. A pasted `?call_type=unknown` is ignored rather
+  than applied, because this page sends only what its own control can display.
+
+### Qurilmalar folded into Xodimlar (2026-09-13)
+
+- [2026-09-13] **One menu entry, not two.** On a fifteen-person team one employee is one phone, and answering "is Aziz's phone working?" across two pages is one page too many. The health columns moved onto the roster and `/devices` left the admin's menu → the **roster is the spine**, not the fleet, because an employee with no handset is a row this page must show and a fleet page by construction cannot: they have no installation, so `GET /devices` has nothing to return for them.
+- [2026-09-13] **The devices page is not deleted, and its nav entry is now `devices:read:own` only.** That permission belongs to `sales` and to nobody else (`core/permissions.py`), so the entry disappears for admin and manager and remains a salesperson's one-row view of their own handset — which is their only view of it, since they do not hold `agents:read`. Deleting the page would have taken that away silently. The route keeps `[DEVICES_READ, DEVICES_READ_OWN]`, so `nav.parity.test.ts` holds and every link into `/devices/{installation_id}` from Ogohlantirishlar, the agent card and the version modal still works.
+- [2026-09-13] `fleetForAgents` picks **the best** installation per agent, which is the opposite of the fleet page's worst-first order and is deliberate: there the question is "which phone is broken", here it is "can this person be recorded at all", so a live handset beside a revoked one from August is the true answer. Ranked by state with an unknown state sorting last — a value this panel has not been taught about must never be allowed to represent somebody's phone. Its own tests, because it is a rule with cases.
+- [2026-09-13] Three columns left the roster — employee code, the date the number was attached, and the note. Each was verified to still live on the agent's own card (`AgentDetailPage`: the code is the page description, the assignment history is a table, the note is a field) **before** being dropped; the two catalogue keys that stopped being rendered were deleted with them. None of them earns a place beside "this phone has not reported in three days".
+- [2026-09-13] The agent's active/archived status stopped being a column and became a badge beside the name: it qualifies *who* this is, and an archived person's phone being offline is not news. An active agent shows no badge at all, because everything on the page is active by default.
+
+### The panel logged people out several times an hour (2026-09-13)
+
+- [2026-09-13] **Two browser tabs are one client, and N24 could not tell.** `AuthService.refresh` killed every session on any replay of a spent token, and its own comment admitted the ambiguity: *"either a client retried a request it had already completed, or somebody else has the token; we cannot tell"*. They are told apart by the **clock**. The panel serialises its refreshes, but that guard is a variable inside one tab while the cookie is shared by all of them — two tabs whose access tokens expire in the same second both send the same token, the first rotates it, and the second is a "replay" that was never theft.
+- [2026-09-13] The evidence was in the database, not in a report: **55 refresh tokens issued in twelve hours and 55 revoked**, in batches of six and four at a single minute — the signature of a chain dying, not of people logging out.
+- [2026-09-13] `REFRESH_REPLAY_GRACE = 20 s`, and that is the whole of the softening. A replay is forgiven only when all three hold: the spent row has a successor (a token revoked by logout or a password change has none, so those are never forgiven), the replay arrived inside the window, and the successor is itself still live. Outside it, a replay still revokes every session the user has. A stolen cookie is used minutes or days later; it does not turn up inside a twenty-second window by coincidence.
+- [2026-09-13] **The load-bearing theft test now ages the spent row past the window** before replaying. Without that it would have gone on passing — through the new forgiving branch — while testing nothing, which is this project's most-repeated failure (`docs/STATUS.md`: seven separate cases of a test reporting safety it was not testing). It ages the row rather than freezing the clock, because a frozen clock that never reached the service under test is one of those seven.
+- [2026-09-13] `ACCESS_TOKEN_TTL_MIN` is **10080 (a week) in `.env` only**; `.env.example` keeps 30 minutes. The client asked for a week on their own machine and that is their call, but it is not a default: a JWT is not checked against a store, so a week-long access token means a disabled account keeps working for up to a week and a leaked one cannot be called back. Thirty minutes plus a working rotation gives an unbroken session with none of that, which is what the grace window above restores.
+
+- [2026-09-13] **"Ichki raqamlar ro'yxati" removed from the panel** at the client's request — the section, its module, its tests and its 22 catalogue keys. Deleted rather than merely unrendered, per the rule that took `StubScreen` out with the last stub it rendered: a component nobody renders is dead code, and `git` is where recovery lives. **The server is untouched**: `line_directory_entries`, its endpoints and the reclassify job all remain, so restoring the section is a checkout and not a rebuild.
+- [2026-09-13] What this costs is smaller than it looks, and worth stating so nobody re-adds it in a panic: the **derived** half of the directory was never in that table. `LineDirectoryEntryModel` says so — every row of `registered_numbers` is computed, not copied — so a call between two of our own agents is still classified `internal` without it. What is lost is the ability to add an EXTRA range by hand: the office line, the warehouse, a `*700` suffix rule. Until somebody needs one, nothing about `call_type` changes.
+
+### Two sections removed, and the sidebar footer shortened (2026-09-14)
+
+- [2026-09-14] **"Ilova tarqatish" and "Audit jurnali" removed from the panel** at the client's request — routes, pages, modules, tests and 111 catalogue keys. Both `nav.parity.test.ts` and `router.gate.test.tsx` now assert their absence rather than remembering it, the way `/monitor`, `/numbers` and `/settings` already are: a menu entry is easy to reintroduce by copying a neighbouring one.
+- [2026-09-14] **The APK surface is gone from the PANEL only, and that distinction is the whole of it.** `GET /i/{code}/apk` still serves a build to a salesperson following their enrolment link, `GET /api/v1/app/download/{version_code}` still answers, and the phone still asks on every heartbeat whether it must update (N33/N34). What is gone is the screen that *publishes* a build and raises the minimum version — so a new APK now has to be put in place another way, which is what the client is doing anyway while the app is installed over adb. Nothing about the fleet's ability to receive an update was removed; the ability to trigger one from a browser was.
+- [2026-09-14] Audit rows are still **written** on every auditable action — the removal took away the reading, not the recording. "Who listened to whose call" remains answerable from the database, which is what UC-24 requires of it; it is no longer answerable from a screen.
+- [2026-09-14] The account cluster — theme, and the person's own name opening a menu with password and logout — went from six stacked rows at the bottom of the sidebar to one row, and then **to the top right**, where every panel puts identity. The top bar is sticky: an alert count is only useful if it is still there after scrolling a page of seven hundred calls. What is left in the sidebar footer is the collapse control, which belongs to the sidebar itself. The bell is the only place a number for open alerts now appears without opening the page. Its two rules — two initials, and a badge that stops at `99+` — live in `layout/identity.ts` with their own tests, because they have edges (an empty name, a count of zero) and a rule exercised only by rendering a sidebar is a rule nobody tests.
+- [2026-09-14] Its test pins the thing that would actually hurt: **the way out of the application is now behind a menu**, and a menu that will not open is a user who cannot log out. Opening it, Escape closing it, and the bell hidden from a reader without `alerts:read` are all asserted.
+- [2026-09-14] On a narrow screen the same cluster rides in the drawer's own top bar rather than being hidden: the sidebar is a drawer there, and putting the only way out of the application behind a drawer somebody has to open first is how a phone user gets stuck. The name and e-mail collapse to the avatar alone below `sm` — an avatar with no name is still recognisably you, and the cluster has to survive a phone-width bar.
+- [2026-09-14] **The theme is light or dark, and "system" is gone** at the client's request: on a panel somebody keeps open all day, a theme that changes itself at sunset is a surprise rather than a feature. What survives is the only part worth keeping — a visitor who has never chosen still gets what their machine prefers, because guessing light for somebody on a dark desktop is a worse first impression than asking nothing. `readStored` deliberately falls through to that preference for the stored value `'system'`, which is what every browser that used the panel before today still holds.
+- [2026-09-14] `data-theme` is now always written, so the `dark:` variant would finally work. It is still not used: every colour here comes from a token, and a component reaching past them is the drift the tokens exist to prevent. The old comment claiming `dark:` "would be dead code" no longer holds and was corrected rather than left to mislead.
+- [2026-09-14] **The alert bell lasted a few hours and was taken out again.** Ogohlantirishlar is a menu entry people open deliberately; a count that follows the reader onto every page is a notification, and this product is not one. `badgeText` and `BADGE_CEILING` went with it rather than being left behind — a rule nothing calls is dead code, and so is its test.
+- [2026-09-14] **"Yozuvsiz qo'ng'iroqlar" (`/reports/gap`) removed** at the client's request — the nav entry, the route, the page, its test and 36 catalogue keys. The `/reports/gap` ENDPOINT stays and is still called: the dashboard's capture-rate tile reads it, which is the number UC-23 exists for, so the headline did not go with the page.
+- [2026-09-14] That tile's link moved to `/calls?has_audio=false` rather than being dropped. It is the same question asked of a page that still exists — which calls have no recording — and a tile that shows a number and leads nowhere is a tile people stop trusting.
+- [2026-09-14] `StorageReportPage` was borrowing `gap.agent` for a column header, so deleting the gap namespace broke its build. Repointed at `calls.colAgent`, which already holds the same word, rather than minting a second key: a catalogue with three spellings of "Xodim" is exactly what `catalogue.test.ts` exists to prevent.
+
+### Alerts simplified, and the reports section removed (2026-09-14)
+
+- [2026-09-14] **Ogohlantirishlar is the OPEN list and nothing else.** The open/all control is gone and the page always asks `open_only=true` → an inbox that never empties is an inbox nobody works, and the page whose whole purpose is "something needs doing" cannot also be an archive.
+- [2026-09-14] The closed half did not go anywhere — **it moved to the person it was about.** `GET /api/v1/alerts` gained an `agent_id` filter and `AgentDetailPage` reads it with `open_only=false`. "This phone was silent for three days in August" is evidence about the rollout, and the half the open list drops is the half somebody asks about when a salesperson's numbers look wrong. **Nothing is deleted to make this work**: an alert is acknowledged or resolved, never removed (SPEC §3.8), and the card reads the same rows the inbox stops showing.
+- [2026-09-14] A fleet-wide alert (`agent_id IS NULL`) belongs to nobody's card and is correctly absent from all of them rather than appearing on every one. Pinned by a test, because the alternative — a join that quietly matches NULL — is the kind of thing that looks fine until every agent's history shows the same row.
+- [2026-09-14] **"Xotira va trafik" removed entirely** at the client's request (they offered either trimming the Wi-Fi/mobile breakdown or removing the page, and chose to allow the latter). With the gap report already gone the whole HISOBOTLAR group went with it, and `nav.groupReports` with that. The server is untouched: `/reports/storage`, `/reports/data-usage` and the nightly `storage_usage` job all still run, so the growth curve keeps being recorded whether or not anybody is looking at it.
+- [2026-09-14] `useGapReport` moved from the deleted `modules/reports` into `modules/dashboard`, its only remaining caller. The capture rate is the number the product is judged on (UC-23) and still headlines the dashboard; keeping a module alive for one function would have been the worse half of that trade.
+- [2026-09-14] `types.gen.ts` was hand-edited for `agent_id` rather than regenerated, for the third time and the same reason: `make types` strips every doc comment out of the committed file and turns nullable response fields optional, which breaks correct code. The generator still needs pinning — it is item 3 in `docs/SECURITY-BACKLOG.md`'s neighbourhood of unfinished tooling.
+
+### A restart logged everybody out, and the profile got a page (2026-09-14)
+
+- [2026-09-14] **A server that cannot be reached has not ended the session.** `performRefresh` returned a bare boolean, so a refresh that threw — the network, or a server mid-restart — was indistinguishable from a refresh the server refused. `restore()` runs on every page load and went anonymous on `false`, which means **reloading the panel during a deploy logged the reader out**, and on a real deployment every update logs out every open panel. It now answers `ok | expired | unreachable`; only `expired` (401/403) ends the session, and `unreachable` is retried three times over about two and a half seconds — long enough for a uvicorn reload, short enough that a genuinely dead server still reaches the login screen.
+- [2026-09-14] Diagnosed from evidence rather than guessed: three sequential `POST /auth/refresh` calls with the same cookie jar all answered 200, and neither `refresh_reused` nor `refresh_replayed_within_grace` had ever fired. The server was innocent; the client was throwing the session away on a failure that said nothing about it.
+- [2026-09-14] **`/settings` is the profile page**, reached from the account menu, which now says "Sozlamalar" rather than "Parolni o'zgartirish" — the password is one thing you do to your own account, and it had a modal with no home. The page shows your login and role, changes your own password, and — with `users:write` — resets anybody else's. **It implements nothing new**: both actions are the existing modals against the existing endpoints, and the row that is *you* offers no reset, because changing your own password proves the current one first and a reset from there would be a way around that.
+- [2026-09-14] `/settings` carries no `anyOf`: your own account is yours whatever your role. It is the second route to do so after the dashboard, and `router.gate.test.tsx` names both in a list rather than pattern-matching them, so a page added later still cannot ship ungated by accident. The path was free — what was removed under it on 2026-09-05 was a page of recording thresholds.
+- [2026-09-14] The users table lost its **e-mail** and **linked agent** columns at the client's request. Neither fact was lost: the login is on the edit dialog, where an admin who needs it is already standing, and the agent link is on the agent's own card. The account menu stopped showing the e-mail under the name for the same reason.
