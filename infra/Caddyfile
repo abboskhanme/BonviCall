@@ -14,7 +14,10 @@
 	email {$BONVICALL_ACME_EMAIL}
 }
 
-{$BONVICALL_DOMAIN} {
+# The site body, defined once. The domain serves it with a real certificate;
+# the bare IP below serves the same thing while DNS is still propagating, and
+# a copy-pasted second block would have drifted from this one within a week.
+(bonvicall) {
 	log {
 		output stdout
 		format console
@@ -89,4 +92,32 @@
 	request_body {
 		max_size 256MB
 	}
+}
+
+{$BONVICALL_DOMAIN} {
+	import bonvicall
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEMPORARY: the panel, reachable at https://<the server's IP>.
+#
+# It exists so an admin can sign in before DNS has propagated, and it should be
+# deleted once call.bonvi.uz answers. Two things are true about it:
+#
+#   • `tls internal` is Caddy's OWN certificate authority. The browser shows a
+#     warning and somebody has to click through it. That is ugly and it is
+#     still the right trade: the alternative is `http://`, and the first thing
+#     anybody does here is type an admin password.
+#
+#   • NO HANDSET CAN USE THIS. A release build refuses cleartext outright and
+#     trusts system CAs only, so it will not accept this certificate — and
+#     `/i/<code>` served from here bakes the IP into the deep link. Enrolment
+#     happens on the domain, once the domain works.
+#
+# Let's Encrypt does not issue certificates for bare IP addresses, which is why
+# this cannot simply be a third name on the block above.
+# ═══════════════════════════════════════════════════════════════════════════
+{$BONVICALL_SERVER_IP:127.0.0.1} {
+	tls internal
+	import bonvicall
 }

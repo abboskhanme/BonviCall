@@ -94,6 +94,11 @@ services:
     environment:
       BONVICALL_DOMAIN: ${BONVICALL_DOMAIN}
       BONVICALL_ACME_EMAIL: ${BONVICALL_ACME_EMAIL}
+      # Temporary, and the Caddyfile says why: signing in before DNS has
+      # propagated. Unset it and that block falls back to 127.0.0.1, which is
+      # reachable from nowhere — so forgetting to remove it is safe, and
+      # removing it is the intended end state.
+      BONVICALL_SERVER_IP: ${BONVICALL_SERVER_IP:-127.0.0.1}
     volumes:
       # The certificate and the account key. Losing this volume means asking
       # Let's Encrypt for a new certificate, and it rate-limits that — so this
