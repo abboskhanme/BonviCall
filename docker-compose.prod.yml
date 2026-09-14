@@ -1,0 +1,110 @@
+# BonviCall, deployed. NOT the development stack — that is `docker-compose.yml`
+# and it stays as it is, because it is what the phones are being tested against.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# What is different here, and why each difference exists:
+#
+#   • Caddy in front, holding the only published ports. Everything else talks
+#     over the compose network and is unreachable from outside the host.
+#   • The database port is NOT published. On a laptop 5443 is convenient; on a
+#     server it is the database offered to the internet behind one password
+#     (docs/SECURITY-BACKLOG.md item 5).
+#   • The backend and the worker run as uid 10001, not root. A container escape
+#     from root is host root (item 4). server/Dockerfile explains why the image
+#     does not simply declare `USER`.
+#   • No bind mounts and no --reload: the code is what was built, and a file
+#     edited on the server changes nothing until it is rebuilt.
+#
+# `tests/test_compose_wiring.py` asserts the first three of those. They are the
+# kind of line that gets dropped while debugging something else at midnight.
+
+# A project name of its own, so this file can never reach into the development
+# stack's volumes. Without it `docker compose -f docker-compose.prod.yml` run in
+# this directory inherits the project name from the directory and reuses
+# `bonvicall_audio` — volumes created root-owned by the development stack, which
+# the non-root user below then cannot write a recording to. That is not a
+# theory; it is what happened the first time this file was tried.
+name: bonvicall-prod
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # No `ports`. Deliberate, and asserted by a test.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./server
+    restart: unless-stopped
+    env_file: [.env]
+    user: "10001:10001"
+    volumes:
+      - audio:/data/audio
+      - releases:/data/releases
+    depends_on:
+      postgres: {condition: service_healthy}
+    # --proxy-headers is what makes `request.client.host` the phone rather than
+    # Caddy. Without it every per-IP rate limit in core/ratelimit.py counts the
+    # whole fleet as one caller and the office locks itself out.
+    #
+    # --forwarded-allow-ips="*" trusts X-Forwarded-For from whatever connects,
+    # and that is safe here for exactly one reason: this service publishes no
+    # port, so the only thing that can connect is on the compose network. If a
+    # port is ever published here, this must be narrowed the same day.
+    command: >
+      uvicorn src.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips="*"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build: ./server
+    restart: unless-stopped
+    env_file: [.env]
+    user: "10001:10001"
+    volumes:
+      - audio:/data/audio
+    depends_on:
+      postgres: {condition: service_healthy}
+    command: python -m src.worker
+
+  caddy:
+    build:
+      # The repository root: the image builds the panel from ./panel and then
+      # copies the bundle in beside the Caddyfile.
+      context: .
+      dockerfile: infra/caddy.Dockerfile
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      BONVICALL_DOMAIN: ${BONVICALL_DOMAIN}
+      BONVICALL_ACME_EMAIL: ${BONVICALL_ACME_EMAIL}
+    volumes:
+      # The certificate and the account key. Losing this volume means asking
+      # Let's Encrypt for a new certificate, and it rate-limits that — so this
+      # is the one volume whose loss is felt immediately.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [backend]
+
+volumes:
+  pgdata:
+  audio:
+  releases:
+  caddy_data:
+  caddy_config:

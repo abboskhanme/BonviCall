@@ -5,7 +5,8 @@
 .PHONY: up down logs logs-backend logs-panel psql test test-server test-panel \
         lint migrate migrate-check migration contract types shell-backend build \
         android-build android-test android-lint android-dto \
-        android-install android-release
+        android-install android-release \
+        prod-up prod-down prod-migrate prod-logs prod-ps
 
 up:                ## Bring the stack up with hot reload
 	docker compose up -d
@@ -160,6 +161,28 @@ android-dto:
 	  -g kotlin -o /out \
 	  --global-property models,modelDocs=false,modelTests=false \
 	  --additional-properties=packageName=uz.bonvi.call.data.remote.dto,modelPackage=uz.bonvi.call.data.remote.dto,serializationLibrary=moshi,enumPropertyNaming=UPPERCASE,sourceFolder=.
+
+# --- Deployment (docs/DEPLOY.md) -------------------------------------------
+# A SEPARATE compose project, `bonvicall-prod`, so none of these can reach the
+# development stack's containers or its volumes. Caddy in front, the database
+# unpublished, the app off root. Read DEPLOY.md before the first one.
+PROD := docker compose -f docker-compose.prod.yml
+
+prod-up:           ## Build and start the deployed stack (needs BONVICALL_DOMAIN in .env)
+	$(PROD) up -d --build
+	@echo "now: make prod-migrate"
+
+prod-down:         ## Stop the deployed stack. Does NOT delete data.
+	$(PROD) down
+
+prod-migrate:      ## Run migrations against the deployment. Read the migration first.
+	$(PROD) run --rm backend alembic upgrade head
+
+prod-logs:
+	$(PROD) logs -f
+
+prod-ps:
+	$(PROD) ps
 
 shell-backend:
 	docker compose exec backend bash

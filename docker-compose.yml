@@ -29,6 +29,9 @@ services:
       # because `/data/releases` was not, and the symptom was a published APK
       # that 404'd after the next `compose up`.
       - ./docker-compose.yml:/compose/docker-compose.yml:ro
+      # Same reason, for the deployment file: the lines that keep the database
+      # off the network and the app off root are asserted rather than reviewed.
+      - ./docker-compose.prod.yml:/compose/docker-compose.prod.yml:ro
       - audio:/data/audio
       # The published APKs (LocalFsReleaseStore, /data/releases). It had NO
       # volume, so every build an admin uploaded lived in the container's

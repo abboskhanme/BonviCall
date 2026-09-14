@@ -1,0 +1,127 @@
+# CI (docs/SECURITY-BACKLOG.md item 3).
+#
+# 759 server tests, 290 panel tests and two flavours of Android unit tests
+# existed and nothing ran them unless somebody remembered to. With two people
+# on two branches merging into `main`, that is a question of when.
+#
+# The server job runs the suite THROUGH DOCKER COMPOSE rather than pip-installing
+# on the runner, because some of these tests are about the compose file itself —
+# `tests/test_compose_wiring.py` reads it from a mount and fails if a volume or
+# the deployment's non-root user goes missing. A runner-native suite would skip
+# the checks most likely to be broken by an infrastructure change.
+
+name: CI
+
+on:
+  push:
+    branches: [main, abboskhan, dilijaxon]
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch cancels the first: there is no value in
+# finishing a run for a commit that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server — tests, migrations, contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write a throwaway .env
+        # Never the real one, and never a committed one. Both values live for
+        # the length of this job, in a database created and destroyed with it.
+        # `change_me` appears in the password, the secret key and inside both
+        # database URLs, so one substitution keeps all four consistent — which
+        # is also why they are the same value here and must not be in a
+        # deployment.
+        run: |
+          secret=$(openssl rand -hex 32)
+          sed "s/change_me/$secret/g" .env.example > .env
+
+      - name: Start the database
+        run: docker compose up -d postgres --wait
+
+      - name: Lint
+        run: docker compose run --rm backend ruff check src tests conftest.py migrations scripts
+
+      - name: Tests
+        run: docker compose run --rm backend pytest -q
+
+      # An empty database must reach head and come back down again. This is the
+      # check that catches a migration which only works on the machine it was
+      # written on, and it is cheap next to discovering it during a deployment.
+      - name: Migrations reach head from empty
+        run: make migrate-head-check
+
+      - name: Models and migrations have not drifted
+        run: docker compose run --rm backend alembic check
+
+      # contract/ is generated from Pydantic and committed. A change to a
+      # schema or an endpoint docstring that was not exported is a contract the
+      # Android DTOs and the panel types were generated from and no longer
+      # matches.
+      - name: Contract is current
+        run: |
+          make contract
+          git diff --exit-code contract/ \
+            || { echo "::error::contract/ is stale — run 'make contract' and commit the result"; exit 1; }
+
+      - name: Known vulnerabilities in Python dependencies
+        # Reported, not enforced. A CVE in a transitive dependency appearing
+        # overnight should not be able to block an unrelated fix from merging;
+        # what matters is that somebody sees it. Drop `|| true` once there is a
+        # person whose job it is to clear the list.
+        run: |
+          docker compose run --rm backend sh -c \
+            "pip install --quiet pip-audit && pip-audit --progress-spinner off" || true
+
+  panel:
+    name: Panel — lint, tests, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: panel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: panel/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      # `tsc -b && vite build`. The type check is the point: the panel's API
+      # types are generated from contract/, so a field that changed shape on
+      # the server fails here rather than as a blank screen.
+      - run: npm run build
+      - run: npm audit --audit-level=high || true
+
+  android:
+    name: Android — unit tests, both flavours
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      # BOTH flavours, because targetSdk is what the capture path behaves
+      # differently under and legacy28 is the one the fleet actually runs.
+      - name: Unit tests
+        working-directory: android
+        run: ./gradlew testLegacy28DebugUnitTest testModern34DebugUnitTest
+
+      - name: Test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports
+          path: android/app/build/reports/tests/

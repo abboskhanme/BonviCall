@@ -1,6 +1,9 @@
 # Security and hardening backlog
 
 **Reviewed 2026-09-13 against the running system, not against the SPEC.**
+**Items 1–5 were built on 2026-09-14 and are marked DONE below, with what
+was actually verified rather than what was intended. Item 6 — backups — is
+untouched and is now the largest remaining risk.**
 Every item below was verified in the code or measured on the stack; nothing here
 is a generic checklist entry. Ordered by real risk, not by effort.
 
@@ -36,82 +39,138 @@ Stated first, so nobody re-solves it. This codebase is above average here:
 
 ---
 
-## 1. There is no TLS — the whole system talks cleartext
+## 1. ~~There is no TLS~~ — DONE 2026-09-14
 
-**Risk: highest, and it is not close.** The app reaches the server over plain
-HTTP at a LAN address (`docs/ON-DEVICE-TESTING.md` step 2 configures exactly
-that, deliberately, for the field test). Anyone on the same Wi-Fi can read:
+**Was: the highest risk, and not close.** The app reached the server over plain
+HTTP at a LAN address. Anyone on the same Wi-Fi could read a **device token**
+and then be that phone, the **admin password** as it was typed, and the
+**audio** as it uploaded. Every control in "what is already right" above is
+bypassed by reading the wire.
 
-- a **device token** — and then be that phone: post fabricated calls, or read
-  that employee's call list through the device API;
-- the **admin password** as it is typed into the panel;
-- the **audio** as it uploads.
+**Built:** `infra/Caddyfile` and `infra/caddy.Dockerfile`, fronting
+`docker-compose.prod.yml`. Automatic certificates from Let's Encrypt, HTTP
+permanently redirected, HSTS for a year. The panel is built into the same image
+and served from the same origin — required, not tidy: the audio player needs
+`Content-Range` back, and a browser withholds it cross-origin.
 
-Every control in "what is already right" above is bypassed by reading the wire.
+**Verified on the running stack, not reasoned about:**
 
-**Fix:** Caddy in front, automatic TLS, one hostname per deployment. SPEC names
-it; nothing built it. The app should also refuse cleartext outside the debug
-flavour — the debug network-security config already scopes cleartext to one
-host, so the release side is the part to assert.
+- `http://…/healthz` → 308 to `https://`; `https://…/healthz` → 200.
+- The panel, its deep routes, and the API all answer through the proxy, with the
+  error envelope intact.
+- A request carrying a forged `X-Forwarded-For` is counted against its **true**
+  source address, so nobody can pick their own rate-limit bucket by sending a
+  header. Caddy overwrites the header rather than appending to it, which is what
+  makes that independent of which end of the list uvicorn happens to read.
+- Two genuinely different source addresses get two different buckets — the other
+  half of the same property, and the one whose absence would lock the office out.
+- The backend records the real caller's address in `enrolment_attempts`, not
+  Caddy's.
 
-**Effort:** half a day. **Blocks:** selling to anyone.
+**The Android half needed nothing.** The release network security config already
+refuses cleartext outright and trusts system CAs only; the debug flavour narrows
+that to named dev hosts and `ManifestPermissionsTest` fails the build if anyone
+widens it. It was written correctly the first time and was not touched.
 
-## 2. The login and enrolment endpoints are not rate-limited
+**Still open on this item:** `caddy_data` holds the certificate and the ACME
+account key and is not backed up. See item 6.
 
-Both docstrings say they are. Neither calls the limiter.
+## 2. ~~The login and enrolment endpoints are not rate-limited~~ — DONE 2026-09-14
 
-- `LoginRequest` (`modules/auth/schemas.py`): *"``POST /api/v1/auth/login`` —
-  public, rate-limited."*
-- `redeem` (`api/device/enrolment.py`): *"Public, rate-limited."*
+Both docstrings said they were. Neither called the limiter. `core/ratelimit.py`
+existed, worked, and was wired to the install page and the two APK downloads —
+never to the two endpoints its own docstring said it existed for. The project's
+recurring failure shape, **a finished component with no caller**, for the third
+recorded time.
 
-`core/ratelimit.py` exists, works, and is wired to exactly three places: the
-install landing page, the APK download, and the per-version download. Its own
-docstring says it exists to *"raise the cost of guessing an eight-character
-enrolment code and of hammering the login form"* — the two places it is not
-called from.
+**Built:** `check()` and `penalise()` beside the existing `hit()`, and both
+endpoints wired to them, with tests that exhaust each window.
 
-This is the project's recurring failure shape — **a finished component with no
-caller** (`STATUS.md`) — for the third recorded time.
+**The design decision worth reading.** These two count **failures only**, where
+the install page counts every request. That is not a softening — it is the
+difference between a limit that works here and one that breaks the rollout.
+Fifteen handsets enrol from one office Wi-Fi, so they arrive as **one** source
+address; and the app deliberately re-sends a redeem whose response was lost,
+because that is the documented recovery path on a bad tunnel. Counting the
+successes would have told the eleventh salesperson of the day to come back in an
+hour, on the first day the product was used. Counting the failures leaves the
+honest rollout untouched and still costs a guesser everything, because guessing
+produces nothing but failures. Four tests pin both directions.
 
-**Fix:** `ratelimit.hit("login", ip, LOGIN_PER_IP)` and the same for redeem, with
-a test per endpoint that exhausts the window. **Effort:** one hour.
+`LOGIN_PER_ACCOUNT` is keyed on **(IP, login)** as SPEC §4.0 words it, not on
+the login alone — otherwise anyone who knew a colleague's login could shut them
+out of the panel from anywhere by failing ten times.
 
-## 3. No CI, so no dependency scanning and no gate on a broken test
+**Not built, and stated so it is not assumed:** SPEC §4.0 also asks that a code
+be auto-revoked *and an alert raised* after five attempts. The revocation was
+already there — `EnrolmentService.MAX_CODE_ATTEMPTS`, counted on the code row
+itself, so it survives a restart. **The alert is not.** An admin sees the
+revoked code and the attempt rows; nothing tells them to look.
 
-766 server tests, 250 panel tests and 389 × 2 Android tests exist, and **nothing
-runs them automatically.** The Makefile's own comments describe a CI that was
-never built ("CI runs: `make contract && git diff --exit-code contract/`").
+## 3. ~~No CI~~ — DONE 2026-09-14
 
-With two people working on two branches this is a question of when, not if.
+759 server tests, 290 panel tests and two flavours of Android unit tests
+existed, and nothing ran them unless somebody remembered to.
 
-**Fix:** one workflow — server tests, panel tests + build, Android unit tests,
-`make migrate-head-check`, `make contract` drift check, plus `pip-audit` and
-`npm audit`. **Effort:** half a day.
+**Built:** `.github/workflows/ci.yml`, on pushes to `main`, `abboskhan` and
+`dilijaxon` and on every pull request into `main`. Three jobs: the server suite
+plus lint, `migrate-head-check`, `alembic check` and a contract-drift gate; the
+panel's lint, tests and typed build; and the Android unit tests for **both**
+flavours, since legacy28 is what the fleet actually runs.
 
-## 4. The backend container runs as root
+The server job runs through **docker compose** rather than pip-installing on the
+runner. Some of these tests are about the compose files themselves —
+`test_compose_wiring.py` reads them from a mount — and a runner-native suite
+would skip exactly the checks an infrastructure change is most likely to break.
 
-`server/Dockerfile` declares no `USER`. A container escape is a host root. One
-line, plus making the writable paths (`/data/...`) owned by that user.
+`pip-audit` and `npm audit` report but do not fail the build: a CVE appearing
+overnight in a transitive dependency should not block an unrelated fix, and what
+matters is that somebody sees it. Drop the `|| true` when there is a person
+whose job it is to clear the list.
 
-**Effort:** one hour, and it must be verified against the audio and release
-stores, which write at runtime.
+## 4. ~~The backend container runs as root~~ — DONE 2026-09-14
 
-## 5. PostgreSQL is published to the host
+**Built:** `server/Dockerfile` creates uid 10001 and gives it `/data/audio` and
+`/data/releases`; `docker-compose.prod.yml` runs the backend and the worker as
+that user. Verified by starting the deployed stack, running the full migration
+history as that uid, and writing to the audio volume.
 
-`ports: ["5443:5432"]` is right on a laptop and wrong on a server: the database
-is reachable from the network with only a password in front of it. On a
-deployment the port should not be published at all — the backend reaches it over
-the compose network.
+**Why the image does not simply say `USER`.** Docker initialises a fresh named
+volume from the image directory it covers, ownership included — but an existing
+volume keeps the ownership it has. Development has volumes created root-owned by
+every `compose up` before this change, so a default of uid 10001 would have left
+a developer's audio uploads failing on a permission error, in the one part of
+this product that was hardest to get working. So the deployment selects the
+user, where the volumes are new. `tests/test_compose_wiring.py` fails if that
+line is ever dropped.
 
-**Effort:** one line, but it needs a deployment compose file separate from the
-development one, which does not exist yet.
+This is also why the deployment has a compose project name of its own,
+`bonvicall-prod`: without it, running the deployment file in this directory
+reuses the development volumes and fails exactly that way. That was found by
+running it, not by thinking about it.
 
-## 6. No backups
+## 5. ~~PostgreSQL is published to the host~~ — DONE 2026-09-14
+
+`ports: ["5443:5432"]` is right on a laptop and wrong on a server. The
+deployment file publishes no database port at all — the backend reaches it over
+the compose network — and publishes nothing for the backend either, which is
+what makes `--forwarded-allow-ips="*"` safe there. Both are asserted by tests,
+because the two lines sit far enough apart in the file that nobody would connect
+them at midnight.
+
+The development file is unchanged and still publishes 5443. That is correct for
+a laptop and is where `make psql` goes.
+
+## 6. No backups — **NOT DONE, and now the largest item**
 
 Audio lives on one disk, on one host, with no copy anywhere. ~200 GB per year
 per customer. Availability is the third leg of security, and for a product sold
 as a service the loss of a customer's recordings is not an incident — it is a
 contract.
+
+Deployment added a third thing worth losing: `caddy_data` holds the TLS
+certificate and the Let's Encrypt account key. It is small and it is not copied
+anywhere either.
 
 **Fix:** `pg_dump` plus an audio sync to a second location, scheduled and
 **restore-tested**. A backup nobody has restored is a hope.
@@ -125,20 +184,28 @@ contract.
   it is the window an ex-employee's phone keeps working in; revocation exists and
   is enforced on the next heartbeat.
 - **No secret scanning** in CI, on a repository that has an `.env` next to it and
-  a keystore that must never be committed.
+  a keystore that must never be committed. CI now exists, so this is a step to
+  add rather than a thing to build.
+- **No alert when an enrolment code is auto-revoked** for too many attempts. The
+  revocation happens; nothing tells an admin to look (item 2).
+- **The access token lives a week and cannot be called back.** At the client's
+  request, so nobody is asked to sign in again during a working week. It is a
+  signed JWT checked against no store: deactivating a user, or a lost laptop,
+  leaves that token working until it expires. The refresh cookie is what a
+  revocation actually stops. Written down in `.env.example` as well.
 
 ---
 
 ## Sequence
 
-| # | Item | Effort |
-|---|---|---|
-| 1 | TLS + Caddy, and the app refusing cleartext in release | ½ day |
-| 2 | Rate-limit login and redeem | 1 hour |
-| 3 | CI with tests, contract drift, `pip-audit`, `npm audit` | ½ day |
-| 4 | Non-root container, unpublished database port, deployment compose | 2 hours |
-| 5 | Backups, with a restore that was actually run | 1 day |
+| # | Item | Effort | State |
+|---|---|---|---|
+| 1 | TLS + Caddy, and the app refusing cleartext in release | ½ day | **done** 2026-09-14 |
+| 2 | Rate-limit login and redeem | 1 hour | **done** 2026-09-14 |
+| 3 | CI with tests, contract drift, `pip-audit`, `npm audit` | ½ day | **done** 2026-09-14 |
+| 4 | Non-root container, unpublished database port, deployment compose | 2 hours | **done** 2026-09-14 |
+| 5 | Backups, with a restore that was actually run | 1 day | **open** |
 
-Three days of work, and the difference between an internal tool and something a
-second company can be sold. Item 2 is one hour and closes a hole the code
-already claims to have closed.
+Four of the five are built and the deployment path is `docs/DEPLOY.md`. What
+stands between this and something a second company can be sold is now one item,
+and it is the one whose absence cannot be recovered from afterwards.

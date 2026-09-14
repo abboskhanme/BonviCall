@@ -1,0 +1,92 @@
+# BonviCall, in front of everything (docs/SECURITY-BACKLOG.md item 1).
+#
+# Until this file existed the whole system spoke cleartext: a device token, the
+# admin password as it is typed, and the audio of every call were readable by
+# anyone on the same Wi-Fi. Every other control in the product — Argon2id,
+# refresh rotation with reuse detection, tokens stored as SHA-256 — is bypassed
+# by reading the wire, so this is the one that had to come first.
+#
+# The certificate is obtained and renewed by Caddy itself, from Let's Encrypt,
+# the first time the domain resolves here. `caddy_data` in the compose file is
+# what holds it; losing that volume means asking for a new certificate, and
+# Let's Encrypt rate-limits how often that may happen. Back it up or keep it.
+{
+	email {$BONVICALL_ACME_EMAIL}
+}
+
+{$BONVICALL_DOMAIN} {
+	log {
+		output stdout
+		format console
+	}
+
+	# HSTS. Not in the base header block below, because a wrong max-age here is
+	# remembered by every browser that saw it: one year, and only once the
+	# domain is genuinely permanent. `includeSubDomains` is left off — this is
+	# one host, and claiming the subdomains of a company domain is not ours to
+	# do.
+	header Strict-Transport-Security "max-age=31536000"
+
+	# The three surfaces of the API, the install landing page, and the two
+	# health probes. Everything the phone and the panel talk to is here.
+	#
+	# NO `encode` on this route, and that is load-bearing: audio is served with
+	# Range requests so the player can seek, and a compressing proxy answers a
+	# range with a body it cannot describe — the browser then withholds
+	# `Content-Range` and seeking breaks (CONVENTIONS-CLIENT.md §4). Opus and
+	# AAC are already compressed, so there is nothing to win by trying.
+	@backend path /api/* /i/* /healthz /readyz
+	handle @backend {
+		# X-Forwarded-Proto and -Host are set by Caddy itself and are not
+		# restated here: `install._public_origin` builds the deep link a
+		# handset is pointed at from them, and a `header_up` that repeats a
+		# default is a line somebody later "fixes" in the wrong direction.
+		#
+		# X-Forwarded-For is the exception, and it is OVERWRITTEN rather than
+		# appended to. Caddy's default is to append, which leaves whatever the
+		# caller sent sitting in front of the real address — and which of the
+		# two uvicorn then reports as `request.client.host` is uvicorn's
+		# internal choice. Today it takes the rightmost and the real address
+		# wins (verified against this stack on 2026-09-14: a request with a
+		# forged `X-Forwarded-For` was still counted against its true source).
+		# If a future version took the leftmost instead, every per-IP limit in
+		# the product would become opt-out by sending one header, silently.
+		# Overwriting makes the answer the same either way.
+		#
+		# It also means Caddy must be the EDGE. Put a CDN in front of this and
+		# `{remote_host}` becomes the CDN, so the whole fleet lands in one rate
+		# limit bucket — at which point this line changes to trust that hop.
+		#
+		# The app holds a WebSocket open at /api/device/v1/ws through its
+		# foreground service; Caddy upgrades it without being told to.
+		reverse_proxy backend:8000 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	# The panel: a built SPA, copied into this image at build time. Same origin
+	# as the API above, which is not a convenience — the audio player requires
+	# it, for the Range reason stated above.
+	handle {
+		root * /srv/panel
+		encode zstd gzip
+		try_files {path} /index.html
+		file_server
+
+		# Fingerprinted assets are immutable; index.html must never be, or a
+		# deployed fix reaches nobody until they clear their cache.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@index path /
+		header @index Cache-Control "no-cache"
+	}
+
+	# The APK upload is 200 MiB (SPEC §4.0) and an audio chunk is 4 MiB. This
+	# sits above both on purpose: the server's own 413 — in the error envelope
+	# the Android client can parse — is a better answer than a refusal from a
+	# proxy, which the client would see as a corrupted body and could not
+	# decide whether to retry.
+	request_body {
+		max_size 256MB
+	}
+}
