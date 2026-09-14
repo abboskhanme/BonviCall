@@ -86,8 +86,22 @@ keytool -list -v -keystore android/bonvicall-release.jks -alias bonvicall
 The SHA-256 fingerprint it prints must match the one recorded below. Re-verify
 whenever the custodian changes.
 
-**Recorded fingerprint:** _(fill in at first release — leaving this blank means
-nobody can tell a good backup from a corrupt one)_
+**Recorded fingerprint:**
+
+```
+29ea7737a691ae5fd68a3a9d3c6ae7fa09445d61a77ccb96cd2f3e2fccf24fa7
+```
+
+Read off the first release published to the production server on 2026-09-14,
+from the APK's own v2 signing block rather than from the keystore — that is the
+value a handset will compare, and a keystore that prints it is a keystore that
+can still sign an update the fleet accepts.
+
+It is also `APK_SIGNING_SHA256` in the deployment's `.env`, which turns the
+check from advice into a refusal: an upload signed by any other key is rejected
+by `ReleaseService.upload` rather than accepted and discovered later. Discovered
+later means every handset must uninstall and reinstall, and an uninstall
+destroys the calls that phone has not yet sent.
 
 ---
 
