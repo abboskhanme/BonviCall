@@ -100,6 +100,15 @@ services:
       # removing it is the intended end state.
       BONVICALL_SERVER_IP: ${BONVICALL_SERVER_IP:-127.0.0.1}
     volumes:
+      # The config, read-only and from the working tree.
+      #
+      # It is COPYied into the image as well, so the image still runs on its
+      # own — but the image also carries the built panel, which means a
+      # one-line proxy change would otherwise cost an `npm ci` and a Vite
+      # build before it took effect. That cost is how the first deployment
+      # came up with a stale Caddyfile: `up -d caddy` reuses the image, and
+      # nothing says so. Mounted, a config change needs a restart.
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       # The certificate and the account key. Losing this volume means asking
       # Let's Encrypt for a new certificate, and it rate-limits that — so this
       # is the one volume whose loss is felt immediately.
