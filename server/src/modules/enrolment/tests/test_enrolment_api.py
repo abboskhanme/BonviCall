@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from src.core import ratelimit
 from src.core.enums import (
     AuditAction,
     EnrolmentOutcome,
@@ -20,6 +21,7 @@ from src.core.enums import (
 from src.core.security import sha256_hex
 from src.modules.audit.models import AuditLogModel
 from src.modules.enrolment.models import CallbackReceiverModel, EnrolmentAttemptModel
+from src.modules.enrolment.service import MAX_CODE_ATTEMPTS
 
 pytestmark = pytest.mark.asyncio
 
@@ -664,3 +666,87 @@ async def test_admin_attestation_reaches_the_phone_through_status(
     assert body["tokens"]["access_token"]
     await db.refresh(installation)
     assert installation.status is InstallationStatus.ACTIVE
+
+
+# --- Rate limiting (SPEC §4.0) ---------------------------------------------
+#
+# Ten FAILED redemptions an hour from one address. The word "failed" is the
+# whole design and `core/ratelimit.py` argues it: the fleet enrols over one
+# office Wi-Fi, so fifteen handsets are one address here.
+
+
+async def test_working_through_codes_is_refused_after_ten_misses(client) -> None:
+    limit = ratelimit.ENROLMENT_REDEEM_PER_IP.requests
+    for _ in range(limit):
+        missed = await client.post(REDEEM, json=redeem_body("ZZZZ9999"))
+        assert missed.status_code == 404
+
+    refused = await client.post(REDEEM, json=redeem_body("ZZZZ9998"))
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "rate_limited"
+    assert int(refused.headers["Retry-After"]) > 0
+
+
+async def test_a_whole_office_can_enrol_from_one_address(
+    client, enrolment_code_factory
+) -> None:
+    """The case the limit must not break, and would have.
+
+    Fifteen salespeople, one Wi-Fi, one afternoon: to a server behind Caddy
+    that is a single source address making fifteen redemptions. Counting the
+    successful ones would have told the eleventh of them to come back in an
+    hour, on the first day the product was used.
+    """
+    handsets = ratelimit.ENROLMENT_REDEEM_PER_IP.requests + 5
+    for n in range(handsets):
+        # Spelled out rather than taken from the factory's default, which ends
+        # in two hex characters — fifteen of those collide on the unique index
+        # often enough to fail this test about one run in three.
+        code = await enrolment_code_factory(code=f"K7M4PQ{n:02d}")
+        accepted = await client.post(
+            REDEEM,
+            json=redeem_body(code.code, device_fingerprint=f"{n:064d}"),
+        )
+        assert accepted.status_code == 201, accepted.json()
+
+
+async def test_the_handset_retrying_a_lost_response_is_not_an_attempt(
+    client, enrolment_code_factory
+) -> None:
+    """`_resume_redeem` is the field recovery path, not a guess.
+
+    The tunnel drops after the server commits and before the 201 arrives, so
+    the app re-sends the code it holds — that is what it is built to do. If
+    those repeats counted, the phone with the worst connection in the fleet
+    would be the one the limiter turned away.
+    """
+    code = await enrolment_code_factory()
+    first = await client.post(REDEEM, json=redeem_body(code.code))
+    assert first.status_code == 201
+
+    for _ in range(ratelimit.ENROLMENT_REDEEM_PER_IP.requests + 3):
+        again = await client.post(REDEEM, json=redeem_body(code.code))
+        assert again.status_code == 201
+        assert again.json()["installation_id"] == first.json()["installation_id"]
+
+
+async def test_the_per_code_half_of_the_limit_is_the_code_row_not_this_window(
+    db, client, enrolment_code_factory
+) -> None:
+    """SPEC §4.0 asks for five per code, and that half predates this one.
+
+    It is counted on the code itself and auto-revokes, so it survives a restart
+    and is not per-process. Asserted here so nobody adds a second counter for
+    the same rule when they come to read §4.0.
+    """
+    code = await enrolment_code_factory(
+        expires_at=datetime.now(UTC) - timedelta(minutes=1)
+    )
+    for _ in range(MAX_CODE_ATTEMPTS):
+        await client.post(REDEEM, json=redeem_body(code.code))
+
+    await db.refresh(code)
+    assert code.attempt_count == MAX_CODE_ATTEMPTS
+    assert code.revoked_at is not None
+    # And the retries an owner makes on a code they DID redeem never reach
+    # this, because the revoke is guarded on `redeemed_at is None`.

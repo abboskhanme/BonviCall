@@ -19,9 +19,10 @@ import uuid
 from fastapi import APIRouter, Request, status
 
 from src.api.device.deps import InstallationDep
-from src.core import clock
+from src.core import clock, ratelimit
 from src.core.deps import SessionDep
 from src.core.enums import VerificationMethod, VerificationState
+from src.core.errors import AppError
 from src.modules.enrolment.rules import display_number
 from src.modules.enrolment.schemas import (
     DeviceCallbackStartOut,
@@ -66,10 +67,30 @@ PROVISIONAL_TOKEN_SECONDS = DEVICE_ACCESS_TOKEN_HOURS * 3600
 async def redeem(
     payload: DeviceRedeemIn, request: Request, session: SessionDep
 ) -> DeviceRedeemOut:
-    """Public, rate-limited. Turns a code into a ``pending`` installation."""
-    result = await EnrolmentService(session).redeem(
-        payload, request.client.host if request.client else None
-    )
+    """Public, rate-limited. Turns a code into a ``pending`` installation.
+
+    Ten **failed** redemptions an hour from one address (SPEC §4.0). Failures
+    only, because the fleet enrols over one office Wi-Fi and so arrives as one
+    address: counting successes would refuse the eleventh salesperson of the
+    day, and counting the idempotent resume above would refuse the very handset
+    whose response was lost. ``core/ratelimit.py`` states the rule.
+
+    The other half of §4.0's limit — five attempts per code, then the code is
+    revoked — is ``EnrolmentService.MAX_CODE_ATTEMPTS``, counted on the code row
+    rather than in memory. This window is what stops somebody working through
+    *different* codes.
+    """
+    ip = ratelimit.client_ip(request)
+    ratelimit.check("enrolment_redeem", ip, ratelimit.ENROLMENT_REDEEM_PER_IP)
+    try:
+        result = await EnrolmentService(session).redeem(payload, ip)
+    except AppError:
+        # Every refusal this service raises is an AppError with its own code —
+        # a code that does not exist, one already revoked, one already spent by
+        # a different handset. All of them are guesses from here; which one it
+        # was is the caller's business, not the limiter's.
+        ratelimit.penalise("enrolment_redeem", ip, ratelimit.ENROLMENT_REDEEM_PER_IP)
+        raise
     return DeviceRedeemOut(
         installation_id=result.installation.id,
         status=result.installation.status,

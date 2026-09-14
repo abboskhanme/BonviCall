@@ -8,6 +8,7 @@ import pytest
 import sqlalchemy as sa
 
 from conftest import TEST_PASSWORD
+from src.core import ratelimit
 from src.core.enums import UserRole
 from src.modules.auth.models import RefreshTokenModel
 from src.modules.auth.service import REFRESH_REPLAY_GRACE
@@ -327,3 +328,99 @@ async def test_an_unknown_login_is_401_and_not_422(client) -> None:
     response = await client.post(LOGIN, json={"email": "nobody", "password": "x"})
 
     assert response.status_code == 401
+
+
+# --- Rate limiting (SPEC §4.0) ---------------------------------------------
+#
+# Both windows count FAILURES only. `core/ratelimit.py` states why; what is
+# pinned here is that the rule holds in both directions, because the obvious
+# implementation — `hit()` on every request — passes the refusal test and
+# quietly locks out the office.
+
+
+async def _fail_login(client, email: str) -> int:
+    response = await client.post(LOGIN, json={"email": email, "password": "wrong"})
+    return response.status_code
+
+
+async def test_guessing_one_account_is_refused_after_ten_tries(
+    client, user_factory
+) -> None:
+    """10 per 5 minutes per (IP, e-mail) — the tighter of the two windows."""
+    user = await user_factory(UserRole.ADMIN, password=TEST_PASSWORD)
+    limit = ratelimit.LOGIN_PER_ACCOUNT.requests
+
+    for _ in range(limit):
+        assert await _fail_login(client, user.email) == 401
+
+    refused = await client.post(LOGIN, json={"email": user.email, "password": "wrong"})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "rate_limited"
+    assert int(refused.headers["Retry-After"]) > 0
+
+
+async def test_a_spent_window_refuses_the_right_password_too(
+    client, user_factory
+) -> None:
+    """And it must, or the limit is not one.
+
+    Stated as a test because it is the cost of the feature and somebody will
+    otherwise read the refusal as a bug: ten wrong passwords shut this login
+    out of this address for the rest of the five minutes, whoever types the
+    eleventh. The password cannot be known to be right without verifying it,
+    and verifying it is the work being rationed.
+
+    Five minutes rather than an hour is what makes that affordable for the
+    person who simply mistyped, and successes never fill the window at all
+    (the test above), so ordinary use never arrives here.
+    """
+    user = await user_factory(UserRole.ADMIN, password=TEST_PASSWORD)
+    for _ in range(ratelimit.LOGIN_PER_ACCOUNT.requests):
+        await _fail_login(client, user.email)
+
+    refused = await client.post(
+        LOGIN, json={"email": user.email, "password": TEST_PASSWORD}
+    )
+    assert refused.status_code == 429
+    assert ratelimit.LOGIN_PER_ACCOUNT.window_seconds == 300
+
+
+async def test_signing_in_over_and_over_is_never_refused(client, user_factory) -> None:
+    """Successes cost nothing, past the per-IP hourly window and beyond."""
+    user = await user_factory(UserRole.MANAGER, password=TEST_PASSWORD)
+    for _ in range(ratelimit.LOGIN_PER_IP.requests + 5):
+        response = await client.post(
+            LOGIN, json={"email": user.email, "password": TEST_PASSWORD}
+        )
+        assert response.status_code == 200
+
+
+async def test_one_account_being_hammered_does_not_lock_out_another(
+    client, user_factory
+) -> None:
+    """The tight window is keyed on (IP, e-mail), not on the e-mail alone.
+
+    Keyed on the address by itself, anybody who knew a colleague's login could
+    shut them out of the panel from anywhere by failing ten times.
+    """
+    target = await user_factory(UserRole.ADMIN, password=TEST_PASSWORD)
+    other = await user_factory(UserRole.MANAGER, password=TEST_PASSWORD)
+    for _ in range(ratelimit.LOGIN_PER_ACCOUNT.requests):
+        await _fail_login(client, target.email)
+
+    assert await _fail_login(client, target.email) == 429
+    assert await _fail_login(client, other.email) == 401
+
+
+async def test_the_case_of_the_login_does_not_buy_a_second_budget(
+    client, user_factory
+) -> None:
+    """The column is CITEXT: `Admin` and `admin` are one account."""
+    user = await user_factory(UserRole.ADMIN, password=TEST_PASSWORD)
+    for _ in range(ratelimit.LOGIN_PER_ACCOUNT.requests):
+        await _fail_login(client, user.email.lower())
+
+    refused = await client.post(
+        LOGIN, json={"email": user.email.upper(), "password": "wrong"}
+    )
+    assert refused.status_code == 429

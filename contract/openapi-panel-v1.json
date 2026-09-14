@@ -5391,7 +5391,7 @@
     },
     "/api/v1/auth/login": {
       "post": {
-        "description": "Public. A wrong e-mail and a wrong password give the same answer.",
+        "description": "Public, rate-limited. A wrong e-mail and a wrong password give the same answer.\n\nTwo windows, both SPEC §4.0 and both counting **failures only**\n(``core/ratelimit.py`` says why): 20 an hour from one address, and 10 in\nfive minutes against one login from that address. Somebody who knows their\nown password is never refused by either, however often they sign in.",
         "operationId": "login_api_v1_auth_login_post",
         "requestBody": {
           "content": {

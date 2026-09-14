@@ -38,7 +38,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.core import clock, realtime
+from src.core import clock, ratelimit, realtime
 from src.core.config import get_settings
 from src.core.deps import Principal, get_current_principal, get_session
 from src.core.enums import (
@@ -791,6 +791,24 @@ def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[datetime
 
     monkeypatch.setattr(clock, "now", lambda: state["now"])
     yield _set
+
+
+@pytest.fixture(autouse=True)
+def _empty_rate_limit_windows() -> None:
+    """Every test starts with the counters empty.
+
+    ``core/ratelimit.py`` keeps its windows in a module-level dict, so they are
+    shared by the whole session the way the realtime hub below is. Since
+    2026-09-14 the login and redeem routes count *failed* attempts, and the
+    suite makes plenty of those on purpose — a wrong password, an unknown code.
+    Without this, the twenty-first of them in a run would answer 429 where its
+    test expects 401, and the failure would land on whichever test happened to
+    be twenty-first rather than on anything that was actually wrong.
+
+    Reset before, not after: a test that fails half way still leaves the next
+    one a clean window.
+    """
+    ratelimit.reset()
 
 
 @pytest.fixture(autouse=True)

@@ -2852,7 +2852,7 @@
     },
     "/api/device/v1/enrolment/redeem": {
       "post": {
-        "description": "Public, rate-limited. Turns a code into a ``pending`` installation.",
+        "description": "Public, rate-limited. Turns a code into a ``pending`` installation.\n\nTen **failed** redemptions an hour from one address (SPEC §4.0). Failures\nonly, because the fleet enrols over one office Wi-Fi and so arrives as one\naddress: counting successes would refuse the eleventh salesperson of the\nday, and counting the idempotent resume above would refuse the very handset\nwhose response was lost. ``core/ratelimit.py`` states the rule.\n\nThe other half of §4.0's limit — five attempts per code, then the code is\nrevoked — is ``EnrolmentService.MAX_CODE_ATTEMPTS``, counted on the code row\nrather than in memory. This window is what stops somebody working through\n*different* codes.",
         "operationId": "redeem_api_device_v1_enrolment_redeem_post",
         "requestBody": {
           "content": {

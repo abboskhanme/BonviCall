@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
+from src.core import ratelimit
 from src.core.config import get_settings
 from src.core.deps import PrincipalDep, SessionDep
 from src.core.errors import UnauthorizedError
@@ -83,13 +84,31 @@ class LoginResponse(CurrentUserResponse):
 async def login(
     payload: LoginRequest, request: Request, response: Response, session: SessionDep
 ) -> LoginResponse:
-    """Public. A wrong e-mail and a wrong password give the same answer."""
-    user, pair = await AuthService(session).login(
-        email=payload.email,
-        password=payload.password,
-        ip=request.client.host if request.client else None,
-        user_agent=request.headers.get("User-Agent"),
-    )
+    """Public, rate-limited. A wrong e-mail and a wrong password give the same answer.
+
+    Two windows, both SPEC §4.0 and both counting **failures only**
+    (``core/ratelimit.py`` says why): 20 an hour from one address, and 10 in
+    five minutes against one login from that address. Somebody who knows their
+    own password is never refused by either, however often they sign in.
+    """
+    ip = ratelimit.client_ip(request)
+    # The e-mail is lower-cased for the key because the column is CITEXT:
+    # `Admin` and `admin` are one account, and two buckets would be two
+    # budgets for guessing at the same password.
+    account = f"{ip or 'anonymous'}|{payload.email.strip().lower()}"
+    ratelimit.check("login_ip", ip, ratelimit.LOGIN_PER_IP)
+    ratelimit.check("login_account", account, ratelimit.LOGIN_PER_ACCOUNT)
+    try:
+        user, pair = await AuthService(session).login(
+            email=payload.email,
+            password=payload.password,
+            ip=ip,
+            user_agent=request.headers.get("User-Agent"),
+        )
+    except UnauthorizedError:
+        ratelimit.penalise("login_ip", ip, ratelimit.LOGIN_PER_IP)
+        ratelimit.penalise("login_account", account, ratelimit.LOGIN_PER_ACCOUNT)
+        raise
     _set_refresh_cookie(response, pair.refresh_token)
     return LoginResponse(
         **_me(user).model_dump(),
