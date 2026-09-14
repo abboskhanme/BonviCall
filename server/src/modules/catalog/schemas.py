@@ -69,6 +69,47 @@ class UploadReleaseRequest(BaseModel):
     )
 
 
+class PublicReleaseResponse(BaseModel):
+    """One published build, as an anonymous visitor may see it.
+
+    A deliberately NARROW copy of :class:`AppVersionResponse` rather than a
+    reuse of it. That model carries ``created_by`` and ``created_by_name`` —
+    which member of staff uploaded the build — and a public page has no
+    business naming an employee. Widening this model is how that would happen
+    by accident, so it lists its fields rather than inheriting them.
+
+    Everything here is already public by another route: the bytes and their
+    SHA-256 come back from ``GET /api/v1/app/download/{version_code}``, which
+    SPEC §4.1 rule 5 makes public, and the version is printed inside the APK.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    version: str
+    version_code: int
+    variant: AppVariant
+    size_bytes: Int64
+    apk_sha256: str = Field(
+        description="So a download can be checked against what the server holds."
+    )
+    min_api_level: int
+    release_notes_uz: str | None
+    published_at: datetime | None
+
+
+class PublicReleaseListResponse(BaseModel):
+    """The current build of each variant. Empty before the first publish.
+
+    ``total`` can only ever be 0, 1 or 2 — there are two variants — and it is
+    here anyway, because every list response in this API carries the same two
+    fields and a generated client that has to special-case one of them is worse
+    than a field that is always ``len(items)``.
+    """
+
+    items: list[PublicReleaseResponse]
+    total: int
+
+
 class AppVersionResponse(BaseModel):
     """One build in the distribution record."""
 

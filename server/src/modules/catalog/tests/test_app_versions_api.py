@@ -17,6 +17,7 @@ import zipfile
 import pytest
 import sqlalchemy as sa
 
+from src.core import ratelimit
 from src.modules.catalog.models import AppVersionModel
 
 pytestmark = pytest.mark.asyncio
@@ -413,3 +414,93 @@ async def test_a_manager_sees_the_uploader_name_without_users_read(
     listed = (await manager.get("/api/v1/app/versions")).json()["items"][0]
     assert listed["created_by_name"]
     assert listed["created_by_name"] != listed["created_by"]
+
+
+# --- The public download page's read (GET /api/v1/app/latest) ---------------
+#
+# Added 2026-09-14 so the site's front page can offer the app to somebody with
+# no account. It is the same call SPEC §4.1 rule 5 already made about the
+# binary; what these tests pin is the boundary around it.
+
+LATEST = "/api/v1/app/latest"
+
+
+async def test_the_public_list_needs_no_token(db, client, admin) -> None:
+    uploaded = (await _upload(admin)).json()["version"]
+    await admin.post(f"/api/v1/app/versions/{uploaded['id']}/publish")
+
+    response = await client.get(LATEST)
+
+    assert "authorization" not in {k.lower() for k in client.headers}
+    assert response.status_code == 200
+    assert [item["version_code"] for item in response.json()["items"]] == [140]
+
+
+async def test_an_unpublished_build_is_not_offered(db, client, admin) -> None:
+    """Upload and publish are two steps so a build can be inspected first.
+
+    A page that handed out whatever was uploaded would undo that, and the
+    person it would reach is a salesperson installing on their own phone.
+    """
+    await _upload(admin)
+
+    assert (await client.get(LATEST)).json()["items"] == []
+
+
+async def test_a_server_with_no_build_answers_an_empty_list_not_a_404(
+    db, client
+) -> None:
+    """A fresh deployment has no APK. That is a state, not an error — the page
+    says so in Uzbek rather than rendering a button that goes nowhere."""
+    response = await client.get(LATEST)
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "total": 0}
+
+
+async def test_the_public_shape_never_names_the_member_of_staff(
+    db, client, admin
+) -> None:
+    """The admin-facing model carries `created_by` and `created_by_name`.
+
+    This one is a separate model rather than a subset of it, and this is the
+    test that makes that choice load-bearing: reusing `AppVersionResponse`
+    would publish which employee uploaded the build to anybody who asked.
+    """
+    uploaded = (await _upload(admin)).json()["version"]
+    await admin.post(f"/api/v1/app/versions/{uploaded['id']}/publish")
+
+    item = (await client.get(LATEST)).json()["items"][0]
+
+    assert set(item) == {
+        "version",
+        "version_code",
+        "variant",
+        "size_bytes",
+        "apk_sha256",
+        "min_api_level",
+        "release_notes_uz",
+        "published_at",
+    }
+
+
+async def test_each_variant_is_offered_once(db, client, admin) -> None:
+    """Both flavours ship in lockstep (SPEC §7.2) and a phone needs the one
+    that matches its Android version, so the page shows both."""
+    for code, variant in ((140, "modern34"), (141, "legacy28")):
+        uploaded = (await _upload(admin, version_code=code, variant=variant)).json()
+        await admin.post(f"/api/v1/app/versions/{uploaded['version']['id']}/publish")
+
+    items = (await client.get(LATEST)).json()["items"]
+
+    assert sorted(item["variant"] for item in items) == ["legacy28", "modern34"]
+
+
+async def test_the_public_list_is_rate_limited(db, client) -> None:
+    """It is anonymous, so it is bounded — loosely, because it is the front
+    door and one office address is fifteen people."""
+    limit = ratelimit.PUBLIC_RELEASE_PER_IP.requests
+    assert limit > ratelimit.INSTALL_PAGE_PER_IP.requests
+    for _ in range(limit):
+        assert (await client.get(LATEST)).status_code == 200
+    assert (await client.get(LATEST)).status_code == 429

@@ -34,6 +34,7 @@ import { AlertsPage } from '@/modules/alerts/AlertsPage'
 import { CallDetailPage } from '@/modules/calls/CallDetailPage'
 import { CallsPage } from '@/modules/calls/CallsPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
+import { LandingPage } from '@/modules/landing/LandingPage'
 import { DeviceDetailPage } from '@/modules/devices/DeviceDetailPage'
 import { DevicesPage } from '@/modules/devices/DevicesPage'
 import { SettingsPage } from '@/modules/settings/SettingsPage'
@@ -58,6 +59,13 @@ export interface RouteSpec {
 
 export const ROUTES: readonly RouteSpec[] = [
   // ── Public ────────────────────────────────────────────────────────────
+  // The site's front page, and the only route here with no session at all.
+  // It hands out the APK so somebody can install without an account — a
+  // reinstall after a factory reset, a second handset, showing the product to
+  // a visitor — none of which used to be possible without an admin issuing a
+  // per-agent link first. It grants nothing: the app is inert until an
+  // enrolment code is typed into it, and that is still an admin's decision.
+  { path: '/', element: <LandingPage />, isPublic: true, fullScreen: true },
   { path: '/login', element: <LoginPage />, isPublic: true, fullScreen: true },
   //
   // `/i/:code` — the install landing page of SPEC §8.1 — is deliberately NOT
@@ -70,7 +78,12 @@ export const ROUTES: readonly RouteSpec[] = [
   // HTML works without JS and serves the APK directly.
 
   // ── Authenticated, no permission of its own ───────────────────────────
-  { path: '/', element: <DashboardPage /> },
+  //
+  // `/dashboard`, not `/`, since 2026-09-14: the root became the public front
+  // page. `landingPath()` is what sends a signed-in user here and it is the
+  // one place that knows the path — the post-login redirect and every gate
+  // refusal both ask it rather than hard-coding an answer.
+  { path: '/dashboard', element: <DashboardPage /> },
 
   // ── Operations ────────────────────────────────────────────────────────
   //

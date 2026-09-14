@@ -86,7 +86,7 @@ export interface NavItem {
  * ════════════════════════════════════════════════════════════════════════
  */
 export const NAV: readonly NavItem[] = [
-  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
 
   {
     to: '/calls',
@@ -170,7 +170,7 @@ function NavList({
             ) : null}
             <NavLink
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/dashboard'}
               onClick={onNavigate}
               title={collapsed ? t(item.labelKey) : undefined}
               className={({ isActive }) =>

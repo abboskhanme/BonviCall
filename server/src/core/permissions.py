@@ -240,6 +240,12 @@ PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset(
         # path so the download is a funnel signal. Both halves are here.
         ("GET", "/i/{code}/apk"),
         ("GET", "/api/v1/app/download/{version_code}"),
+        # The site's front page reads this so a visitor can install the app
+        # without an account, which is the same decision rule 5 already made
+        # about the binary itself. It returns a version number and a size; the
+        # admin-facing list, which names the uploader, stays behind
+        # `appversions:read`.
+        ("GET", "/api/v1/app/latest"),
         ("POST", "/api/device/v1/enrolment/redeem"),
         # T-MZ. MoiZvonki's servers post call events here and hold no
         # credential of ours, so the secret in the PATH is the authentication

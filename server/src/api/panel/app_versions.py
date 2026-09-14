@@ -41,6 +41,8 @@ from src.modules.catalog.rules import normalise_fingerprint
 from src.modules.catalog.schemas import (
     AppVersionListResponse,
     AppVersionResponse,
+    PublicReleaseListResponse,
+    PublicReleaseResponse,
     SetMinimumVersionRequest,
     SetMinimumVersionResponse,
     StrandedInstallationOut,
@@ -48,7 +50,7 @@ from src.modules.catalog.schemas import (
     UploadReleaseResponse,
     VersionGateImpactResponse,
 )
-from src.modules.catalog.service import ReleaseService
+from src.modules.catalog.service import CatalogService, ReleaseService
 from src.modules.installations.service import (
     SETTING_MIN_VERSION_CODE,
     VersionGateService,
@@ -238,6 +240,37 @@ async def set_min_version(
     )
     return SetMinimumVersionResponse(
         version_code=payload.version_code, stranded_count=stranded
+    )
+
+
+@router.get("/latest", response_model=PublicReleaseListResponse)
+async def latest_releases(
+    request: Request, session: SessionDep
+) -> PublicReleaseListResponse:
+    """The current published build of each variant. **Public**, rate-limited.
+
+    What the site's front page reads, so that somebody sent to this server can
+    install the app without an account. It is the same permission decision SPEC
+    §4.1 rule 5 already made for the APK itself: the binary is a client and
+    holds no secret, and a version number beside it tells an attacker nothing
+    the file would not.
+
+    It answers an EMPTY list before the first publish, and that is a real
+    answer rather than a 404 — a fresh server has no build, and the page says
+    so in Uzbek instead of offering a button that goes nowhere.
+
+    ``PublicReleaseResponse`` is a narrow model on purpose: the admin-facing
+    one names the member of staff who uploaded the build.
+    """
+    ratelimit.hit("public_release", _client_ip(request), ratelimit.PUBLIC_RELEASE_PER_IP)
+    # CatalogService, not ReleaseService: this is the read side — what is
+    # current — and it sits beside `current_release` and
+    # `current_version_code`, which the install page and the phones' update
+    # check already ask. ReleaseService is upload, publish and download.
+    rows = await CatalogService(session).published_releases()
+    return PublicReleaseListResponse(
+        items=[PublicReleaseResponse.model_validate(row) for row in rows],
+        total=len(rows),
     )
 
 

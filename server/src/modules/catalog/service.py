@@ -50,6 +50,26 @@ class CatalogService:
             statement = statement.where(AppVersionModel.variant == variant)
         return await self.session.scalar(statement.limit(1))
 
+    async def published_releases(self) -> list[AppVersionModel]:
+        """The current build of every variant, newest variant order aside.
+
+        What the public download page reads. It asks for the *published*
+        current row per variant, so an uploaded-but-not-published build is
+        invisible here exactly as it is to every phone — the two-step upload
+        exists so a build can be inspected before the fleet is committed to it,
+        and a page that offered it anyway would undo that.
+        """
+        return list(
+            await self.session.scalars(
+                select(AppVersionModel)
+                .where(
+                    AppVersionModel.is_current.is_(True),
+                    AppVersionModel.published_at.is_not(None),
+                )
+                .order_by(AppVersionModel.variant, AppVersionModel.version_code.desc())
+            )
+        )
+
     async def current_version_code(
         self, variant: AppVariant | None = None
     ) -> int | None:

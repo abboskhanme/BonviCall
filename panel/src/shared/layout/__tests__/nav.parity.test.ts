@@ -40,7 +40,9 @@ describe('nav and route table', () => {
 
   it('hides every gated entry from a user with no permissions', () => {
     const visible = visibleNav(new Set<string>())
-    expect(visible.map((item) => item.to)).toEqual(['/'])
+    // The dashboard, and only the dashboard. It moved to `/dashboard` on
+    // 2026-09-14 when `/` became the public download page.
+    expect(visible.map((item) => item.to)).toEqual(['/dashboard'])
   })
 
   it('offers neither the audit log nor the APK page to anybody', () => {

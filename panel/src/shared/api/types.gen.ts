@@ -2767,6 +2767,56 @@ export interface components {
             status: components["schemas"]["ReceiverStatus"];
         };
         /**
+         * PublicReleaseListResponse
+         * @description The current build of each variant. Empty before the first publish.
+         *
+         *     `total` can only ever be 0, 1 or 2 — there are two variants — and it is
+         *     here anyway, because every list response in this API carries the same two
+         *     fields and a generated client that has to special-case one of them is worse
+         *     than a field that is always `len(items)`.
+         */
+        PublicReleaseListResponse: {
+            /** Items */
+            items: components["schemas"]["PublicReleaseResponse"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * PublicReleaseResponse
+         * @description One published build, as an anonymous visitor may see it.
+         *
+         *     A deliberately NARROW copy of `AppVersionResponse` rather than a
+         *     reuse of it. That model carries `created_by` and `created_by_name` —
+         *     which member of staff uploaded the build — and a public page has no
+         *     business naming an employee.
+         */
+        PublicReleaseResponse: {
+            /**
+             * Apk Sha256
+             * @description So a download can be checked against what the server holds.
+             */
+            apk_sha256: string;
+            /** Min Api Level */
+            min_api_level: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string | null;
+            /** Release Notes Uz */
+            release_notes_uz: string | null;
+            /**
+             * Size Bytes
+             * Format: int64
+             */
+            size_bytes: number;
+            variant: components["schemas"]["AppVariant"];
+            /** Version */
+            version: string;
+            /** Version Code */
+            version_code: number;
+        };
+        /**
          * ReclassifyResponse
          * @description A directory change is only half done until the calls agree with it.
          */

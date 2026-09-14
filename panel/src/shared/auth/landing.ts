@@ -28,7 +28,15 @@ export const DASHBOARD_PERMISSIONS: readonly Permission[] = [
   Perm.REPORTS_READ,
 ]
 
-export const DEFAULT_LANDING = '/'
+/**
+ * `/dashboard` since 2026-09-14, when `/` became the public download page.
+ *
+ * The value moving is the entire cost of that change, which is why it was a
+ * constant in one file rather than a string in three: the post-login redirect,
+ * the gate refusal and the front page's own "go to the panel" button all read
+ * it, and none of them had to be found.
+ */
+export const DEFAULT_LANDING = '/dashboard'
 
 /** The first page any signed-in user should see. */
 export function landingPath(): string {

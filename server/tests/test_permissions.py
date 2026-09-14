@@ -128,6 +128,13 @@ def test_public_routes_are_the_reconciled_list() -> None:
     than given a principal because it genuinely resolves none — which is what
     membership of this set means, and why this test is written out by hand
     rather than derived from the routes.
+
+    ``/api/v1/app/latest`` is the fourth, added 2026-09-14 for the site's front
+    page: somebody sent to this server can install the app without an account.
+    It is rule 5's decision applied to the sentence beside the button rather
+    than to the button — the binary is already public, and a version number and
+    a file size tell a reader nothing the file would not. It answers with a
+    narrow model that never names the member of staff who uploaded the build.
     """
     assert PUBLIC_ROUTES == {
         ("GET", "/healthz"),
@@ -136,6 +143,7 @@ def test_public_routes_are_the_reconciled_list() -> None:
         ("GET", "/i/{code}"),
         ("GET", "/i/{code}/apk"),
         ("GET", "/api/v1/app/download/{version_code}"),
+        ("GET", "/api/v1/app/latest"),
         ("POST", "/api/device/v1/enrolment/redeem"),
         ("POST", "/api/telephony/moizvonki/{secret}"),
     }

@@ -3707,6 +3707,84 @@
         "title": "OpenDeltaOut",
         "type": "object"
       },
+      "PublicReleaseListResponse": {
+        "description": "The current build of each variant. Empty before the first publish.\n\n``total`` can only ever be 0, 1 or 2 — there are two variants — and it is\nhere anyway, because every list response in this API carries the same two\nfields and a generated client that has to special-case one of them is worse\nthan a field that is always ``len(items)``.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicReleaseResponse"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PublicReleaseListResponse",
+        "type": "object"
+      },
+      "PublicReleaseResponse": {
+        "description": "One published build, as an anonymous visitor may see it.\n\nA deliberately NARROW copy of :class:`AppVersionResponse` rather than a\nreuse of it. That model carries ``created_by`` and ``created_by_name`` —\nwhich member of staff uploaded the build — and a public page has no\nbusiness naming an employee. Widening this model is how that would happen\nby accident, so it lists its fields rather than inheriting them.\n\nEverything here is already public by another route: the bytes and their\nSHA-256 come back from ``GET /api/v1/app/download/{version_code}``, which\nSPEC §4.1 rule 5 makes public, and the version is printed inside the APK.",
+        "properties": {
+          "apk_sha256": {
+            "description": "So a download can be checked against what the server holds.",
+            "type": "string"
+          },
+          "min_api_level": {
+            "type": "integer"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "release_notes_uz": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/AppVariant"
+          },
+          "version": {
+            "type": "string"
+          },
+          "version_code": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "version_code",
+          "variant",
+          "size_bytes",
+          "apk_sha256",
+          "min_api_level",
+          "release_notes_uz",
+          "published_at"
+        ],
+        "title": "PublicReleaseResponse",
+        "type": "object"
+      },
       "ReadyResponse": {
         "description": "Dependency readiness, one flag per dependency.",
         "properties": {
@@ -4943,6 +5021,28 @@
           }
         },
         "summary": "Download Version",
+        "tags": [
+          "App versions"
+        ]
+      }
+    },
+    "/api/v1/app/latest": {
+      "get": {
+        "description": "The current published build of each variant. **Public**, rate-limited.\n\nWhat the site's front page reads, so that somebody sent to this server can\ninstall the app without an account. It is the same permission decision SPEC\n§4.1 rule 5 already made for the APK itself: the binary is a client and\nholds no secret, and a version number beside it tells an attacker nothing\nthe file would not.\n\nIt answers an EMPTY list before the first publish, and that is a real\nanswer rather than a 404 — a fresh server has no build, and the page says\nso in Uzbek instead of offering a button that goes nowhere.\n\n``PublicReleaseResponse`` is a narrow model on purpose: the admin-facing\none names the member of staff who uploaded the build.",
+        "operationId": "latest_releases_api_v1_app_latest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicReleaseListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Latest Releases",
         "tags": [
           "App versions"
         ]

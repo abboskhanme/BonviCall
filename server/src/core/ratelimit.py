@@ -61,6 +61,11 @@ LOGIN_PER_ACCOUNT = Limit(requests=10, window_seconds=300)
 #: Two counters for one rule would only mean two places to change it.
 ENROLMENT_REDEEM_PER_IP = Limit(requests=10, window_seconds=3600)
 INSTALL_PAGE_PER_IP = Limit(requests=60, window_seconds=3600)
+#: The public download page's one read. Looser than the install page because it
+#: is the site's front door rather than a one-off link — a visitor who reloads,
+#: or fifteen people behind one office address, must not run into it — and it
+#: costs one indexed row. Bounded rather than absent because it is anonymous.
+PUBLIC_RELEASE_PER_IP = Limit(requests=300, window_seconds=3600)
 #: The landing page hands out a ~30 MB binary, so it is stricter than the page.
 APK_DOWNLOAD_PER_IP = Limit(requests=10, window_seconds=3600)
 
@@ -146,6 +151,7 @@ __all__ = [
     "INSTALL_PAGE_PER_IP",
     "LOGIN_PER_ACCOUNT",
     "LOGIN_PER_IP",
+    "PUBLIC_RELEASE_PER_IP",
     "Limit",
     "check",
     "client_ip",

@@ -179,15 +179,19 @@ describe('route gate', () => {
   })
 
   it('gates every non-public route except the dashboard', () => {
-    // The dashboard is "any authenticated user" (SPEC §5.2) and the two public
+    // The dashboard is "any authenticated user" (SPEC §5.2) and the public
     // pages carry no gate by definition. `/settings` joined them on
     // 2026-09-14: your own account is yours whatever your role, and the one
     // section on it that touches OTHER accounts is gated inside the page and
     // by the server on every request it makes.
     //
+    // The dashboard is `/dashboard` rather than `/` since the same day — the
+    // root became the public download page — and it is written out here so
+    // that a route losing its gate is still a failure rather than a rename.
+    //
     // The exceptions are listed rather than pattern-matched, so a page added
     // later still cannot ship ungated by accident.
-    const ANY_AUTHENTICATED = ['/', '/settings']
+    const ANY_AUTHENTICATED = ['/dashboard', '/settings']
     const ungated = ROUTES.filter(
       (route) =>
         !route.isPublic && !ANY_AUTHENTICATED.includes(route.path) && !route.anyOf?.length,
