@@ -17,6 +17,19 @@
  *
  * Repeats bump `occurrence_count` rather than inserting rows, so a phone that
  * has been offline for a week is one line, not a thousand.
+ *
+ * **`detail` is read, never printed.** It used to be rendered raw under the
+ * sentence — `to=granted_not_working · from=null · capability=microphone` —
+ * as a diagnostic aid. It was removed on 2026-09-14 at the client's request,
+ * and the request was right: this page is read by an office manager deciding
+ * who to telephone, and a line of English identifiers in a monospace font
+ * reads as something has gone wrong with the program rather than with a
+ * phone. It was also mostly redundant — `first_report` is the Uzbek sentence
+ * directly above it, and the rest restates `body_uz` in a second language.
+ *
+ * The field is still on the wire and still decides what the row says:
+ * `isFirstObservation` reads it. Nothing was dropped from the response, only
+ * from the screen.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { Link, useSearchParams } from 'react-router-dom'
@@ -50,25 +63,6 @@ function parseSeverity(raw: string | null): AlertSeverity | undefined {
   return raw !== null && raw in ALERT_SEVERITY_LABEL ? (raw as AlertSeverity) : undefined
 }
 
-/**
- * The machine-readable half of the envelope, shown small.
- *
- * The keys are English identifiers — `offline_minutes`, `never_reported` — and
- * they stay that way on purpose: this is a build artefact for whoever is
- * diagnosing, in the same spirit as a task id, not a sentence anybody is meant
- * to read as prose. The Uzbek sentence above it is what the page is for.
- */
-function AlertDetail({ detail }: { detail: Record<string, unknown> | null }) {
-  if (!detail) return null
-  const entries = Object.entries(detail)
-  if (entries.length === 0) return null
-  return (
-    <p className="mt-1 font-mono text-2xs text-muted">
-      {entries.map(([key, value]) => `${key}=${String(value)}`).join(' · ')}
-    </p>
-  )
-}
-
 function AlertRow({ alert, agentName }: { alert: Alert; agentName: (id: string) => string | null }) {
   const can = useAuth((state) => state.can)
   const acknowledge = useAcknowledgeAlert()
@@ -98,7 +92,6 @@ function AlertRow({ alert, agentName }: { alert: Alert; agentName: (id: string) 
           {firstObservation ? (
             <p className="mt-1 text-xs text-warn">{t('alerts.firstObservation')}</p>
           ) : null}
-          <AlertDetail detail={detail} />
 
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-muted">
             {name ? (

@@ -13,7 +13,7 @@
  *  • acknowledge is not rendered without `alerts:ack`.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -323,12 +323,20 @@ describe('permissions and states', () => {
     expect(url).toContain('open_only=true')
   })
 
-  it('scopes the detail line to technical values, and shows no secrets', async () => {
+  it('never prints the machine-readable detail on the page', async () => {
+    /** It used to, and it read as a program fault rather than a phone fault.
+     *
+     *  The field still arrives and still decides what the row says — the
+     *  first-observation sentence below is driven by it — so this pins the
+     *  screen, not the response. Re-adding the line is a one-line change and
+     *  would look like an improvement to whoever made it. */
     world([makeAlert()])
     renderPage()
 
-    const detail = await screen.findByText(/offline_minutes=10/)
-    expect(within(detail).queryByText(/token/i)).toBeNull()
+    await screen.findByText(TITLE)
+    expect(screen.queryByText(/offline_minutes/)).toBeNull()
+    expect(screen.queryByText(/never_reported/)).toBeNull()
+    expect(screen.queryByText(/=/)).toBeNull()
   })
 })
 
