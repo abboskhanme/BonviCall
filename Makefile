@@ -6,7 +6,7 @@
         lint migrate migrate-check migration contract types shell-backend build \
         android-build android-test android-lint android-dto \
         android-install android-release \
-        prod-up prod-down prod-migrate prod-logs prod-ps
+        prod-up prod-down prod-migrate prod-logs prod-ps prod-publish-apk
 
 up:                ## Bring the stack up with hot reload
 	docker compose up -d
@@ -177,6 +177,12 @@ prod-down:         ## Stop the deployed stack. Does NOT delete data.
 
 prod-migrate:      ## Run migrations against the deployment. Read the migration first.
 	$(PROD) run --rm backend alembic upgrade head
+
+# A new server has NO published build, and the panel's publishing screen was
+# removed. Without this step /i/<code> offers a 404 to every salesperson.
+prod-publish-apk:  ## make prod-publish-apk url=https://call.bonvi.uz p='<admin password>'
+	scripts/publish_apk.sh --url $(url) --login $(or $(u),admin) --password '$(p)' \
+	  --apk android/app/build/outputs/apk/legacy28/release/app-legacy28-release.apk
 
 prod-logs:
 	$(PROD) logs -f

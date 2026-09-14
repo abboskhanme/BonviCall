@@ -45,6 +45,37 @@ one.
 
 ---
 
+## Before you start — what must be true
+
+Verified on 2026-09-14 against this commit; re-run the first four before any
+deployment, they are `make test`, `make lint` and two lines.
+
+| Check | State |
+|---|---|
+| Server suite | 766 passed, 2 skipped |
+| Panel suite | 302 passed |
+| Lint, both sides | clean |
+| Panel build (`tsc -b && vite build`) | clean |
+| Migrations reach head from empty, and downgrade | clean |
+| Models vs migrations (`alembic check`) | no drift |
+| `contract/` current | no drift |
+| `ENVIRONMENT=prod` refuses placeholder secrets | refuses |
+| `ENVIRONMENT=prod` hides `/docs` and `/openapi.json` | hidden |
+| Refresh cookie gains `Secure` in prod | yes |
+| The whole TLS path, on a real stack | rehearsed — see below |
+
+The last line is the one worth knowing about: the deployed stack was brought
+up locally on 2026-09-14, migrated, seeded, given a real signed APK through
+`scripts/publish_apk.sh`, and an install link was followed end to end. The
+deep link came back as `server=https%3A%2F%2F…` and the APK downloaded, 2.6 MB,
+through Caddy. That is the path a salesperson walks.
+
+**What you need before step 1:** a host, a domain pointed at it, ports 80 and
+443 open, and a decision about which APK the fleet gets (see step 6 — the build
+sitting in `android/app/build/outputs/` may be older than the recording fixes).
+
+---
+
 ## First deployment
 
 ### 1. The domain, before anything else
@@ -119,6 +150,48 @@ curl -sI https://call.bonvi.uz/ | grep -i strict-transport                      
 
 Then sign in to `https://call.bonvi.uz/` and change the seeded password — the
 account is created with `must_change_password`, so the panel will insist.
+
+### 6. Publish the APK — a new server has none
+
+**Do not skip this.** A fresh deployment has no build, `/i/<code>` renders
+"APK not ready", and there is nothing for a salesperson to install. It is the
+first thing to do on a new server and the easiest to forget, because the
+panel's publishing screen was removed on 2026-09-14 at the client's request —
+it was a page an admin opens once a month. The endpoints it drove are still
+there; `scripts/publish_apk.sh` is the path without the screen.
+
+```sh
+make android-release          # needs android/keystore.properties — APK-SIGNING.md
+
+scripts/publish_apk.sh \
+  --url https://call.bonvi.uz --login admin --password '…' \
+  --apk android/app/build/outputs/apk/legacy28/release/app-legacy28-release.apk
+```
+
+Version, version code and variant are read from
+`android/app/build.gradle.kts` and from the APK's path. Pass them only to
+override, and get them right if you do: the server does **not** open the
+manifest, so `version_code` is whatever the call says it is, and a wrong one
+leaves every handset either offered a build it already has for ever, or
+refused as under-version while running the newest one. Neither fails loudly.
+
+Both flavours are separate publications — `legacy28` is what the fleet runs
+(SPEC §7.2); publish `modern34` as well if any handset needs it.
+
+`--no-publish` uploads and stops, so the signer fingerprint can be read before
+the fleet is committed to a build. A build signed with a different key cannot
+install over an existing one, and the phone reports that as a bare failure.
+
+### 7. Check the whole path, as a salesperson would
+
+```sh
+curl -s "https://call.bonvi.uz/i/<code>" | grep -o 'server=[^"]*'   # https, not http
+curl -sL -o /tmp/x.apk -w '%{http_code} %{size_download}\n' "https://call.bonvi.uz/i/<code>/apk"
+```
+
+The `server=` in the deep link is what a release build is pointed at, and it
+is built from the headers Caddy sets. It **must** be `https://` — a release
+APK refuses cleartext outright and will not connect to anything else.
 
 ---
 
