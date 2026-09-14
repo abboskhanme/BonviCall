@@ -43,7 +43,7 @@ import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { relativeText } from '@/shared/lib/relativeText'
 import { Page, PageHeader } from '@/shared/layout/Page'
-import { formatDate, formatInstantTitle } from '@/shared/lib/format'
+import { formatInstantTitle } from '@/shared/lib/format'
 import { Badge, Button } from '@/shared/ui/primitives'
 import { Field, FieldGrid, Section } from '@/shared/ui/detail'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
@@ -71,12 +71,44 @@ function DeviceSection({ agentId }: { agentId: string }) {
   const stageByInstallation = new Map(
     (installationsQuery.data?.items ?? []).map((item) => [item.id, item.funnel_stage]),
   )
-  const fleet = buildFleet(
+  const everyDevice = buildFleet(
     devicesQuery.data?.items,
     stageByInstallation,
     new Date(),
     supersededInstallationIds(installationsQuery.data?.items),
   ).filter((row) => row.health.agent_id === agentId)
+
+  /**
+   * The phone this person is using, and only that one.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * A rollout retries: one agent on the live fleet had twenty installations,
+   * and every one of them rendered a card here. The list was long enough to
+   * hide the only row anybody opens this page for — the handset in their
+   * pocket right now.
+   *
+   * NEWEST, not `status === 'active'`, and that distinction already cost this
+   * page once (see `AgentCard` below, which states it at length): an old
+   * verified installation outranks the phone that is stuck at a permission
+   * screen this morning, so picking "active" shows the wrong one precisely
+   * when somebody is looking for the right one.
+   *
+   * Sorted by the installation's `created_at` rather than by last heartbeat,
+   * because a new phone that has never reported is still the current phone.
+   * The older ones are counted, not silently discarded — twenty attempts
+   * behind one salesperson is the story, even when only one is shown.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  const createdAt = new Map(
+    (installationsQuery.data?.items ?? []).map((item) => [item.id, item.created_at]),
+  )
+  const newestFirst = [...everyDevice].sort((a, b) =>
+    (createdAt.get(b.health.installation_id) ?? '').localeCompare(
+      createdAt.get(a.health.installation_id) ?? '',
+    ),
+  )
+  const fleet = newestFirst.slice(0, 1)
+  const olderDevices = Math.max(0, newestFirst.length - 1)
 
   return (
     <Section title={t('agentDetail.deviceTitle')} description={t('agentDetail.deviceSubtitle')}>
@@ -146,6 +178,11 @@ function DeviceSection({ agentId }: { agentId: string }) {
               </div>
             )
           })}
+          {olderDevices > 0 ? (
+            <p className="text-2xs text-muted">
+              {t('agentDetail.olderDevices', { n: olderDevices })}
+            </p>
+          ) : null}
         </div>
       )}
     </Section>
@@ -214,6 +251,12 @@ function AgentCard({ agent }: { agent: Agent }) {
           </>
         }
       >
+        {/* Status alone. The hire date and the free-text note were removed on
+            2026-09-14 at the client's request: this card is opened to answer
+            "is this person's phone capturing", and neither fact has ever been
+            part of that. The columns stay on the server and the import still
+            accepts `hired_at` — nothing was dropped from the record, only
+            from the screen. */}
         <FieldGrid>
           <Field label={t('agents.colStatus')}>
             {agent.archived_at ? (
@@ -224,11 +267,6 @@ function AgentCard({ agent }: { agent: Agent }) {
               <Badge tone="warn">{t('agents.statusInactive')}</Badge>
             )}
           </Field>
-          <Field
-            label={t('agents.colHired')}
-            value={agent.hired_at ? formatDate(agent.hired_at) : null}
-          />
-          <Field label={t('agents.colNote')} value={agent.note} />
         </FieldGrid>
       </Section>
 

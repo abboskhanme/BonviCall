@@ -21,19 +21,28 @@ import { Input } from '@/shared/ui/primitives'
 
 import { useCreateAgent, useUpdateAgent, type Agent } from './api'
 
+/**
+ * Name, code and — when editing — active. No hire date and no note.
+ *
+ * Both were removed on 2026-09-14 at the client's request, from the card that
+ * displayed them and therefore from the form that collected them: a field
+ * nobody ever reads back is the shape of thing this project keeps building by
+ * accident.
+ *
+ * **Neither is cleared on an existing agent.** `AgentService.update` dumps the
+ * payload with `exclude_unset=True`, so a key this form no longer sends is a
+ * key the server does not touch. The columns, the schema and the CSV import
+ * all still carry `hired_at`; only the two inputs are gone.
+ */
 interface Draft {
   full_name: string
   employee_code: string
-  hired_at: string
-  note: string
   is_active: boolean
 }
 
 const EMPTY: Draft = {
   full_name: '',
   employee_code: '',
-  hired_at: '',
-  note: '',
   is_active: true,
 }
 
@@ -42,8 +51,6 @@ function draftFrom(agent: Agent | null): Draft {
   return {
     full_name: agent.full_name,
     employee_code: agent.employee_code ?? '',
-    hired_at: agent.hired_at ?? '',
-    note: agent.note ?? '',
     is_active: agent.is_active,
   }
 }
@@ -89,8 +96,6 @@ export function AgentModal({
     const shared = {
       full_name: draft.full_name.trim(),
       employee_code: orNull(draft.employee_code),
-      hired_at: orNull(draft.hired_at),
-      note: orNull(draft.note),
     }
 
     if (editing) {
@@ -133,23 +138,6 @@ export function AgentModal({
             value={draft.employee_code}
             placeholder={t('agents.fieldCodeHint')}
             onChange={(event) => setDraft({ ...draft, employee_code: event.target.value })}
-          />
-        </ModalField>
-
-        <ModalField htmlFor="agent-hired" label={t('agents.fieldHired')}>
-          <Input
-            id="agent-hired"
-            type="date"
-            value={draft.hired_at}
-            onChange={(event) => setDraft({ ...draft, hired_at: event.target.value })}
-          />
-        </ModalField>
-
-        <ModalField htmlFor="agent-note" label={t('agents.fieldNote')}>
-          <Input
-            id="agent-note"
-            value={draft.note}
-            onChange={(event) => setDraft({ ...draft, note: event.target.value })}
           />
         </ModalField>
 

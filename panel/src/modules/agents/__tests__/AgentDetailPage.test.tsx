@@ -132,12 +132,50 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
+/** One phone, as `/devices` reports it. Only the fields this page reads. */
+function health(installationId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    installation_id: installationId,
+    agent_id: AGENT_ID,
+    number_id: NUMBER_ID,
+    manufacturer: 'Xiaomi',
+    model: `Redmi ${installationId}`,
+    android_release: '13',
+    api_level: 33,
+    app_version: '1.0.7',
+    app_variant: 'legacy28',
+    battery_percent: 80,
+    battery_charging: false,
+    battery_optimisation_exempt: true,
+    capturing: true,
+    recording_route: 'oem_file_harvest',
+    recording_route_ok: true,
+    last_heartbeat_at: '2026-09-14T09:00:00+05:00',
+    last_call_at: null,
+    queue_pending: 0,
+    queue_bytes: null,
+    never_reported: false,
+    installation_status: 'active',
+    bound_at: '2026-09-01T00:00:00+05:00',
+    created_at: '2026-09-01T00:00:00+05:00',
+    ...overrides,
+  }
+}
+
+/** One installation row, as `/installations` reports it. `created_at` is the
+ *  field the page orders by, so it is what the caller sets. */
+function installationRow(id: string, createdAt: string, overrides: Record<string, unknown> = {}) {
+  return { ...installations('permitted').items[0], id, created_at: createdAt, ...overrides }
+}
+
 interface WorldOptions {
   stage?: string
   codes?: unknown[]
   attempts?: unknown[]
   receiverDown?: boolean
   noNumber?: boolean
+  devices?: unknown[]
+  installationItems?: unknown[]
 }
 
 function world(options: WorldOptions = {}) {
@@ -151,8 +189,18 @@ function world(options: WorldOptions = {}) {
       return reply(options.noNumber ? { items: [], total: 0 } : agentAssignments)
     }
     if (url.includes('/api/v1/numbers')) return reply(numbers)
-    if (url.includes('/api/v1/installations')) return reply(installations(options.stage ?? 'permitted'))
-    if (url.includes('/api/v1/devices')) return reply({ items: [], total: 0 })
+    if (url.includes('/api/v1/installations')) {
+      const items = options.installationItems
+      return reply(
+        items
+          ? { items, total: items.length }
+          : installations(options.stage ?? 'permitted'),
+      )
+    }
+    if (url.includes('/api/v1/devices')) {
+      const items = options.devices ?? []
+      return reply({ items, total: items.length })
+    }
     if (url.includes('/api/v1/enrolment-codes')) {
       return reply({ items: options.codes ?? [], total: (options.codes ?? []).length })
     }
@@ -378,5 +426,132 @@ describe('states', () => {
     const section = heading.closest('div')?.parentElement?.parentElement
     expect(section).toBeTruthy()
     expect(within(section as HTMLElement).getByText(t('agentDetail.noDevice'))).toBeInTheDocument()
+  })
+})
+
+describe('one phone, not the whole history of phones', () => {
+  /**
+   * A rollout retries. One agent on the live fleet had twenty installations,
+   * and every one of them used to render a card here — long enough to hide
+   * the only row anybody opens this page for.
+   */
+  const THREE_PHONES: WorldOptions = {
+    installationItems: [
+      installationRow('inst-old', '2026-08-01T00:00:00+05:00'),
+      installationRow('inst-new', '2026-09-10T00:00:00+05:00'),
+      installationRow('inst-mid', '2026-09-01T00:00:00+05:00'),
+    ],
+    devices: [health('inst-old'), health('inst-new'), health('inst-mid')],
+  }
+
+  it('shows the newest installation and no other', async () => {
+    world(THREE_PHONES)
+    renderPage()
+
+    expect(await screen.findByText('Xiaomi Redmi inst-new')).toBeInTheDocument()
+    expect(screen.queryByText('Xiaomi Redmi inst-old')).toBeNull()
+    expect(screen.queryByText('Xiaomi Redmi inst-mid')).toBeNull()
+  })
+
+  it('counts the older ones rather than discarding them silently', async () => {
+    world(THREE_PHONES)
+    renderPage()
+
+    expect(
+      await screen.findByText(t('agentDetail.olderDevices', { n: 2 })),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about older phones when there is only one', async () => {
+    world({
+      installationItems: [installationRow('inst-1', '2026-09-01T00:00:00+05:00')],
+      devices: [health('inst-1')],
+    })
+    renderPage()
+
+    expect(await screen.findByText('Xiaomi Redmi inst-1')).toBeInTheDocument()
+    expect(screen.queryByText(/eski qurilma/)).toBeNull()
+  })
+
+  it('prefers the newest over the ACTIVE one', async () => {
+    /** The distinction this page has already paid for once: an old verified
+     *  installation outranks the handset that is stuck at a permission screen
+     *  this morning, so "active" shows the wrong phone exactly when somebody
+     *  is looking for the right one. */
+    world({
+      installationItems: [
+        installationRow('inst-old', '2026-08-01T00:00:00+05:00', { status: 'active' }),
+        installationRow('inst-new', '2026-09-10T00:00:00+05:00', { status: 'pending' }),
+      ],
+      devices: [
+        health('inst-old', { installation_status: 'active' }),
+        health('inst-new', { installation_status: 'pending', never_reported: true, last_heartbeat_at: null }),
+      ],
+    })
+    renderPage()
+
+    expect(await screen.findByText('Xiaomi Redmi inst-new')).toBeInTheDocument()
+    expect(screen.queryByText('Xiaomi Redmi inst-old')).toBeNull()
+  })
+})
+
+describe('one enrolment code', () => {
+  function code(id: string, createdAt: string, overrides: Record<string, unknown> = {}) {
+    return {
+      id,
+      code: id.toUpperCase(),
+      number_id: NUMBER_ID,
+      agent_id: AGENT_ID,
+      created_at: createdAt,
+      expires_at: '2026-12-31T00:00:00+05:00',
+      redeemed_at: null,
+      revoked_at: null,
+      attempt_count: 0,
+      ...overrides,
+    }
+  }
+
+  it('shows the live code and not the ones it replaced', async () => {
+    world({
+      codes: [
+        code('k7m4pq01', '2026-09-01T00:00:00+05:00', { redeemed_at: '2026-09-02T00:00:00+05:00' }),
+        code('k7m4pq02', '2026-09-10T00:00:00+05:00'),
+      ],
+    })
+    renderPage()
+
+    expect(await screen.findByText('K7M4PQ02')).toBeInTheDocument()
+    expect(screen.queryByText('K7M4PQ01')).toBeNull()
+    expect(screen.getByText(t('enrol.olderCodes', { n: 1 }))).toBeInTheDocument()
+  })
+
+  it('falls back to the newest when none is live', async () => {
+    /** A dead code is still worth showing — it carries when it was issued and
+     *  what happened to it. Showing nothing would read as "no code was ever
+     *  given", which is a different and wrong answer. */
+    world({
+      codes: [
+        code('k7m4pq03', '2026-09-10T00:00:00+05:00', { revoked_at: '2026-09-11T00:00:00+05:00' }),
+      ],
+    })
+    renderPage()
+
+    expect(await screen.findByText('K7M4PQ03')).toBeInTheDocument()
+  })
+})
+
+describe('what the card no longer says', () => {
+  it('shows neither a hire date nor a note', async () => {
+    /** Removed at the client's request on 2026-09-14. This card is opened to
+     *  answer "is this person's phone capturing", and neither fact was ever
+     *  part of that. Pinned because re-adding a Field looks like an
+     *  improvement to whoever does it. */
+    world()
+    renderPage()
+
+    await screen.findByText('Aziz Karimov')
+    expect(screen.queryByText('01.03.2025')).toBeNull()
+    expect(screen.queryByText(/Ishga kirgan/i)).toBeNull()
+    expect(screen.queryByText(/^Izoh$/)).toBeNull()
   })
 })

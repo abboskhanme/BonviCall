@@ -8,6 +8,7 @@
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -39,6 +40,12 @@ function alert(overrides: Record<string, unknown> = {}) {
     installation_status: 'active',
     ...overrides,
   }
+}
+
+function manyAlerts(n: number) {
+  return Array.from({ length: n }, (_, i) =>
+    alert({ id: `alert-${i}`, title_uz: `ogohlantirish-${i}` }),
+  )
 }
 
 function world(items: unknown[]) {
@@ -115,5 +122,59 @@ describe('what a row says', () => {
     await waitFor(() =>
       expect(screen.getByText(t('agentDetail.alertsEmpty'))).toBeInTheDocument(),
     )
+  })
+})
+
+
+describe('pagination', () => {
+  /**
+   * A phone that has been through a long rollout collects a page of history,
+   * and the card is a summary — not a place to scroll. Ten at a time, turned
+   * in the browser: `GET /alerts` takes a limit and no offset, and one
+   * person's history is small by construction because alerts dedupe.
+   */
+  it('shows ten rows at a time', async () => {
+    world(manyAlerts(25))
+    renderSection()
+
+    expect(await screen.findByText('ogohlantirish-0')).toBeInTheDocument()
+    expect(screen.getByText('ogohlantirish-9')).toBeInTheDocument()
+    expect(screen.queryByText('ogohlantirish-10')).toBeNull()
+  })
+
+  it('turns to the next ten', async () => {
+    world(manyAlerts(25))
+    renderSection()
+
+    await screen.findByText('ogohlantirish-0')
+    await userEvent.click(screen.getByRole('button', { name: t('calls.nextPage') }))
+
+    expect(await screen.findByText('ogohlantirish-10')).toBeInTheDocument()
+    expect(screen.queryByText('ogohlantirish-0')).toBeNull()
+  })
+
+  it('says how many there are in total', async () => {
+    world(manyAlerts(25))
+    renderSection()
+
+    expect(await screen.findByText(t('agentDetail.alertsCount', { n: 25 }))).toBeInTheDocument()
+  })
+
+  it('offers no controls at all when ten is the whole history', async () => {
+    /** Two dead buttons under a four-row table is worse than no buttons. */
+    world(manyAlerts(10))
+    renderSection()
+
+    await screen.findByText('ogohlantirish-0')
+    expect(screen.queryByRole('button', { name: t('calls.nextPage') })).toBeNull()
+    expect(screen.queryByRole('button', { name: t('calls.prevPage') })).toBeNull()
+  })
+
+  it('cannot go back from the first page', async () => {
+    world(manyAlerts(25))
+    renderSection()
+
+    await screen.findByText('ogohlantirish-0')
+    expect(screen.getByRole('button', { name: t('calls.prevPage') })).toBeDisabled()
   })
 })

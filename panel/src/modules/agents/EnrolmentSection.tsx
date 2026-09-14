@@ -218,6 +218,8 @@ export function EnrolmentSection({
     b.created_at.localeCompare(a.created_at),
   )
   const liveCode = codes.find((code) => isCodeLive(code)) ?? null
+  /** The one code this card shows. See the block that renders it. */
+  const shownCode = liveCode ?? codes[0] ?? null
 
   const attempts = [...(attemptsQuery.data?.items ?? [])].sort((a, b) =>
     b.created_at.localeCompare(a.created_at),
@@ -374,11 +376,28 @@ export function EnrolmentSection({
             </p>
           ) : null}
 
-          {codes.length > 0 ? (
+          {/* ONE code, not three.
+              ═══════════════════════════════════════════════════════════════
+              Reissuing is normal — an agent mistypes, a code expires over a
+              weekend — so the list grew and the three most recent were shown.
+              Only one of them is ever read aloud to anybody, and the other two
+              are noise on a card an admin opens to answer one question: what
+              do I give this person right now.
+
+              LIVE first, newest second. The two are the same code in every
+              ordinary case, because issuing a new one is what makes it the
+              live one; they differ only if the newest has already been
+              redeemed or has expired, and there a code that still works is
+              strictly more useful than a more recent one that does not.
+              The rest are counted, so the churn stays visible. */}
+          {shownCode ? (
             <div className="space-y-2">
-              {codes.slice(0, 3).map((code) => (
-                <CodeRow key={code.id} code={code} mayWrite={mayWrite} />
-              ))}
+              <CodeRow code={shownCode} mayWrite={mayWrite} />
+              {codes.length > 1 ? (
+                <p className="text-2xs text-muted">
+                  {t('enrol.olderCodes', { n: codes.length - 1 })}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-muted">{t('enrol.noCodes')}</p>
