@@ -3501,8 +3501,9 @@
         "description": "``POST /api/v1/auth/login`` — public, rate-limited.",
         "properties": {
           "email": {
-            "description": "Case-insensitive; the column is CITEXT.",
-            "format": "email",
+            "description": "The login identifier, matched verbatim against ``users.email``. Case-insensitive; the column is CITEXT.",
+            "maxLength": 255,
+            "minLength": 1,
             "type": "string"
           },
           "password": {
@@ -4777,7 +4778,7 @@
     },
     "/api/v1/alerts": {
       "get": {
-        "description": "Severity, cause, agent, device, first/last seen and the repeat count.",
+        "description": "Severity, cause, agent, device, first/last seen and the repeat count.\n\n``agent_id`` is what the agent's own card reads. The alerts page shows the\nopen list and nothing else since 2026-09-14 — an inbox that never empties\nis an inbox nobody works — so one person's closed history is answered here\ninstead of by a second page.",
         "operationId": "list_alerts_api_v1_alerts_get",
         "parameters": [
           {
@@ -4814,6 +4815,23 @@
               "default": 200,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
             }
           }
         ],
@@ -5899,6 +5917,384 @@
           }
         },
         "summary": "List Calls",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/api/v1/calls/audio-archive": {
+      "get": {
+        "description": "The recordings of **the page the reader is looking at**, as one ZIP.\n\nDeliberately a page and not a filter. The button sits under fifty rows and\nhands over those fifty rows; \"everything since January\" is a different\nproduct decision, and one whose size nobody can see before pressing it.\nIt therefore takes the same ``cursor``, ``limit`` and sort as the list, so\nthe archive and the screen cannot disagree about which calls they mean.\n\n``limit`` is clamped exactly as the list clamps it, so hand-editing the URL\nwidens nothing.\n\nEvery recording it contains is one this principal may already download one\nat a time: the page comes from the same scoped query, so own-scope means\nown recordings. **One audit row per archive**, not one per file — the\nquestion this action answers is \"who took a copy, and of what\", and seven\nhundred rows would bury the log the way open alerts once buried the alerts\npage.",
+        "operationId": "download_audio_archive_api_v1_calls_audio_archive_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "received_at",
+              "enum": [
+                "received_at",
+                "started_at",
+                "duration_sec"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "number_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Number Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "installation_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Installation Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDirection"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disposition",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallDisposition"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Disposition"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "has_audio",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Audio"
+            }
+          },
+          {
+            "in": "query",
+            "name": "audio_missing_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AudioMissingReason"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Audio Missing Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "capture_route",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/CaptureRoute"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Capture Route"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remote_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Remote Number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_duration_sec",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Duration Sec"
+            }
+          },
+          {
+            "in": "query",
+            "name": "device_model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app_variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppVariant"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "App Variant"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Download Audio Archive",
         "tags": [
           "Calls"
         ]

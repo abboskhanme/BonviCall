@@ -45,12 +45,19 @@ from src.core.errors import (
 )
 from src.core.logging import get_logger
 from src.core.storage import LocalFsAudioStorage, ObjectStat, build_audio_key
+from src.modules.audio.archive import ArchiveEntry, ArchivePlan
 from src.modules.audio.models import (
     AudioUploadSessionModel,
     CallAudioModel,
     StorageUsageDailyModel,
 )
-from src.modules.audio.rules import duration_mismatch, is_attributable
+from src.modules.audio.rules import (
+    archive_entry_filename,
+    duration_mismatch,
+    is_attributable,
+    recording_filename,
+    unique_filename,
+)
 from src.modules.audio.schemas import OpenUploadIn
 from src.modules.audit.service import AuditService
 from src.modules.calls.models import CallModel
@@ -75,6 +82,32 @@ DELETED_REASON_RETENTION = "retention"
 #: Service Worker bridge, which is the only way an <audio> element can carry an
 #: Authorization header and still issue real Range requests (T153, N43).
 PLAYBACK_PATH = "/api/v1/calls/{call_id}/audio"
+
+
+#: The manifest's own columns, and the same `﻿` + `;` shape the CSV export
+#: uses — for the same reason it does: Excel in a ru/uz locale renders a
+#: comma-separated UTF-8 file as one column, and the person who opens it has no
+#: way to know that is what happened.
+MANIFEST_NAME = "manifest.csv"
+MANIFEST_COLUMNS = ("vaqti", "xodim", "raqam", "fayl", "sabab")
+
+#: Written when a call has no recording and the product recorded no reason —
+#: rare, because ``audio_missing_reason`` is NOT NULL whenever ``has_audio`` is
+#: false, but a blank cell would read as "we did not check".
+MANIFEST_NO_AUDIO = "no_audio"
+
+
+def _manifest_csv(rows: list[tuple[str, ...]]) -> bytes:
+    lines = [";".join(MANIFEST_COLUMNS)]
+    lines.extend(";".join(_manifest_cell(cell) for cell in row) for row in rows)
+    return ("﻿" + "\r\n".join(lines) + "\r\n").encode("utf-8")
+
+
+def _manifest_cell(value: str) -> str:
+    """A separator inside a cell would silently shift every later column."""
+    return value.replace(";", ",").replace("\r", " ").replace("\n", " ")
+
+
 
 
 @dataclass(frozen=True)
@@ -397,13 +430,28 @@ class AudioService:
 
         stat = self.storage.stat(audio.storage_key)
         content_type = "audio/ogg" if audio.container.value == "ogg" else "audio/mp4"
-        stamp = call.started_at.strftime("%Y%m%d-%H%M")
         extension = Path(audio.storage_key).suffix.lstrip(".")
+        # ⚠️ **The agent's name belongs in this filename** and was missing for
+        # the whole life of the product: SPEC §4.8 states
+        # ``<agent>_<yyyymmdd-hhmm>.<ext>`` and the code built
+        # ``<yyyymmdd-hhmm>.<ext>``, so a recording saved to somebody's desktop
+        # said nothing about whose call it was. The rule now lives in
+        # ``audio/rules.py`` and the archive uses the same function, because
+        # the two names disagreeing is exactly what happened here.
+        from src.modules.calls.service import CallService
+
+        agent_name = await CallService(self.session).agent_display_name(call.agent_id)
         return PlaybackSource(
             audio=audio,
             stat=stat,
             content_type=content_type,
-            filename=f"{stamp}.{extension}",
+            # Tashkent, not UTC. Timestamps are stored in UTC and rendered in
+            # Tashkent everywhere a person reads one (D-10), and a filename is
+            # read by a person: a call the panel lists at 13:55 must not arrive
+            # on their desktop called ``…_0855``.
+            filename=recording_filename(
+                agent_name, call.started_at.astimezone(TASHKENT), extension
+            ),
         )
 
     async def record_device_playback(
@@ -479,6 +527,114 @@ class AudioService:
         )
         await self.session.commit()
         return True
+
+    # --- The archive of one page (UC-22's sibling) -------------------------
+
+    async def record_archive_download(
+        self, principal: Principal, calls: int, files: int, ip: str | None
+    ) -> None:
+        """One audit row for the whole archive (UC-24).
+
+        Not one per recording. The question this log answers is "who took a
+        copy, and of how much" — a hundred rows saying the same thing at the
+        same second answers it worse, and buries everything around it. The
+        counts are in the detail so "they downloaded a page and got four files"
+        is still readable a month later.
+        """
+        await self.audit.record(
+            action=AuditAction.AUDIO_DOWNLOAD,
+            object_type="calls",
+            actor_type=ActorType.SERVICE if principal.kind == "service" else ActorType.USER,
+            actor_user_id=principal.id if principal.kind == "user" else None,
+            actor_service_token_id=principal.id if principal.kind == "service" else None,
+            ip=ip,
+            detail={"archive": True, "calls": calls, "files": files},
+        )
+        await self.session.commit()
+
+    async def archive_for(self, calls: list) -> ArchivePlan:
+        """What to put in the ZIP for the calls the reader is looking at.
+
+        Takes the page the list endpoint already produced rather than a filter,
+        for the reason the client gave: the button sits under fifty rows and
+        must hand over those fifty rows. It also means the agent names are
+        already resolved — the page carries them — so this adds one query, for
+        the storage keys, and not one per file.
+
+        ⚠️ **The manifest is not decoration.** A page of fifty calls of which
+        four have audio produces four files, and a download that silently drops
+        forty-six rows is indistinguishable from a broken one. The manifest
+        names every call on the page and, for each one without a recording,
+        the reason the product already recorded.
+        """
+        by_call = {
+            row.call_id: row
+            for row in (
+                await self.session.scalars(
+                    select(CallAudioModel).where(
+                        CallAudioModel.call_id.in_([call.id for call in calls]),
+                        CallAudioModel.deleted_at.is_(None),
+                    )
+                )
+            ).all()
+        }
+
+        entries: list[ArchiveEntry] = []
+        rows: list[tuple[str, ...]] = []
+        taken: list[str] = []
+        for call in calls:
+            local_start = call.started_at.astimezone(TASHKENT)
+            audio = by_call.get(call.id)
+            if audio is None:
+                reason = (
+                    call.audio_missing_reason.value
+                    if call.audio_missing_reason
+                    else MANIFEST_NO_AUDIO
+                )
+                rows.append(
+                    (
+                        local_start.strftime("%Y-%m-%d %H:%M"),
+                        call.agent_name,
+                        call.remote_number or "",
+                        "",
+                        reason,
+                    )
+                )
+                continue
+
+            name = unique_filename(
+                archive_entry_filename(
+                    call.agent_name,
+                    local_start,
+                    Path(audio.storage_key).suffix.lstrip("."),
+                    call.remote_number,
+                ),
+                taken,
+            )
+            taken.append(name)
+            key = audio.storage_key
+            entries.append(
+                ArchiveEntry(
+                    name=name,
+                    modified_at=local_start,
+                    # Bound now, opened later: fifty entries must not mean
+                    # fifty open descriptors from the moment the response
+                    # starts. `key=key` binds this row's key rather than the
+                    # loop variable, which every later iteration would rebind.
+                    open_bytes=lambda key=key: self.storage.open_range(key, 0, None),
+                )
+            )
+            rows.append(
+                (
+                    local_start.strftime("%Y-%m-%d %H:%M"),
+                    call.agent_name,
+                    call.remote_number or "",
+                    name,
+                    "",
+                )
+            )
+
+        return ArchivePlan(entries=entries, manifest=_manifest_csv(rows))
 
     # --- Storage accounting (T57, N18) ------------------------------------
 

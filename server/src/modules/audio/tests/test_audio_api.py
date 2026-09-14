@@ -8,15 +8,25 @@ interrupted-resume test that proves an identical SHA-256 with no bytes re-sent.
 from __future__ import annotations
 
 import hashlib
+import io
 import uuid
+import zipfile
 from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
 
-from src.core.enums import AuditAction, CallDisposition, UploadStatus
+from src.core.clock import TASHKENT
+from src.core.enums import (
+    AudioMissingReason,
+    AuditAction,
+    CallDisposition,
+    UploadStatus,
+)
+from src.modules.agents.models import AgentModel
 from src.modules.audio.models import AudioUploadSessionModel, CallAudioModel
 from src.modules.audit.models import AuditLogModel
+from src.modules.calls.models import CallModel
 
 pytestmark = pytest.mark.asyncio
 
@@ -414,6 +424,32 @@ async def test_download_sets_an_attachment_disposition(manager, audio_factory) -
     assert response.headers["content-disposition"].startswith("attachment")
 
 
+async def test_a_downloaded_recording_is_named_after_the_agent_and_the_call(
+    db, manager, audio_factory
+) -> None:
+    """SPEC §4.8: ``<agent>_<yyyymmdd-hhmm>.<ext>``.
+
+    The test above asserted only that the disposition said "attachment", which
+    is why the defect it missed survived the life of the product: the filename
+    was built inline as ``<yyyymmdd-hhmm>.<ext>`` with **no agent in it**, so a
+    recording saved to somebody's desktop said nothing about whose call it was.
+
+    The stamp is **Tashkent**, not UTC. Everywhere else a person reads a time
+    it is converted (D-10), and a filename is read by a person: a call the
+    panel lists at 13:55 arriving as ``…_0855`` is the same defect wearing a
+    different hat.
+    """
+    audio = await audio_factory(payload=PAYLOAD)
+    call = await db.get(CallModel, audio.call_id)
+    agent = await db.get(AgentModel, call.agent_id)
+
+    response = await manager.get(f"/api/v1/calls/{audio.call_id}/audio?download=true")
+
+    disposition = response.headers["content-disposition"]
+    assert agent.full_name in disposition
+    assert call.started_at.astimezone(TASHKENT).strftime("%Y%m%d-%H%M") in disposition
+
+
 async def test_retention_deleted_audio_is_410_not_404_or_500(
     db, manager, audio_factory
 ) -> None:
@@ -586,3 +622,90 @@ async def test_retention_deleted_audio_stops_counting_against_the_volume(
     body = (await admin.get("/api/v1/reports/storage")).json()
     assert body["audio_files"] == 0
     assert body["audio_bytes_total"] == 0
+
+
+# --- The archive of one page ------------------------------------------------
+
+ARCHIVE = "/api/v1/calls/audio-archive"
+
+
+async def test_the_archive_needs_a_caller_and_refuses_a_salesperson(
+    client, sales
+) -> None:
+    """A bulk copy of recordings is the most privacy-sensitive thing this
+    product does; ``audio:download`` is what gates it."""
+    assert (await client.get(ARCHIVE)).status_code == 401
+    assert (await sales.get(ARCHIVE)).status_code == 403
+
+
+async def test_the_archive_opens_and_holds_the_recording(manager, audio_factory) -> None:
+    """The test that would have caught a stream that produces bytes nobody can
+    extract: it opens the result with ``zipfile`` rather than trusting a 200."""
+    await audio_factory(payload=PAYLOAD)
+
+    response = await manager.get(ARCHIVE)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert archive.testzip() is None, "the archive is not corrupt"
+        recordings = [name for name in archive.namelist() if name != "manifest.csv"]
+        assert len(recordings) == 1
+        assert archive.read(recordings[0]) == PAYLOAD
+
+
+async def test_an_archive_entry_is_named_after_agent_time_and_number(
+    db, manager, audio_factory
+) -> None:
+    """What the client asked for, and what somebody opening the folder reads."""
+    audio = await audio_factory(payload=PAYLOAD)
+    call = await db.get(CallModel, audio.call_id)
+    agent = await db.get(AgentModel, call.agent_id)
+
+    response = await manager.get(ARCHIVE)
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        name = next(n for n in archive.namelist() if n != "manifest.csv")
+    assert name.startswith(f"{agent.full_name}_")
+    assert call.started_at.astimezone(TASHKENT).strftime("%Y%m%d-%H%M") in name
+    assert call.remote_number.lstrip("+").replace(" ", "") in name
+
+
+async def test_the_manifest_explains_every_call_that_has_no_recording(
+    manager, audio_factory, call_factory
+) -> None:
+    """A page of calls of which one has audio produces one file, and a download
+    that silently drops the rest is indistinguishable from a broken one."""
+    await audio_factory(payload=PAYLOAD)
+    silent = await call_factory(
+        disposition=CallDisposition.NO_ANSWER, duration_sec=0, has_audio=False
+    )
+
+    response = await manager.get(ARCHIVE)
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        manifest = archive.read("manifest.csv").decode("utf-8-sig")
+    assert manifest.startswith("vaqti;xodim;raqam;fayl;sabab")
+    assert len(manifest.strip().splitlines()) == 3, "header plus both calls"
+    assert (silent.audio_missing_reason or AudioMissingReason.NOT_EXPECTED).value in manifest
+
+
+async def test_one_audit_row_per_archive_not_one_per_file(
+    db, manager, audio_factory
+) -> None:
+    """Seven hundred rows saying the same thing at the same second answer
+    "who took a copy" worse than one row does, and bury everything around it."""
+    await audio_factory(payload=PAYLOAD)
+
+    await manager.get(ARCHIVE)
+
+    rows = (
+        await db.execute(
+            sa.select(AuditLogModel).where(
+                AuditLogModel.action == AuditAction.AUDIO_DOWNLOAD
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].detail["archive"] is True
+    assert rows[0].detail["files"] == 1

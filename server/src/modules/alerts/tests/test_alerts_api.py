@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 import sqlalchemy as sa
 
+from src.core import clock
 from src.core.enums import AlertKind, AlertSeverity, AuditAction
 from src.modules.alerts.models import AlertModel
 from src.modules.alerts.service import AlertService, dedupe_key
@@ -435,3 +436,73 @@ async def test_replacing_a_phone_closes_the_alerts_it_left_behind(
     closed = await service.resolve_all_for(installation.id)
     assert closed == 1
     assert (await admin.get("/api/v1/alerts")).json()["open_count"] == 0
+
+
+# --- One person's history (2026-09-14) --------------------------------------
+
+
+async def _raise_for(db, agent_id, scope: str):
+    """One alert, raised the way the scheduler raises them."""
+    alert = await AlertService(db).raise_alert(
+        kind=AlertKind.DEVICE_OFFLINE,
+        severity=AlertSeverity.WARNING,
+        scope=scope,
+        agent_id=agent_id,
+    )
+    await db.flush()
+    return alert
+
+
+async def test_alerts_can_be_narrowed_to_one_agent(db, admin, agent_factory) -> None:
+    """What the agent's own card reads.
+
+    The alerts page shows the open list and nothing else since 2026-09-14 — an
+    inbox that never empties is an inbox nobody works — so everything ever
+    raised about somebody has to be readable from the person it was about.
+    """
+    mine = await agent_factory()
+    theirs = await agent_factory()
+    await _raise_for(db, mine.id, "scope-mine")
+    await _raise_for(db, theirs.id, "scope-theirs")
+
+    body = (await admin.get(f"/api/v1/alerts?agent_id={mine.id}")).json()
+
+    assert [item["agent_id"] for item in body["items"]] == [str(mine.id)]
+
+
+async def test_one_agents_history_includes_the_alerts_already_closed(
+    db, admin, agent_factory
+) -> None:
+    """``open_only`` still decides, and the card asks for false.
+
+    A closed alert is the half of the history that matters — "this phone was
+    silent for three days in August" is evidence about the rollout, and it is
+    exactly the half the open list drops.
+    """
+    agent = await agent_factory()
+    closed = await _raise_for(db, agent.id, "scope-closed")
+    closed.resolved_at = clock.now()
+    await db.flush()
+
+    open_only = (await admin.get(f"/api/v1/alerts?agent_id={agent.id}")).json()
+    everything = (
+        await admin.get(f"/api/v1/alerts?agent_id={agent.id}&open_only=false")
+    ).json()
+
+    assert open_only["items"] == []
+    assert [item["id"] for item in everything["items"]] == [str(closed.id)]
+
+
+async def test_a_fleet_wide_alert_belongs_to_nobodys_card(
+    db, admin, agent_factory
+) -> None:
+    """An alert with no agent is correctly absent from every agent's history,
+    rather than appearing on all of them."""
+    agent = await agent_factory()
+    await _raise_for(db, None, "scope-fleet")
+
+    body = (
+        await admin.get(f"/api/v1/alerts?agent_id={agent.id}&open_only=false")
+    ).json()
+
+    assert body["items"] == []

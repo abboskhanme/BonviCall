@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.enums import UserRole
 from src.core.security import MIN_PASSWORD_LENGTH
@@ -13,8 +13,24 @@ from src.core.security import MIN_PASSWORD_LENGTH
 class LoginRequest(BaseModel):
     """``POST /api/v1/auth/login`` — public, rate-limited."""
 
-    email: EmailStr = Field(description="Case-insensitive; the column is CITEXT.")
+    email: str = Field(
+        min_length=1,
+        max_length=255,
+        description=(
+            "The login identifier, matched verbatim against ``users.email``. "
+            "Case-insensitive; the column is CITEXT."
+        ),
+    )
     password: str = Field(min_length=1, description="Never logged, never echoed.")
+
+    # ⚠️ **Not ``EmailStr``, and that is deliberate.** This field identifies an
+    # account; it does not deliver mail. Validating its format here refuses
+    # ``admin`` before any lookup happens, which makes a short operator login
+    # impossible — while adding nothing: an address that passes ``EmailStr``
+    # and belongs to nobody fails at exactly the same place, with exactly the
+    # same 401. ``UserCreateRequest`` still requires a real address, because a
+    # panel account is invited by e-mail and one that cannot be written to is
+    # an account nobody can recover.
 
 
 class TokenResponse(BaseModel):

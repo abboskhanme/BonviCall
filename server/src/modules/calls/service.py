@@ -497,6 +497,16 @@ class CallService:
         """One call, enriched the same way as a list row."""
         return (await self.views([call]))[0]
 
+    async def agent_display_name(self, agent_id: uuid.UUID) -> str | None:
+        """The agent's name, for a caller outside this module.
+
+        Public because ``modules/audio`` needs it to name a downloaded
+        recording (SPEC §4.8) and must not read ``agents`` itself: ``calls``
+        holds the foreign key into it, and a second module selecting from that
+        table is how two spellings of one name appear (§2).
+        """
+        return (await self._display_names([agent_id])).get(agent_id)
+
     async def _display_names(self, agent_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
         rows = (
             await self.session.execute(

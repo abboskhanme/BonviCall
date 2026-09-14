@@ -12,9 +12,11 @@ import uuid
 from datetime import date
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
+from src.core import clock
+from src.core.clock import TASHKENT
 from src.core.deps import PrincipalDep, SessionDep
 from src.core.enums import (
     AppVariant,
@@ -27,6 +29,8 @@ from src.core.enums import (
 from src.core.errors import ErrorCode, MethodNotAllowedError
 from src.core.pagination import MAX_LIMIT_CALLS, Cursor, clamp_limit
 from src.core.permissions import Perm, require_any_permission, require_permission
+from src.modules.audio.archive import stream_archive
+from src.modules.audio.service import MANIFEST_NAME, AudioService
 from src.modules.calls.schemas import (
     CallFilters,
     CallListResponse,
@@ -183,6 +187,65 @@ async def export_calls(
         rows(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="calls.csv"'},
+    )
+
+
+@router.get(
+    "/audio-archive",
+    dependencies=[Depends(require_permission(Perm.AUDIO_DOWNLOAD))],
+)
+async def download_audio_archive(
+    principal: PrincipalDep,
+    session: SessionDep,
+    filters: FiltersDep,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=MAX_LIMIT_CALLS),
+    cursor: str | None = None,
+    sort: Literal["received_at", "started_at", "duration_sec"] = "received_at",
+    order: Literal["asc", "desc"] = "desc",
+) -> StreamingResponse:
+    """The recordings of **the page the reader is looking at**, as one ZIP.
+
+    Deliberately a page and not a filter. The button sits under fifty rows and
+    hands over those fifty rows; "everything since January" is a different
+    product decision, and one whose size nobody can see before pressing it.
+    It therefore takes the same ``cursor``, ``limit`` and sort as the list, so
+    the archive and the screen cannot disagree about which calls they mean.
+
+    ``limit`` is clamped exactly as the list clamps it, so hand-editing the URL
+    widens nothing.
+
+    Every recording it contains is one this principal may already download one
+    at a time: the page comes from the same scoped query, so own-scope means
+    own recordings. **One audit row per archive**, not one per file — the
+    question this action answers is "who took a copy, and of what", and seven
+    hundred rows would bury the log the way open alerts once buried the alerts
+    page.
+    """
+    page = await CallService(session).list(
+        principal=principal,
+        limit=clamp_limit(limit, MAX_LIMIT_CALLS),
+        cursor=Cursor.decode(cursor) if cursor else None,
+        filters=filters,
+        sort=sort,
+        order=order,
+    )
+    audio = AudioService(session)
+    plan = await audio.archive_for(page.items)
+    await audio.record_archive_download(
+        principal,
+        calls=len(page.items),
+        files=len(plan.entries),
+        ip=request.client.host if request.client else None,
+    )
+
+    stamp = clock.now().astimezone(TASHKENT).strftime("%Y%m%d-%H%M")
+    return StreamingResponse(
+        stream_archive(plan, MANIFEST_NAME),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="bonvicall-{stamp}.zip"'
+        },
     )
 
 

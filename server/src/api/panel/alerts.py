@@ -31,10 +31,17 @@ async def list_alerts(
     severity: AlertSeverity | None = None,
     open_only: bool = True,
     limit: int = 200,
+    agent_id: uuid.UUID | None = None,
 ) -> AlertListResponse:
-    """Severity, cause, agent, device, first/last seen and the repeat count."""
+    """Severity, cause, agent, device, first/last seen and the repeat count.
+
+    ``agent_id`` is what the agent's own card reads. The alerts page shows the
+    open list and nothing else since 2026-09-14 — an inbox that never empties
+    is an inbox nobody works — so one person's closed history is answered here
+    instead of by a second page.
+    """
     items, total, open_count = await AlertService(session).list(
-        severity=severity, open_only=open_only, limit=limit
+        severity=severity, open_only=open_only, limit=limit, agent_id=agent_id
     )
     return AlertListResponse(
         items=items,

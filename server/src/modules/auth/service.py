@@ -46,6 +46,19 @@ from src.modules.users.models import UserModel
 
 log = get_logger(__name__)
 
+#: How long after a rotation the spent token is still forgiven (N24).
+#:
+#: Twenty seconds. It has to cover the only honest replay there is — two
+#: browser tabs refreshing in the same moment, or one request retried across a
+#: dropped connection — and nothing longer. A stolen cookie is used minutes or
+#: days later, never inside the window the theft would have to share with the
+#: real client's own retry.
+#:
+#: **This is the whole of the softening**, and everything else about N24 is
+#: unchanged: outside the window, or with no live successor, a replay still
+#: kills every session the user has.
+REFRESH_REPLAY_GRACE = timedelta(seconds=20)
+
 TOKEN_TYPE_USER = "user"
 TOKEN_TYPE_DEVICE = "device"
 
@@ -119,8 +132,26 @@ class AuthService:
 
         if row.revoked_at is not None:
             # The token was already spent. Either a client retried a request it
-            # had already completed, or somebody else has the token; we cannot
-            # tell, and only one of those is safe to allow. Kill the chain.
+            # had already completed, or somebody else has the token. The two
+            # are told apart by the CLOCK, and until 2026-09-13 they were not:
+            # every replay killed the chain, and the honest case is common
+            # enough that the panel logged people out several times an hour.
+            #
+            # ⚠️ **Two browser tabs are one client.** The panel serialises its
+            # own refreshes, but that guard is a variable inside one tab; the
+            # cookie is shared across all of them. Two tabs whose access tokens
+            # expire in the same second both read the same cookie, both send
+            # it, the first rotates it and the second is a "replay" that was
+            # never theft. The evidence was in the database: fifty-five
+            # sessions issued in twelve hours and fifty-five revoked, in
+            # batches of six at one minute — the signature of a chain dying.
+            successor = await self._live_successor(row)
+            if successor is not None:
+                log.info("refresh_replayed_within_grace", user_id=str(row.user_id))
+                return await self._rotate(successor, ip=ip, user_agent=user_agent)
+
+            # Outside the window, or with no live successor, it is theft until
+            # proven otherwise and the rule is unchanged (N24, SPEC §4.7).
             await self.revoke_all_sessions(row.user_id)
             await self.session.commit()
             log.warning("refresh_reused", user_id=str(row.user_id))
@@ -129,6 +160,39 @@ class AuthService:
         if row.expires_at <= clock.now():
             raise UnauthorizedError(ErrorCode.UNAUTHORIZED)
 
+        return await self._rotate(row, ip=ip, user_agent=user_agent)
+
+    async def _live_successor(
+        self, row: RefreshTokenModel
+    ) -> RefreshTokenModel | None:
+        """The token that replaced ``row``, when this is a retry and not theft.
+
+        Three conditions, and all three are the difference:
+
+        * the replacement exists — a token revoked by logout or by a password
+          change has none, and presenting one of those is not a race;
+        * the replay arrived within :data:`REFRESH_REPLAY_GRACE_SECONDS` of the
+          rotation — a thief with a stolen cookie does not turn up inside a
+          twenty-second window by coincidence, and a second browser tab does
+          nothing else;
+        * the replacement is itself still live — once the chain has moved on,
+          or been revoked for any reason, there is nothing safe to hand back.
+        """
+        if row.replaced_by_id is None or row.revoked_at is None:
+            return None
+        if clock.now() - row.revoked_at > REFRESH_REPLAY_GRACE:
+            return None
+        successor = await self.session.get(RefreshTokenModel, row.replaced_by_id)
+        if successor is None or successor.revoked_at is not None:
+            return None
+        if successor.expires_at <= clock.now():
+            return None
+        return successor
+
+    async def _rotate(
+        self, row: RefreshTokenModel, ip: str | None, user_agent: str | None
+    ) -> tuple[UserModel, TokenPair]:
+        """Spend one token and issue its replacement."""
         user = await self.session.get(UserModel, row.user_id)
         if user is None or not user.is_active:
             raise UnauthorizedError(ErrorCode.UNAUTHORIZED)

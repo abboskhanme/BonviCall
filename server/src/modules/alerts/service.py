@@ -172,11 +172,22 @@ class AlertService:
         severity: AlertSeverity | None = None,
         open_only: bool = True,
         limit: int = 200,
+        agent_id: uuid.UUID | None = None,
     ) -> tuple[list[AlertResponse], int, int]:
-        """The inbox feed, newest activity first."""
+        """The inbox feed, newest activity first.
+
+        ``agent_id`` narrows it to one person's history, which is what the
+        agent's own card asks for: the alerts page is the **open** list and
+        stops there, so everything that was ever raised about somebody has to
+        be readable somewhere, and the somewhere is the person it was about.
+        A fleet-wide alert — one with no agent — belongs to nobody's card and
+        is correctly absent from all of them.
+        """
         statement = select(AlertModel).order_by(AlertModel.last_seen_at.desc())
         if severity is not None:
             statement = statement.where(AlertModel.severity == severity)
+        if agent_id is not None:
+            statement = statement.where(AlertModel.agent_id == agent_id)
         if open_only:
             statement = statement.where(
                 AlertModel.acknowledged_at.is_(None), AlertModel.resolved_at.is_(None)

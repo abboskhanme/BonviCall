@@ -169,6 +169,11 @@ shell-backend:
 # chain and the ingest path. Local stack only — it creates accounts with a
 # password that is written down in the repo.
 
+dev-admin:         ## A short login for THIS machine: admin/admin (never in prod)
+	docker compose exec -T \
+	  -e DEV_ADMIN_LOGIN=$(or $(u),admin) -e DEV_ADMIN_PASSWORD=$(or $(p),admin) \
+	  backend python scripts/dev_admin.py
+
 seed:              ## Create the first admin (idempotent; prints the password once)
 	docker compose run --rm backend python -m src.seed
 
