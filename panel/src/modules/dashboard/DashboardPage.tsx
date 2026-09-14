@@ -34,7 +34,7 @@ import {
 } from '@/modules/devices/api'
 import { FLEET_STATE_LABEL } from '@/modules/devices/labels'
 import { useCallsPage } from '@/modules/calls/api'
-import { useGapReport } from '@/modules/reports/api'
+import { useGapReport } from './api'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
@@ -180,7 +180,9 @@ function CaptureTile() {
           ? t('dashboard.captureHint', { n: formatCount(report.missing_total) })
           : t('dashboard.captureHintEmpty')
       }
-      to="/reports/gap"
+      // `/reports/gap` was removed on 2026-09-14; the same question is the
+      // calls list filtered to the recordings that are missing.
+      to="/calls?has_audio=false"
     />
   )
 }

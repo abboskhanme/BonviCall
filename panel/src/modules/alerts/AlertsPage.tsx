@@ -31,7 +31,7 @@ import { Page, PageHeader } from '@/shared/layout/Page'
 import { formatCount, formatDateTime, formatInstantTitle } from '@/shared/lib/format'
 import { relativeText } from '@/shared/lib/relativeText'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
-import { EnumFilter, FilterField, SELECT_CLASS } from '@/shared/ui/filters'
+import { EnumFilter } from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 
 import { useAcknowledgeAlert, useAlerts, type Alert } from './api'
@@ -45,7 +45,6 @@ import {
 } from './routing'
 
 const PARAM_SEVERITY = 'severity'
-const PARAM_OPEN = 'open'
 
 function parseSeverity(raw: string | null): AlertSeverity | undefined {
   return raw !== null && raw in ALERT_SEVERITY_LABEL ? (raw as AlertSeverity) : undefined
@@ -171,10 +170,13 @@ export function AlertsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const severity = parseSeverity(searchParams.get(PARAM_SEVERITY))
   // Open-only by default: the inbox is a to-do list, not an archive.
-  const openOnly = searchParams.get(PARAM_OPEN) !== 'all'
 
   const alertsQuery = useAlerts({
-    open_only: openOnly,
+    // **Open only, always** (2026-09-14). What has been acknowledged or
+    // resolved is history, and history belongs on the person it was about —
+    // `AgentDetailPage` reads it with `agent_id` + `open_only=false`. An inbox
+    // that never empties is an inbox nobody works.
+    open_only: true,
     ...(severity ? { severity } : {}),
   })
   const agentsQuery = useAgentDirectory(can(Perm.AGENTS_READ))
@@ -216,18 +218,6 @@ export function AlertsPage() {
           value={severity}
           onChange={(value) => applyFilter(PARAM_SEVERITY, value)}
         />
-        <FilterField label={t('alerts.filterState')}>
-          <select
-            className={SELECT_CLASS}
-            value={openOnly ? 'open' : 'all'}
-            onChange={(event) =>
-              applyFilter(PARAM_OPEN, event.target.value === 'all' ? 'all' : null)
-            }
-          >
-            <option value="open">{t('alerts.filterOpen')}</option>
-            <option value="all">{t('alerts.filterAll')}</option>
-          </select>
-        </FilterField>
       </Card>
 
       <QueryBoundary
@@ -235,8 +225,8 @@ export function AlertsPage() {
         isEmpty={() => alerts.length === 0}
         // "Nothing is wrong" is genuinely good news and should read that way,
         // rather than as the same grey box every empty list shows.
-        emptyTitle={severity || !openOnly ? t('alerts.emptyFiltered') : t('alerts.emptyAll')}
-        emptyHint={severity || !openOnly ? t('alerts.emptyFilteredHint') : t('alerts.emptyAllHint')}
+        emptyTitle={severity ? t('alerts.emptyFiltered') : t('alerts.emptyAll')}
+        emptyHint={severity ? t('alerts.emptyFilteredHint') : t('alerts.emptyAllHint')}
         skeletonRows={4}
       >
         {() => (

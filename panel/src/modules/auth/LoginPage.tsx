@@ -60,7 +60,11 @@ export function LoginPage() {
             <Label htmlFor="email">{t('auth.email')}</Label>
             <Input
               id="email"
-              type="email"
+              // `text`, not `email`: the field carries a login identifier, and
+              // the server matches it verbatim against the account. A short
+              // operator login is refused by the browser's own validation
+              // before any request leaves, which reads as a dead button.
+              type="text"
               autoComplete="username"
               value={email}
               onChange={(event) => setEmail(event.target.value)}

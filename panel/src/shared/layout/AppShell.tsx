@@ -22,19 +22,10 @@ import {
   BellRing,
   ChevronsLeft,
   ChevronsRight,
-  FileWarning,
-  HardDrive,
   LayoutDashboard,
-  KeyRound,
-  LogOut,
   Menu,
-  MonitorPlay,
-  Moon,
-  Package,
   Phone,
-  ScrollText,
   Smartphone,
-  SunMedium,
   UserCog,
   Users,
   X,
@@ -43,11 +34,11 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { ChangePasswordModal } from '@/modules/auth/ChangePasswordModal'
+import { AccountMenu } from './AccountMenu'
 import { useAuth } from '@/modules/auth/store'
 import { Perm, type Permission } from '@/shared/auth/permissions'
 import { t, type MessageKey } from '@/shared/i18n'
 import { cn } from '@/shared/lib/cn'
-import { useTheme, type Theme } from '@/shared/theme/store'
 import { Button } from '@/shared/ui/primitives'
 
 type IconComponent = typeof LayoutDashboard
@@ -112,14 +103,18 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
-    // Own-scope is here on purpose: a salesperson holding `devices:read:own`
-    // gets a one-row list — their own phone's health, "is it still
-    // reporting?" — because the SERVER narrows the query, not the permission
-    // (CONVENTIONS.md §11). Same shape as their calls page.
+    // **`devices:read:own` only, since 2026-09-13**, and the narrowing is the
+    // whole point: that permission belongs to `sales` and to nobody else
+    // (`core/permissions.py`), so this entry is now a salesperson's one-row
+    // view of their own handset — "is it still reporting?" — and disappears
+    // for an admin or a manager, who read the same health as columns on
+    // Xodimlar. One menu entry for the fleet, not two, which is what the
+    // client asked for; the page and the route are untouched, and every link
+    // into `/devices/:installationId` from Ogohlantirishlar still works.
     to: '/devices',
     labelKey: 'nav.devices',
     icon: Smartphone,
-    anyOf: [Perm.DEVICES_READ, Perm.DEVICES_READ_OWN],
+    anyOf: [Perm.DEVICES_READ_OWN],
     group: 'nav.groupOperations',
   },
   {
@@ -134,43 +129,10 @@ export const NAV: readonly NavItem[] = [
   },
 
   {
-    to: '/reports/gap',
-    labelKey: 'nav.gapReport',
-    icon: FileWarning,
-    anyOf: [Perm.REPORTS_READ],
-    group: 'nav.groupReports',
-  },
-  {
-    to: '/reports/storage',
-    labelKey: 'nav.storageReport',
-    icon: HardDrive,
-    anyOf: [Perm.REPORTS_READ],
-    group: 'nav.groupReports',
-  },
-
-  {
     to: '/users',
     labelKey: 'nav.users',
     icon: UserCog,
     anyOf: [Perm.USERS_READ],
-    group: 'nav.groupAdmin',
-  },
-  {
-    // Distribution, not configuration. `/settings` is gone; this is what
-    // publishes an APK and raises the minimum version, and without it a fleet
-    // of personal phones cannot be updated at all (N33). The path keeps its
-    // old shape so existing links still work.
-    to: '/settings/app-versions',
-    labelKey: 'nav.appVersions',
-    icon: Package,
-    anyOf: [Perm.APPVERSIONS_READ],
-    group: 'nav.groupAdmin',
-  },
-  {
-    to: '/audit',
-    labelKey: 'nav.audit',
-    icon: ScrollText,
-    anyOf: [Perm.AUDIT_READ],
     group: 'nav.groupAdmin',
   },
 ]
@@ -181,37 +143,6 @@ export function visibleNav(
   nav: readonly NavItem[] = NAV,
 ): NavItem[] {
   return nav.filter((item) => !item.anyOf || item.anyOf.some((perm) => held.has(perm)))
-}
-
-const THEME_ORDER: readonly Theme[] = ['system', 'light', 'dark']
-const THEME_ICON: Record<Theme, IconComponent> = {
-  system: MonitorPlay,
-  light: SunMedium,
-  dark: Moon,
-}
-const THEME_LABEL: Record<Theme, MessageKey> = {
-  system: 'theme.system',
-  light: 'theme.light',
-  dark: 'theme.dark',
-}
-
-function ThemeToggle({ collapsed }: { collapsed: boolean }) {
-  const { theme, setTheme } = useTheme()
-  const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length] ?? 'system'
-  const Icon = THEME_ICON[theme]
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setTheme(next)}
-      title={t('theme.label')}
-      aria-label={t(THEME_LABEL[theme])}
-      className={cn('w-full justify-start', collapsed && 'justify-center px-2')}
-    >
-      <Icon className="size-4 shrink-0" aria-hidden />
-      {collapsed ? null : <span className="truncate">{t(THEME_LABEL[theme])}</span>}
-    </Button>
-  )
 }
 
 function NavList({
@@ -267,15 +198,12 @@ function Sidebar({
   onToggleCollapsed,
   items,
   onNavigate,
-  onChangePassword,
 }: {
   collapsed: boolean
   onToggleCollapsed?: () => void
   items: readonly NavItem[]
   onNavigate?: () => void
-  onChangePassword: () => void
 }) {
-  const { user, logout } = useAuth()
   return (
     <div className="flex h-full flex-col border-e border-border bg-surface">
       <div
@@ -294,35 +222,10 @@ function Sidebar({
 
       <NavList items={items} collapsed={collapsed} onNavigate={onNavigate} />
 
-      <div className="space-y-1 border-t border-border p-2">
-        <ThemeToggle collapsed={collapsed} />
-        {collapsed ? null : user ? (
-          <div className="px-3 py-1">
-            <p className="truncate text-xs font-medium text-text">{user.full_name}</p>
-            <p className="truncate text-2xs text-muted">{user.email}</p>
-          </div>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onChangePassword}
-          className={cn('w-full justify-start', collapsed && 'justify-center px-2')}
-          aria-label={t('password.title')}
-        >
-          <KeyRound className="size-4 shrink-0" aria-hidden />
-          {collapsed ? null : <span className="truncate">{t('password.title')}</span>}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void logout()}
-          className={cn('w-full justify-start', collapsed && 'justify-center px-2')}
-          aria-label={t('auth.logout')}
-        >
-          <LogOut className="size-4 shrink-0" aria-hidden />
-          {collapsed ? null : <span>{t('auth.logout')}</span>}
-        </Button>
-        {onToggleCollapsed ? (
+      {/* The account cluster moved to the top bar on 2026-09-14. What is
+          left here is the one control that belongs to the sidebar itself. */}
+      {onToggleCollapsed ? (
+        <div className="border-t border-border p-2">
           <Button
             variant="ghost"
             size="sm"
@@ -337,8 +240,8 @@ function Sidebar({
             )}
             {collapsed ? null : <span>{t('nav.collapse')}</span>}
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -372,6 +275,9 @@ export function AppShell() {
           <Menu className="size-5" aria-hidden />
         </Button>
         <span className="text-sm font-semibold text-text">{t('app.name')}</span>
+        <div className="ms-auto">
+          <AccountMenu />
+        </div>
       </header>
 
       {drawerOpen ? (
@@ -396,10 +302,6 @@ export function AppShell() {
               collapsed={false}
               items={items}
               onNavigate={() => setDrawerOpen(false)}
-              onChangePassword={() => {
-                setDrawerOpen(false)
-                setPasswordOpen(true)
-              }}
             />
           </div>
         </div>
@@ -416,11 +318,17 @@ export function AppShell() {
             collapsed={collapsed}
             onToggleCollapsed={() => setCollapsed((value) => !value)}
             items={items}
-            onChangePassword={() => setPasswordOpen(true)}
           />
         </aside>
 
         <main className="min-w-0 flex-1">
+          {/* Top right, where every panel puts identity. Sticky, because the
+              alert count is only useful if it is still there after scrolling
+              a page of seven hundred calls. Hidden on narrow screens, where
+              the same cluster rides in the drawer's own header instead. */}
+          <header className="sticky top-0 z-20 hidden justify-end border-b border-border bg-surface px-4 py-2 lg:flex">
+            <AccountMenu />
+          </header>
           <Outlet />
         </main>
       </div>

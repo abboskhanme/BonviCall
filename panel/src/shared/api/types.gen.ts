@@ -3341,6 +3341,8 @@ export interface operations {
                 limit?: number;
                 open_only?: boolean;
                 severity?: components["schemas"]["AlertSeverity"] | null;
+                /** Agent Id */
+                agent_id?: string | null;
             };
             header?: never;
             path?: never;

@@ -18,7 +18,7 @@
  * envelope for real and the assertions cover the wire, not a stub of it.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -217,6 +217,130 @@ describe('call list', () => {
     expect(within(table).getByText('00:00')).toBeInTheDocument()
   })
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * The customer's name is a column, not a footnote.
+   *
+   * It used to be a grey suffix inside the number cell, at `text-xs` beside a
+   * monospace number, which is easy to miss entirely — and it is the thing
+   * people scan this list for. Asserted by COLUMN INDEX rather than by "the
+   * text is somewhere in the row", because "somewhere in the row" is exactly
+   * what it was before.
+   * ══════════════════════════════════════════════════════════════════════
+   */
+  it('renders the contact name in its own column, and a dash where there is none', async () => {
+    respond(() =>
+      jsonResponse(
+        200,
+        page([
+          makeCall({ id: 'named', contact_name: 'Nodira Yusupova' }),
+          makeCall({ id: 'unknown', contact_name: null }),
+        ]),
+      ),
+    )
+
+    renderPage()
+
+    const table = await screen.findByRole('table')
+    const [header, named, unknown] = within(table).getAllByRole('row')
+    const columns = within(header as HTMLElement)
+      .getAllByRole('columnheader')
+      .map((cell) => cell.textContent)
+    const contactColumn = columns.indexOf(t('calls.colContact'))
+    expect(contactColumn).toBeGreaterThan(-1)
+
+    const namedCell = within(named as HTMLElement).getAllByRole('cell')[contactColumn]
+    expect(namedCell).toHaveTextContent('Nodira Yusupova')
+    // The full name is on the cell even when the column truncates it.
+    expect(namedCell).toHaveAttribute('title', 'Nodira Yusupova')
+
+    // An absent value is the em dash the rest of the product uses, never a
+    // blank cell (`shared/ui/detail.tsx`).
+    expect(within(unknown as HTMLElement).getAllByRole('cell')[contactColumn]).toHaveTextContent('—')
+
+    // And it is not rendered twice: the number cell keeps the number only.
+    const numberColumn = columns.indexOf(t('calls.colRemote'))
+    expect(within(named as HTMLElement).getAllByRole('cell')[numberColumn]).not.toHaveTextContent(
+      'Nodira Yusupova',
+    )
+  })
+
+  it('shows the contact column to an own-scope user too', async () => {
+    signIn([Perm.CALLS_READ_OWN])
+    respond(() => jsonResponse(200, page([makeCall({ contact_name: 'Nodira Yusupova' })])))
+
+    renderPage()
+
+    const header = (await screen.findAllByRole('row'))[0]
+    expect(header).toBeDefined()
+    expect(within(header as HTMLElement).getByText(t('calls.colContact'))).toBeInTheDocument()
+    expect(within(header as HTMLElement).queryByText(t('calls.colAgent'))).toBeNull()
+  })
+
+  /**
+   * The column ORDER, pinned. A header and a cell that drift apart is a table
+   * that lies — and moving a column is a two-place edit that looks like a
+   * one-place edit, so it is exactly the change a test has to catch.
+   */
+  it('lays out the columns in the agreed order, headers and cells together', async () => {
+    respond(() =>
+      jsonResponse(
+        200,
+        page([makeCall({ agent_name: 'Aziz Karimov', contact_name: 'Nodira Yusupova' })]),
+      ),
+    )
+
+    renderPage()
+
+    const table = await screen.findByRole('table')
+    const [header, row] = within(table).getAllByRole('row')
+    expect(
+      within(header as HTMLElement)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      t('calls.colTime'),
+      t('calls.colReceived'),
+      t('calls.colAgent'),
+      t('calls.colDirection'),
+      t('calls.colRemote'),
+      t('calls.colContact'),
+      t('calls.colStatus'),
+      t('calls.colDuration'),
+      t('calls.colAudio'),
+    ])
+
+    const cells = within(row as HTMLElement).getAllByRole('cell')
+    expect(cells).toHaveLength(9)
+    expect(cells[2]).toHaveTextContent('Aziz Karimov')
+    expect(cells[5]).toHaveTextContent('Nodira Yusupova')
+  })
+
+  it('closes the eight remaining columns up when the agent column is hidden', async () => {
+    signIn([Perm.CALLS_READ_OWN])
+    respond(() => jsonResponse(200, page([makeCall({ contact_name: 'Nodira Yusupova' })])))
+
+    renderPage()
+
+    const table = await screen.findByRole('table')
+    const [header, row] = within(table).getAllByRole('row')
+    expect(
+      within(header as HTMLElement)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      t('calls.colTime'),
+      t('calls.colReceived'),
+      t('calls.colDirection'),
+      t('calls.colRemote'),
+      t('calls.colContact'),
+      t('calls.colStatus'),
+      t('calls.colDuration'),
+      t('calls.colAudio'),
+    ])
+    expect(within(row as HTMLElement).getAllByRole('cell')).toHaveLength(8)
+  })
+
   it('shows WHY a call has no recording rather than an empty cell (UC-14)', async () => {
     respond(() => jsonResponse(200, page([callWithoutAudio('oem_recorder_off')])))
 
@@ -331,7 +455,7 @@ describe('filters', () => {
     renderPage(
       `/calls?agent_id=${AGENT_ID}&direction=incoming&disposition=answered` +
         '&call_type=external&has_audio=false&date_from=2026-09-01&date_to=2026-09-05' +
-        '&remote_number=901112233&q=Nodira',
+        '&search=Nodira',
     )
 
     await screen.findByRole('table')
@@ -345,8 +469,49 @@ describe('filters', () => {
     expect(url).toContain('has_audio=false')
     expect(url).toContain('date_from=2026-09-01')
     expect(url).toContain('date_to=2026-09-05')
-    expect(url).toContain('remote_number=901112233')
+    // `search` is the panel's own parameter — the ONE box — and the server
+    // receives whichever of its two it turned out to be (`./search.ts`).
     expect(url).toContain('q=Nodira')
+    expect(url).not.toContain('search=')
+  })
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * The "Turi" filter offers two values, not three.
+   *
+   * `unknown` is a real stored value and stays everywhere else — SPEC §10.2
+   * makes it the mandatory default for a call the line directory cannot
+   * classify, and the detail page still badges it. The client asked for the
+   * FILTER not to offer it, and `CALL_TYPE_FILTER_LABEL` is where that
+   * narrowing is written down. This test is what stops somebody reading the
+   * divergence from `CALL_TYPE_LABEL` as a bug and "fixing" it back.
+   * ══════════════════════════════════════════════════════════════════════
+   */
+  it('offers internal and external as call types, and not "unknown"', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    const select = screen.getByLabelText(t('calls.filterCallType'))
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      t('calls.filterAny'),
+      t('calls.type.internal'),
+      t('calls.type.external'),
+    ])
+    expect(within(select).queryByText(t('calls.type.unknown'))).toBeNull()
+  })
+
+  it('does not forward a call type it cannot show', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    // The page sends only what its own control can display, so a link asking
+    // for the withdrawn value is no filter rather than a filter with nothing
+    // selected in the box.
+    renderPage('/calls?call_type=unknown')
+
+    await screen.findByRole('table')
+    expect(callsRequests()[0] ?? '').not.toContain('call_type=')
   })
 
   it('ignores a filter value the server does not accept', async () => {
@@ -363,7 +528,7 @@ describe('filters', () => {
   it('clears every filter at once, leaving none behind', async () => {
     respond(() => jsonResponse(200, page([makeCall()])))
 
-    renderPage('/calls?direction=incoming&q=Nodira&has_audio=false')
+    renderPage('/calls?direction=incoming&search=Nodira&has_audio=false&date_from=2026-09-01')
     await screen.findByRole('table')
 
     await userEvent.click(screen.getByRole('button', { name: t('calls.filterReset') }))
@@ -372,7 +537,9 @@ describe('filters', () => {
     const url = callsRequests().at(-1) ?? ''
     expect(url).not.toContain('direction=')
     expect(url).not.toContain('q=')
+    expect(url).not.toContain('remote_number=')
     expect(url).not.toContain('has_audio=')
+    expect(url).not.toContain('date_from=')
   })
 
   it('says "nothing matches" rather than "no calls yet" once a filter is set', async () => {
@@ -382,6 +549,277 @@ describe('filters', () => {
 
     expect(await screen.findByText(t('calls.emptyFiltered'))).toBeInTheDocument()
     expect(screen.queryByText(t('calls.emptyAll'))).toBeNull()
+  })
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * Two date filters, not one range control.
+   *
+   * Each bound stands alone — the server reads a missing one as open-ended —
+   * and each applies the moment it is picked. They only know about each other
+   * through `min`/`max`, so the picker cannot offer a start after the end.
+   * ══════════════════════════════════════════════════════════════════════
+   */
+  it('reads both dates out of the URL and cross-constrains them', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?date_from=2026-09-01&date_to=2026-09-05')
+
+    await screen.findByRole('table')
+    const from = screen.getByLabelText(t('calls.filterDateFrom'))
+    const to = screen.getByLabelText(t('calls.filterDateTo'))
+    expect(from).toHaveValue('2026-09-01')
+    expect(to).toHaveValue('2026-09-05')
+    expect(from).toHaveAttribute('max', '2026-09-05')
+    expect(to).toHaveAttribute('min', '2026-09-01')
+  })
+
+  it('applies a start date on its own, without waiting for an end date', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    // Picking a day in the calendar is the act of choosing; the filter runs
+    // there and then, and "from this date" is a complete question by itself.
+    fireEvent.change(screen.getByLabelText(t('calls.filterDateFrom')), {
+      target: { value: '2026-09-01' },
+    })
+
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('date_from=2026-09-01'))
+    expect(callsRequests().at(-1) ?? '').not.toContain('date_to=')
+  })
+
+  it('applies an end date on its own too', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    fireEvent.change(screen.getByLabelText(t('calls.filterDateTo')), {
+      target: { value: '2026-09-05' },
+    })
+
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('date_to=2026-09-05'))
+    expect(callsRequests().at(-1) ?? '').not.toContain('date_from=')
+  })
+
+  it('clears one bound without touching the other', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?date_from=2026-09-01&date_to=2026-09-05')
+    await screen.findByRole('table')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('calls.filterDateClearFrom') }),
+    )
+
+    await waitFor(() => expect(callsRequests().at(-1)).not.toContain('date_from='))
+    expect(callsRequests().at(-1) ?? '').toContain('date_to=2026-09-05')
+    expect(screen.getByLabelText(t('calls.filterDateTo'))).toHaveValue('2026-09-05')
+  })
+})
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * One box, two server parameters.
+ *
+ * The page used to carry "Kontakt nomi" (`q`) and "Raqam bo'yicha"
+ * (`remote_number`) side by side and made the reader choose. It now has one
+ * field and `../search.ts` chooses — that rule has its own unit test; what is
+ * asserted here is the wiring: that the box reaches the URL, that the URL
+ * reaches the right server parameter, and that the query still fires on intent
+ * rather than on every keystroke.
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe('search', () => {
+  function searchBox(): HTMLElement {
+    return screen.getByRole('searchbox', { name: t('calls.search') })
+  }
+
+  it('offers one search box, not the two it replaced', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+
+    await screen.findByRole('table')
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1)
+    expect(searchBox()).toHaveAttribute('placeholder', t('calls.searchHint'))
+    // The two labels the old pair carried are gone from the bar.
+    expect(screen.queryByText(t('calls.filterContact'))).toBeNull()
+    expect(screen.queryByText(t('calls.filterRemoteNumber'))).toBeNull()
+  })
+
+  it('sends typed text as the contact-name filter', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    await userEvent.type(searchBox(), 'Nodira{Enter}')
+
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('q=Nodira'))
+    expect(callsRequests().at(-1) ?? '').not.toContain('remote_number=')
+  })
+
+  it('sends a typed number as the number filter, spacing and all', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    await userEvent.type(searchBox(), '90 111 22 33{Enter}')
+
+    // `URLSearchParams` spells a space `+`, which the server reads back as a
+    // space and `phone_key` then strips (N37).
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('remote_number=90+111+22+33'))
+    // Not as a contact name: `q` is an ILIKE over `contact_name` and would
+    // match nothing at all for a number.
+    expect(callsRequests().at(-1) ?? '').not.toContain('q=')
+  })
+
+  /**
+   * Deliberately not debounced (`shared/ui/filters.tsx`). Typing eight
+   * characters must not be eight ILIKE scans of a 500k-row table.
+   */
+  it('does not query per keystroke', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+    const before = callsRequests().length
+
+    await userEvent.type(searchBox(), 'Nodira')
+    expect(callsRequests().length).toBe(before)
+
+    // Blur commits, exactly like Enter does.
+    await userEvent.tab()
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('q=Nodira'))
+  })
+
+  it('puts the typed text in the URL, so the filtered list is a link', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?search=901112233')
+
+    await screen.findByRole('table')
+    expect(searchBox()).toHaveValue('901112233')
+    expect(callsRequests()[0] ?? '').toContain('remote_number=901112233')
+  })
+
+  it('finds an extension, which only the number filter can match', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage()
+    await screen.findByRole('table')
+
+    // `*700` has no phone key, so the server falls back to an exact match on
+    // the raw string — the branch that finds extension calls. Sending it as
+    // `q` would search contact names and find nothing.
+    await userEvent.type(searchBox(), '*700{Enter}')
+
+    // `URLSearchParams` leaves `*` literal; the server sees the raw string it
+    // needs for the exact-match branch.
+    await waitFor(() => expect(callsRequests().at(-1)).toContain('remote_number=*700'))
+    expect(callsRequests().at(-1) ?? '').not.toContain('q=')
+  })
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * Somebody's saved link still means what it meant.
+   *
+   * `q` and `remote_number` were the URL parameters until this page merged its
+   * two boxes. A bookmark or a chat message carrying one of them must not open
+   * an UNFILTERED list — that looks exactly like a filtered list that found a
+   * lot, and nothing on screen says otherwise.
+   * ══════════════════════════════════════════════════════════════════════
+   */
+  it('keeps an old ?q= link filtered', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?q=Nodira')
+
+    await screen.findByRole('table')
+    expect(searchBox()).toHaveValue('Nodira')
+    expect(callsRequests()[0] ?? '').toContain('q=Nodira')
+  })
+
+  it('keeps an old ?remote_number= link filtered', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?remote_number=901112233')
+
+    await screen.findByRole('table')
+    expect(searchBox()).toHaveValue('901112233')
+    expect(callsRequests()[0] ?? '').toContain('remote_number=901112233')
+  })
+
+  it('retires the legacy parameter as soon as the box is used', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?q=Nodira')
+    await screen.findByRole('table')
+
+    await userEvent.click(screen.getByRole('button', { name: t('calls.searchClear') }))
+
+    // If `q=` were left in the URL, the fallback would read it again on the
+    // next render and the filter would come back from the dead.
+    await waitFor(() => expect(callsRequests().at(-1)).not.toContain('q='))
+  })
+})
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * The count, and how long it is allowed to live.
+ *
+ * Only the first page asks for a total (SPEC §4.0), so every later page answers
+ * `total: null`. With 50-row pages a reader reaches page two twenty times
+ * sooner than with 1000, and watching "Jami: 742 ta" turn into a dash reads as
+ * a number that got lost. Holding it costs no request; holding it across a
+ * FILTER change would be a lie.
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe('the total', () => {
+  const CURSOR = 'C1'
+
+  function respondWithTotals() {
+    respond((url) => {
+      if (url.includes(`cursor=${CURSOR}`)) {
+        return jsonResponse(200, page([makeCall({ id: 'p2' })], { total: null }))
+      }
+      // A different answer per filter, so a held count cannot pass for the
+      // right one by accident.
+      const total = url.includes('direction=incoming') ? 7 : 742
+      return jsonResponse(
+        200,
+        page([makeCall({ id: 'p1' })], { next_cursor: CURSOR, has_more: true, total }),
+      )
+    })
+  }
+
+  it('stays on screen on page two, and is replaced when a filter changes', async () => {
+    respondWithTotals()
+
+    renderPage()
+    expect(await screen.findByText(t('calls.total', { count: '742' }))).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: t('calls.nextPage') }))
+    await waitFor(() => expect(callsRequests().at(-1)).toContain(`cursor=${CURSOR}`))
+
+    // The server sent `total: null` for this page and the panel did not ask it
+    // to do otherwise — the count on screen is the one it already had.
+    expect(screen.getByText(t('calls.total', { count: '742' }))).toBeInTheDocument()
+    expect(callsRequests().at(-1) ?? '').toContain('with_total=false')
+
+    await userEvent.selectOptions(
+      screen.getByLabelText(t('calls.filterDirection')),
+      'incoming',
+    )
+
+    // A count from the previous filter is worse than no count: 742 never
+    // appears beside a filtered list.
+    expect(await screen.findByText(t('calls.total', { count: '7' }))).toBeInTheDocument()
+    expect(screen.queryByText(t('calls.total', { count: '742' }))).toBeNull()
   })
 })
 
@@ -405,7 +843,7 @@ describe('pagination', () => {
     await screen.findByText(t('calls.nextPage'))
 
     const first = callsRequests()[0] ?? ''
-    expect(first).toContain('limit=')
+    expect(first).toContain('limit=50')
     // The first page carries no cursor, and asks for the total exactly once —
     // per filter change, not per page (SPEC §4.0).
     expect(first).not.toContain('cursor=')
@@ -423,6 +861,23 @@ describe('pagination', () => {
     for (const url of callsRequests()) {
       expect(url).not.toMatch(/[?&](offset|page|skip)=/)
     }
+  })
+
+  /**
+   * The page size is a constant now, not a control. A link somebody saved
+   * while the picker still existed must open the list, not a 1000-row page and
+   * not an error — the parameter is simply ignored.
+   */
+  it('asks for a fixed 50 rows and ignores a page size left in an old link', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+
+    renderPage('/calls?limit=1000&direction=incoming')
+
+    await screen.findByRole('table')
+    const url = callsRequests()[0] ?? ''
+    expect(url).toContain('limit=50')
+    expect(url).not.toContain('limit=1000')
+    expect(url).toContain('direction=incoming')
   })
 
   it('disables "previous" on the first page', async () => {
@@ -483,5 +938,46 @@ describe('scope', () => {
     // The roster is fetched only to fill the filter's option list; the row's
     // own `agent_name` is what the column renders.
     expect(await screen.findByRole('option', { name: 'Aziz Karimov' })).toBeInTheDocument()
+  })
+})
+
+describe('the audio archive button', () => {
+  it('is hidden from a reader who may not download recordings', async () => {
+    respond(() => jsonResponse(200, page([makeCall()])))
+    signIn([Perm.CALLS_READ])
+    renderPage()
+    await screen.findByText('+998 90 111 22 33')
+
+    expect(screen.queryByRole('button', { name: /Ovoz/ })).toBeNull()
+  })
+
+  it('says how many recordings this page holds', async () => {
+    respond(() =>
+      jsonResponse(200, page([makeCall({ has_audio: true })])),
+    )
+    signIn([Perm.CALLS_READ, Perm.AUDIO_DOWNLOAD])
+    renderPage()
+    await screen.findByText('+998 90 111 22 33')
+
+    const button = screen.getByRole('button', {
+      name: t('calls.audioArchive', { count: 1 }),
+    })
+    expect(button).toBeEnabled()
+  })
+
+  it('refuses the click when the page holds none', async () => {
+    /**
+     * The case that reads as a broken download: an archive containing only
+     * `manifest.csv`. It is the correct answer and it looks like a fault, so
+     * the button says it before the click rather than the archive after it.
+     */
+    respond(() => jsonResponse(200, page([callWithoutAudio('not_expected')])))
+    signIn([Perm.CALLS_READ, Perm.AUDIO_DOWNLOAD])
+    renderPage()
+    await screen.findByText(t('calls.audioArchiveNone'))
+
+    expect(
+      screen.getByRole('button', { name: t('calls.audioArchiveNone') }),
+    ).toBeDisabled()
   })
 })

@@ -114,20 +114,37 @@ async function toApiError(response: Response): Promise<ApiError> {
  * a replayed refresh token as theft (`refresh_reused`, SPEC §4.7) and logs
  * everybody out. They share one promise instead.
  */
-let refreshInFlight: Promise<boolean> | null = null
+let refreshInFlight: Promise<RefreshOutcome> | null = null
+
+/**
+ * Three answers, and the middle one is the whole point.
+ *
+ * `expired`     the server said no. The session is over; log in again.
+ * `unreachable` we could not ask — the network, or a server restarting. The
+ *               session may be perfectly valid and must NOT be thrown away.
+ *
+ * Collapsing these two into `false` is what made a deploy log out every open
+ * panel: `restore()` runs on page load, a refresh during a restart threw, and
+ * the store went anonymous on the spot.
+ */
+export type RefreshOutcome = 'ok' | 'expired' | 'unreachable'
 
 interface RefreshResponse {
   access_token: string
 }
 
-async function performRefresh(): Promise<boolean> {
+async function performRefresh(): Promise<RefreshOutcome> {
   try {
     const response = await fetch(buildUrl(REFRESH_PATH), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     })
-    if (!response.ok) return false
+    // 401 is the server refusing this cookie, which is the only answer that
+    // means the session is over. A 502 from a proxy in front of a restarting
+    // server, or a 500, says nothing about the session.
+    if (response.status === 401 || response.status === 403) return 'expired'
+    if (!response.ok) return 'unreachable'
     const body = await readJson(response)
     if (
       typeof body === 'object' &&
@@ -136,17 +153,18 @@ async function performRefresh(): Promise<boolean> {
       typeof (body as RefreshResponse).access_token === 'string'
     ) {
       tokenStore.set((body as RefreshResponse).access_token)
-      return true
+      return 'ok'
     }
-    return false
+    // A 200 carrying something else is a server we do not understand, which is
+    // not the same as a server that turned us away.
+    return 'unreachable'
   } catch {
-    // The network is down, not the session. Treat it as a failed refresh: the
-    // caller reports the original 401 and the user logs in again once online.
-    return false
+    // The network is down, not the session.
+    return 'unreachable'
   }
 }
 
-function refreshOnce(): Promise<boolean> {
+function refreshOnce(): Promise<RefreshOutcome> {
   refreshInFlight ??= performRefresh().finally(() => {
     refreshInFlight = null
   })
@@ -160,7 +178,7 @@ function refreshOnce(): Promise<boolean> {
  * after a page reload the refresh cookie is the only evidence of a session.
  * Shares the in-flight promise with the mid-session retry above.
  */
-export function refreshAccessToken(): Promise<boolean> {
+export function refreshAccessToken(): Promise<RefreshOutcome> {
   return refreshOnce()
 }
 
@@ -196,7 +214,7 @@ async function send(options: SendOptions, isRetry = false): Promise<Response> {
 
   // The token expired mid-session. Refresh silently once and replay the
   // request; only when that fails does the user see a login screen.
-  const refreshed = await refreshOnce()
+  const refreshed = (await refreshOnce()) === 'ok'
   if (!refreshed) {
     tokenStore.clear()
     onUnauthorized()

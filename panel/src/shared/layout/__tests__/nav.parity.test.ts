@@ -43,9 +43,15 @@ describe('nav and route table', () => {
     expect(visible.map((item) => item.to)).toEqual(['/'])
   })
 
-  it('shows the audit log only to a holder of audit:read', () => {
-    expect(visibleNav(new Set(['calls:read'])).map((item) => item.to)).not.toContain('/audit')
-    expect(visibleNav(new Set(['audit:read'])).map((item) => item.to)).toContain('/audit')
+  it('offers neither the audit log nor the APK page to anybody', () => {
+    // Both left the panel on 2026-09-14 at the client's request. Asserted
+    // rather than remembered: a menu entry is easy to reintroduce by copying
+    // a neighbouring one, and the permissions behind these two still exist.
+    const everything = new Set(['audit:read', 'appversions:read', 'appversions:write'])
+    const paths = visibleNav(everything).map((item) => item.to)
+
+    expect(paths).not.toContain('/audit')
+    expect(paths).not.toContain('/settings/app-versions')
   })
 
   it('has an Uzbek label for every menu entry', () => {

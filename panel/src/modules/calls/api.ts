@@ -36,10 +36,16 @@ export type CallListQuery = NonNullable<
   operations['list_calls_api_v1_calls_get']['parameters']['query']
 >
 
-/** SPEC §4.0: `limit` default 50, and 1000 for `/calls` because UC-19 renders 1000. */
-export const DEFAULT_PAGE_SIZE = 50
-export const MAX_PAGE_SIZE = 1000
-export const PAGE_SIZES: readonly number[] = [50, 100, 500, MAX_PAGE_SIZE]
+/**
+ * How many calls a page holds. Fixed, and not a control any more.
+ *
+ * The bar used to offer 50 / 100 / 500 / 1000 (SPEC §4.0 allows up to 1000 for
+ * `/calls`). Nobody chose anything but the default, and the picker was one more
+ * box in a filter bar that had too many — so the choice is gone and the value
+ * is a constant. Paging is keyset, so reading further is "next page", not a
+ * bigger number.
+ */
+export const PAGE_SIZE = 50
 
 /**
  * A generated query object as `client.ts` wants it.
@@ -137,4 +143,31 @@ export function callsExportUrl(params: CallListQuery): string {
   search.delete('cursor')
   search.delete('with_total')
   return `/api/v1/calls/export?${search.toString()}`
+}
+
+/**
+ * The recordings of **the page on screen**, as one ZIP.
+ *
+ * The opposite of the CSV export, and deliberately so: that one drops `limit`
+ * and `cursor` because a spreadsheet of a filtered set has no pages, while
+ * this one keeps them because the button sits under fifty rows and hands over
+ * those fifty rows. A download whose contents do not match what the reader is
+ * looking at is a download nobody can check.
+ *
+ * `with_total` still goes — a count is a list concern and the archive has no
+ * use for one.
+ */
+export function callsAudioArchiveUrl(params: CallListQuery): string {
+  const query = toQuery(params)
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value)) {
+      for (const item of value) search.append(key, String(item))
+    } else {
+      search.set(key, String(value))
+    }
+  }
+  search.delete('with_total')
+  return `/api/v1/calls/audio-archive?${search.toString()}`
 }

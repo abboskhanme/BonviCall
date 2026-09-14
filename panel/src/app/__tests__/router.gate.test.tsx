@@ -66,21 +66,21 @@ describe('route gate', () => {
 
   it('does not render a page the user lacks the permission for', () => {
     signIn([Perm.CALLS_READ])
-    renderAt('/audit')
+    renderAt('/users')
 
     // The page title is the <h1>; the sidebar carries the same words as a
     // link, so the heading role is what distinguishes "rendered" from
     // "merely listed in a menu".
-    expect(heading(t('page.audit'))).toBeNull()
+    expect(heading(t('page.users'))).toBeNull()
     // Redirected to the dashboard, per SPEC §5.1.
     expect(heading(t('page.dashboard'))).not.toBeNull()
   })
 
   it('renders the same page once the permission is held', () => {
-    signIn([Perm.AUDIT_READ])
-    renderAt('/audit')
+    signIn([Perm.USERS_READ])
+    renderAt('/users')
 
-    expect(heading(t('page.audit'))).not.toBeNull()
+    expect(heading(t('page.users'))).not.toBeNull()
   })
 
   it('sends an anonymous visitor to /login and remembers the page', () => {
@@ -104,7 +104,7 @@ describe('route gate', () => {
 
   it('keeps the dashboard as the fallback for everybody who has a tile on it', () => {
     signIn([Perm.CALLS_READ])
-    renderAt('/audit')
+    renderAt('/users')
 
     expect(heading(t('page.dashboard'))).not.toBeNull()
   })
@@ -126,13 +126,22 @@ describe('route gate', () => {
     // easy to reintroduce by copying a neighbouring one, so it is asserted
     // rather than remembered.
     const paths = ROUTES.map((route) => route.path)
-    expect(paths).not.toContain('/settings')
+    // NOTE: `/settings` is back since 2026-09-14, as the profile page. What
+    // was removed in 2026-09-05 was a page of recording thresholds, and the
+    // path was free.
     expect(paths).not.toContain('/monitor')
     expect(paths).not.toContain('/numbers')
     expect(paths).not.toContain('/enrolment')
-    // The APK surface stays: it is distribution, not configuration, and
-    // without it a fleet of personal phones cannot be updated (N33).
-    expect(paths).toContain('/settings/app-versions')
+    // `/settings/app-versions` and `/audit` went on 2026-09-14, also at the
+    // client's request. The APK surface is gone from the PANEL only: the
+    // server still publishes builds, the enrolment link still serves one, and
+    // the phone still asks whether it must update — none of which the panel
+    // was doing.
+    expect(paths).not.toContain('/settings/app-versions')
+    expect(paths).not.toContain('/audit')
+    // `/reports/gap` followed on 2026-09-14. The number it led with is still
+    // on the dashboard; the drill-down page is not.
+    expect(paths).not.toContain('/reports/gap')
   })
 
   it('does not register /i/:code — the server renders the install page', () => {
@@ -151,11 +160,8 @@ describe('route gate', () => {
 
     for (const path of [
       '/alerts',
-      '/reports/gap',
-      '/audit',
       '/agents',
       '/users',
-      '/settings/app-versions',
     ]) {
       const view = renderAt(path)
       expect(heading(t('page.dashboard'))).not.toBeNull()
@@ -174,10 +180,17 @@ describe('route gate', () => {
 
   it('gates every non-public route except the dashboard', () => {
     // The dashboard is "any authenticated user" (SPEC §5.2) and the two public
-    // pages carry no gate by definition. Everything else must declare one, or a
-    // page added later silently ships ungated.
+    // pages carry no gate by definition. `/settings` joined them on
+    // 2026-09-14: your own account is yours whatever your role, and the one
+    // section on it that touches OTHER accounts is gated inside the page and
+    // by the server on every request it makes.
+    //
+    // The exceptions are listed rather than pattern-matched, so a page added
+    // later still cannot ship ungated by accident.
+    const ANY_AUTHENTICATED = ['/', '/settings']
     const ungated = ROUTES.filter(
-      (route) => !route.isPublic && route.path !== '/' && !route.anyOf?.length,
+      (route) =>
+        !route.isPublic && !ANY_AUTHENTICATED.includes(route.path) && !route.anyOf?.length,
     )
     expect(ungated.map((route) => route.path)).toEqual([])
   })

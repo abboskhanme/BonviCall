@@ -151,12 +151,16 @@ describe('a user is a login, not a salesperson', () => {
     expect(screen.queryByText(t('enrol.reissue'))).toBeNull()
   })
 
-  it('links a sales account to the AGENT it points at', async () => {
+  it('no longer shows which agent a sales account points at', async () => {
+    // The column went on 2026-09-14 at the client's request. The link itself
+    // is not lost — it is on the agent's own card, which is where somebody
+    // asking "whose login is this" is already headed — but this page stopped
+    // answering it, and that is asserted rather than remembered.
     world([admin, sales])
     renderPage()
 
-    const link = await screen.findByRole('link', { name: 'Aziz Karimov' })
-    expect(link).toHaveAttribute('href', `/agents/${AGENT_ID}`)
+    await screen.findByText(sales.full_name)
+    expect(screen.queryByRole('link', { name: 'Aziz Karimov' })).toBeNull()
   })
 
   it('forces an agent picker for a sales account', async () => {

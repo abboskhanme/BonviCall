@@ -20,23 +20,103 @@ import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
-import { EM_DASH, formatDate, formatInstantTitle, formatPhone } from '@/shared/lib/format'
+import { EM_DASH, formatInstantTitle, formatPhone } from '@/shared/lib/format'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { FilterField, SELECT_CLASS, TextFilter } from '@/shared/ui/filters'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
 import { useNumbers } from '@/modules/numbers/api'
+import { useDevices, useInstallations, type FleetRow } from '@/modules/devices/api'
+import {
+  CAPTURE_ROUTE_LABEL,
+  FLEET_PROBLEM_LABEL,
+  FLEET_STATE_LABEL,
+  FLEET_STATE_TONE,
+} from '@/modules/devices/labels'
+import { relativeText } from '@/shared/lib/relativeText'
 
 import { AgentModal } from './AgentModal'
 import { CreateAgentModal } from './CreateAgentModal'
 import { ImportAgentsModal } from './ImportAgentsModal'
-import { LineDirectorySection } from '@/modules/lineDirectory/LineDirectorySection'
 import { ArchiveAgentModal } from './ArchiveAgentModal'
 import { useAgentLines, useAgents, type Agent } from './api'
+import { fleetForAgents } from './fleet'
 
 const PARAM_Q = 'q'
 const PARAM_ARCHIVED = 'archived'
+
+/**
+ * The four health cells, for one employee.
+ *
+ * `row === undefined` is a real and important state: an employee who has been
+ * hired and has no handset yet. It is not an error and it is not "unknown" —
+ * it is the rollout's own to-do list, and the fleet page could never show it
+ * because a person with no installation has no row there at all.
+ */
+function FleetCells({ row }: { row: FleetRow | undefined }) {
+  if (row === undefined) {
+    return (
+      <>
+        <TD className="text-muted">{EM_DASH}</TD>
+        <TD className="whitespace-nowrap">
+          <Badge tone="warn">{t('agents.noDevice')}</Badge>
+        </TD>
+        <TD className="text-muted">{EM_DASH}</TD>
+        <TD className="text-muted">{EM_DASH}</TD>
+        <TD className="text-muted">{EM_DASH}</TD>
+      </>
+    )
+  }
+
+  const { health, state, problems } = row
+  const model = `${health.manufacturer ?? ''} ${health.model ?? ''}`.trim()
+  return (
+    <>
+      <TD className="whitespace-nowrap">
+        <Link
+          to={`/devices/${health.installation_id}`}
+          className="text-text underline-offset-2 hover:text-accent hover:underline"
+        >
+          {model || t('devices.unknownModel')}
+        </Link>
+      </TD>
+      {/* `whitespace-nowrap` on the cell: the badge wrapped onto two lines on
+          the fleet page and took the whole row with it. */}
+      <TD className="whitespace-nowrap">
+        <Badge tone={FLEET_STATE_TONE[state]}>{t(FLEET_STATE_LABEL[state])}</Badge>
+      </TD>
+      <TD
+        className="whitespace-nowrap text-muted"
+        title={
+          health.last_heartbeat_at ? formatInstantTitle(health.last_heartbeat_at) : undefined
+        }
+      >
+        {/* Never-reported has no timestamp, and a dash would say "unknown"
+            when the truth is "never". */}
+        {health.last_heartbeat_at ? relativeText(health.last_heartbeat_at) : t('devices.never')}
+      </TD>
+      <TD className="whitespace-nowrap">
+        {health.recording_route ? (
+          <span className={health.recording_route_ok === false ? 'text-bad' : 'text-text'}>
+            {t(CAPTURE_ROUTE_LABEL[health.recording_route])}
+          </span>
+        ) : (
+          <span className="text-muted">{EM_DASH}</span>
+        )}
+      </TD>
+      <TD className="text-xs text-muted">
+        {problems.length === 0 ? (
+          EM_DASH
+        ) : (
+          <span className="line-clamp-2">
+            {problems.map((problem) => t(FLEET_PROBLEM_LABEL[problem])).join(' · ')}
+          </span>
+        )}
+      </TD>
+    </>
+  )
+}
 
 export function AgentsPage() {
   const can = useAuth((state) => state.can)
@@ -59,6 +139,33 @@ export function AgentsPage() {
   const { lines, isError: linesFailed } = useAgentLines(
     agentsQuery.data?.items,
     numbersQuery.data?.items,
+  )
+
+  /**
+   * The fleet, folded into the roster (2026-09-13).
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * `/devices` used to be a menu entry of its own. On a fifteen-person team
+   * one employee is one phone, and answering "is Aziz's phone working?"
+   * across two pages is one page too many — so the health columns live here
+   * and the roster is the spine, because an employee with **no** phone is a
+   * row this page must still show and a fleet page by construction cannot.
+   *
+   * The devices page itself is not deleted: a `sales` user holds
+   * `devices:read:own` and not `agents:read`, so it remains their one view of
+   * their own handset. It is simply no longer in an admin's menu.
+   *
+   * Both requests are unconditional, and that is safe rather than sloppy:
+   * this page is gated on `agents:read`, which only admin and manager hold,
+   * and both of them also hold `devices:read`. A reader who reaches this code
+   * can always make these two calls.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  const devicesQuery = useDevices()
+  const installationsQuery = useInstallations()
+  const fleetByAgent = fleetForAgents(
+    devicesQuery.data?.items,
+    installationsQuery.data?.items,
   )
 
   function applyFilter(key: string, value: string | null) {
@@ -125,30 +232,47 @@ export function AgentsPage() {
               <Table>
                 <THead>
                   <tr>
+                    {/* Left to right, the questions somebody opens this page
+                        with: who, on what number, on which phone, is it
+                        working, when did it last say so, and what is wrong.
+                        The employee code, the note and the date the number was
+                        attached were columns here until 2026-09-13 and are now
+                        on the agent's own card — none of them earns a place
+                        beside "this phone has not reported in three days". */}
                     <TH>{t('agents.colName')}</TH>
-                    <TH>{t('agents.colCode')}</TH>
                     <TH>{t('agents.colNumber')}</TH>
-                    {/* The date the NUMBER was attached — the assignment's
-                        `valid_from`, not the employment date. */}
-                    <TH>{t('agents.colAttached')}</TH>
-                    <TH>{t('agents.colStatus')}</TH>
-                    <TH>{t('agents.colNote')}</TH>
+                    <TH>{t('agents.colDevice')}</TH>
+                    <TH>{t('agents.colDeviceState')}</TH>
+                    <TH title={t('agents.colLastSeenHint')}>{t('agents.colLastSeen')}</TH>
+                    <TH>{t('agents.colRoute')}</TH>
+                    <TH>{t('agents.colProblems')}</TH>
                     {mayWrite || mayArchive ? <TH className="w-0" /> : null}
                   </tr>
                 </THead>
                 <TBody>
                   {data.items.map((agent) => (
                     <TR key={agent.id}>
-                      <TD>
+                      <TD className="whitespace-nowrap">
                         <Link
                           to={`/agents/${agent.id}`}
                           className="font-medium text-text underline-offset-2 hover:text-accent hover:underline"
                         >
                           {agent.full_name}
                         </Link>
-                      </TD>
-                      <TD className="font-mono text-xs text-muted">
-                        {agent.employee_code ?? EM_DASH}
+                        {/* The status was a column of its own and is now a
+                            mark beside the name: "archived" qualifies WHO this
+                            is, and an archived person's phone being offline is
+                            not news. An active one says nothing, because
+                            everything on this page is active by default. */}
+                        {agent.archived_at ? (
+                          <Badge tone="neutral" className="ms-2">
+                            {t('agents.statusArchived')}
+                          </Badge>
+                        ) : !agent.is_active ? (
+                          <Badge tone="warn" className="ms-2">
+                            {t('agents.statusInactive')}
+                          </Badge>
+                        ) : null}
                       </TD>
                       <TD className="whitespace-nowrap font-mono">
                         {(() => {
@@ -157,30 +281,7 @@ export function AgentsPage() {
                           return formatPhone(line.e164) ?? line.e164
                         })()}
                       </TD>
-                      <TD
-                        className="whitespace-nowrap text-muted"
-                        title={(() => {
-                          const line = lines.get(agent.id)
-                          return line ? formatInstantTitle(line.since) : undefined
-                        })()}
-                      >
-                        {(() => {
-                          const line = lines.get(agent.id)
-                          return line ? formatDate(line.since) : EM_DASH
-                        })()}
-                      </TD>
-                      <TD>
-                        {agent.archived_at ? (
-                          <Badge tone="neutral">{t('agents.statusArchived')}</Badge>
-                        ) : agent.is_active ? (
-                          <Badge tone="good">{t('agents.statusActive')}</Badge>
-                        ) : (
-                          <Badge tone="warn">{t('agents.statusInactive')}</Badge>
-                        )}
-                      </TD>
-                      <TD className="max-w-xs truncate text-xs text-muted" title={agent.note ?? ''}>
-                        {agent.note ?? '—'}
-                      </TD>
+                      <FleetCells row={fleetByAgent.get(agent.id)} />
                       {mayWrite || mayArchive ? (
                         <TD>
                           <div className="flex justify-end gap-1">
@@ -221,7 +322,6 @@ export function AgentsPage() {
         )}
       </QueryBoundary>
 
-      <LineDirectorySection />
 
       {mayWrite ? (
         <>

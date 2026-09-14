@@ -39,6 +39,17 @@ interface AuthState {
   passwordChanged: () => void
 }
 
+/**
+ * How hard `restore` tries before giving up on an unreachable server.
+ *
+ * Three attempts at 400 ms, 800 ms and 1200 ms — about two and a half seconds
+ * in total, which covers a uvicorn reload and a container restart, and is
+ * short enough that a genuinely dead server still reaches the login screen
+ * without the reader wondering whether the page is broken.
+ */
+const RESTORE_RETRIES = 3
+const RESTORE_RETRY_MS = 400
+
 function settle(user: SessionUser) {
   return {
     status: 'authenticated' as const,
@@ -73,16 +84,33 @@ export const useAuth = create<AuthState>((set, get) => ({
   restore: async () => {
     if (get().status === 'loading') return
     set({ status: 'loading' })
-    const refreshed = await refreshAccessToken()
-    if (!refreshed) {
+
+    /**
+     * ⚠️ **A server that cannot be reached has not ended the session.**
+     *
+     * This used to treat every failed refresh alike, so reloading the page
+     * while the server was restarting logged the reader out — which on a real
+     * deployment means every open panel is logged out by every update. The
+     * refresh now says which happened, and only `expired` is the session's
+     * end. `unreachable` is retried, because a restart takes a second or two
+     * and a reader who reloaded into it should never notice.
+     */
+    let outcome = await refreshAccessToken()
+    for (let attempt = 1; outcome === 'unreachable' && attempt <= RESTORE_RETRIES; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, RESTORE_RETRY_MS * attempt))
+      outcome = await refreshAccessToken()
+    }
+    if (outcome !== 'ok') {
+      // Out of retries, or genuinely refused. Either way there is nothing to
+      // render a session from.
       set({ ...ANONYMOUS, loginError: null })
       return
     }
+
     try {
       set(settle(await authApi.fetchMe()))
     } catch {
-      // A valid refresh token whose user was deactivated between requests, or
-      // the server restarting mid-boot. Either way there is no session.
+      // A valid refresh token whose user was deactivated between requests.
       tokenStore.clear()
       set({ ...ANONYMOUS, loginError: null })
     }

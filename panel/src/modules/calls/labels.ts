@@ -42,6 +42,34 @@ export const CALL_TYPE_LABEL: Record<CallType, MessageKey> = {
   unknown: 'calls.type.unknown',
 }
 
+/**
+ * The same enum MINUS `unknown`, for the call list's "Turi" filter only.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * **This subset is deliberate and is not a bug to be "fixed" back.** The client
+ * asked for the filter to offer Ichki and Tashqi and nothing else.
+ *
+ * `unknown` remains a real, stored value that rows genuinely carry: SPEC §10.2
+ * makes it the mandatory default for a call the line directory cannot classify,
+ * because BonviZvonki defaulted to `external` instead and mislabelled 82 calls
+ * out of 98. It is still rendered — the badge on the call detail page reads it
+ * out of `CALL_TYPE_LABEL` above, which keeps all three entries — and the
+ * server still accepts `call_type=unknown` on the wire. Only this one filter's
+ * option list is shorter.
+ *
+ * It is a separate map rather than a filtered `CALL_TYPE_LABEL` because
+ * `EnumFilter` derives its options from exactly one map and says why: "a value
+ * the server adds appears in both at once, or in neither". Narrowing a filter
+ * by hand costs that guarantee for this filter, so the narrowing is written
+ * down in one place with its reason attached. `Record<Exclude<…>>` still means
+ * a new CallType value breaks the build here rather than going unnoticed.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const CALL_TYPE_FILTER_LABEL: Record<Exclude<CallType, 'unknown'>, MessageKey> = {
+  internal: 'calls.type.internal',
+  external: 'calls.type.external',
+}
+
 export const SOURCE_LABEL: Record<CallSource, MessageKey> = {
   live_capture: 'calls.source.live_capture',
   call_log_recovery: 'calls.source.call_log_recovery',

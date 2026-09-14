@@ -15,9 +15,17 @@
  *
  * Loading, empty and error are `QueryBoundary`'s, not this page's.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Download, PhoneIncoming, PhoneOutgoing } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileArchive,
+  FilterX,
+  PhoneIncoming,
+  PhoneOutgoing,
+} from 'lucide-react'
 
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
@@ -33,24 +41,33 @@ import {
 } from '@/shared/lib/format'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { ExportCallsModal } from './ExportCallsModal'
-import { EnumFilter, FilterField, SELECT_CLASS, TextFilter } from '@/shared/ui/filters'
+import {
+  DateFilter,
+  EnumFilter,
+  FilterField,
+  SearchFilter,
+  SELECT_CLASS,
+} from '@/shared/ui/filters'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from '@/shared/ui/table'
 
 import { useAgentDirectory } from '@/modules/agents/api'
 
 import {
+  callsAudioArchiveUrl,
   useCallsPage,
-  DEFAULT_PAGE_SIZE,
-  PAGE_SIZES,
+  PAGE_SIZE,
   type Call,
   type CallListQuery,
   type CallPage,
 } from './api'
+import { downloadExport } from './export'
+import { searchParamFor } from './search'
 import {
   audioState,
   audioStateLabel,
   audioStateTone,
+  CALL_TYPE_FILTER_LABEL,
   CALL_TYPE_LABEL,
   DIRECTION_LABEL,
   DISPOSITION_LABEL,
@@ -76,13 +93,40 @@ const PARAM_DISPOSITION = 'disposition'
 const PARAM_CALL_TYPE = 'call_type'
 const PARAM_DATE_FROM = 'date_from'
 const PARAM_DATE_TO = 'date_to'
-const PARAM_REMOTE = 'remote_number'
-const PARAM_Q = 'q'
-const PARAM_LIMIT = 'limit'
 const PARAM_CURSOR = 'cursor'
 
+/**
+ * The one exception to "the parameter names are the server's own".
+ *
+ * The search box is a single field over TWO server parameters — `q` (contact
+ * name) and `remote_number` — and `./search.ts` decides which one a given
+ * input becomes. Calling the URL parameter `q` would therefore be a lie half
+ * the time: `?q=901112233` would travel to the server as `remote_number`.
+ * `search` names what it actually holds — what somebody typed in the box —
+ * and the routing rule stays in one readable place.
+ *
+ * The page-size `limit=` an old link may carry is simply ignored — the page
+ * size is a constant now.
+ */
+const PARAM_SEARCH = 'search'
+
+/**
+ * The two names the search used to have, still read — once, as a fallback.
+ *
+ * Somebody has `?q=Nodira` in a chat message or a bookmark. Ignoring it would
+ * open an UNFILTERED list that looks exactly like a filtered one that found a
+ * lot, which is the worst kind of wrong answer: silent. Reading them keeps the
+ * old link meaning what it meant. `search` wins where both are present, and
+ * touching the box rewrites the URL to `search`, so the legacy names fade out
+ * on their own rather than being maintained forever.
+ */
+const LEGACY_PARAM_Q = 'q'
+const LEGACY_PARAM_REMOTE = 'remote_number'
+
 /** Every filter parameter, so "clear" and "is anything filtered" cannot miss
- *  one — the bug where a reset button leaves a hidden filter behind. */
+ *  one — the bug where a reset button leaves a hidden filter behind. The two
+ *  legacy names are in here for exactly that reason: a filter that is in force
+ *  must be a filter "clear" removes. */
 const FILTER_PARAMS = [
   PARAM_AGENT,
   PARAM_AUDIO,
@@ -91,8 +135,9 @@ const FILTER_PARAMS = [
   PARAM_CALL_TYPE,
   PARAM_DATE_FROM,
   PARAM_DATE_TO,
-  PARAM_REMOTE,
-  PARAM_Q,
+  PARAM_SEARCH,
+  LEGACY_PARAM_Q,
+  LEGACY_PARAM_REMOTE,
 ] as const
 
 /**
@@ -107,11 +152,6 @@ function parseEnum<T extends string>(
   allowed: Record<T, unknown>,
 ): T | undefined {
   return raw !== null && raw in allowed ? (raw as T) : undefined
-}
-
-function parseLimit(raw: string | null): number {
-  const value = Number(raw)
-  return PAGE_SIZES.includes(value) ? value : DEFAULT_PAGE_SIZE
 }
 
 /** `'true' | 'false' | null` → the tri-state the server's `has_audio` is. */
@@ -162,9 +202,17 @@ function CallRows({ page, showAgent }: { page: CallPage; showAgent: boolean }) {
                 look shuffled — and it hides the skew, which on a phone with a
                 wrong date is days. Both columns, so the order is explainable. */}
             <TH title={t('calls.colReceivedHint')}>{t('calls.colReceived')}</TH>
+            {/* Third: who the call belongs to comes before what the call was.
+                Hidden for own-scope, where it would be one repeated name, and
+                the remaining eight columns simply close up. */}
+            {showAgent ? <TH>{t('calls.colAgent')}</TH> : null}
             <TH>{t('calls.colDirection')}</TH>
             <TH>{t('calls.colRemote')}</TH>
-            {showAgent ? <TH>{t('calls.colAgent')}</TH> : null}
+            {/* The name is what people scan this list for, so it is a column
+                and not a grey suffix inside the number cell. Unconditional,
+                unlike the agent column: a `sales` user reading their own calls
+                needs it most of all. */}
+            <TH>{t('calls.colContact')}</TH>
             <TH>{t('calls.colStatus')}</TH>
             <TH className="text-end">{t('calls.colDuration')}</TH>
             <TH>{t('calls.colAudio')}</TH>
@@ -194,20 +242,39 @@ function CallRows({ page, showAgent }: { page: CallPage; showAgent: boolean }) {
                 >
                   {formatDateTime(call.received_at)}
                 </TD>
+                {/* `agent_name` is resolved server-side (SPEC §4.7): looking
+                    a name up per row in the browser is the N+1 problem
+                    relocated to the client. Third, with its header. */}
+                {showAgent ? <TD className="whitespace-nowrap">{call.agent_name}</TD> : null}
                 <TD>
                   <DirectionCell call={call} />
                 </TD>
-                <TD>
+                {/* A phone number is a single token. With a free-text
+                    column beside it, an unconstrained cell is the one the
+                    table takes its slack from, and a number broken across two
+                    lines doubles the height of every row. */}
+                <TD className="whitespace-nowrap">
                   <span className="font-mono">{phone ?? t('calls.numberWithheld')}</span>
-                  {call.contact_name ? (
-                    <span className="ms-2 text-xs text-muted">{call.contact_name}</span>
-                  ) : null}
                 </TD>
-                {/* `agent_name` is resolved server-side (SPEC §4.7): looking
-                    a name up per row in the browser is the N+1 problem
-                    relocated to the client. */}
-                {showAgent ? <TD className="whitespace-nowrap">{call.agent_name}</TD> : null}
-                <TD>
+                {/* A name long enough to push the audio column off a 1440px
+                    screen is truncated rather than allowed to widen the table;
+                    the `title` still carries all of it. An absent name is the
+                    em dash the rest of the product uses, never a blank cell
+                    (`shared/ui/detail.tsx`). */}
+                <TD
+                  className="max-w-[14rem] truncate"
+                  title={call.contact_name ?? undefined}
+                >
+                  {call.contact_name ?? <span className="text-muted">{EM_DASH}</span>}
+                </TD>
+                {/* Four short labels that name WHO did not pick up ("Xodim
+                    javob bermadi" / "Mijoz javob bermadi"), so they are read
+                    as a phrase or not at all — a badge broken across three
+                    lines is what made the rows grow at 1280px. The audio cell
+                    below is deliberately NOT pinned this way: its labels are
+                    whole sentences and holding them on one line would push the
+                    table into a horizontal scroll. */}
+                <TD className="whitespace-nowrap">
                   <Badge tone={DISPOSITION_TONE[call.disposition]}>
                     {t(DISPOSITION_LABEL[call.disposition])}
                   </Badge>
@@ -238,13 +305,22 @@ export function CallsPage() {
   const hasAudio = parseHasAudio(searchParams.get(PARAM_AUDIO))
   const direction = parseEnum(searchParams.get(PARAM_DIRECTION), DIRECTION_LABEL)
   const disposition = parseEnum(searchParams.get(PARAM_DISPOSITION), DISPOSITION_LABEL)
-  const callType = parseEnum(searchParams.get(PARAM_CALL_TYPE), CALL_TYPE_LABEL)
+  // Parsed against the FILTER's map, not the full enum: this page can only
+  // send a value it can also show, so a pasted `?call_type=unknown` is no
+  // filter rather than a filter with no matching option in the select.
+  const callType = parseEnum(searchParams.get(PARAM_CALL_TYPE), CALL_TYPE_FILTER_LABEL)
   const dateFrom = searchParams.get(PARAM_DATE_FROM) ?? undefined
   const dateTo = searchParams.get(PARAM_DATE_TO) ?? undefined
-  const remoteNumber = searchParams.get(PARAM_REMOTE) ?? undefined
-  const nameQuery = searchParams.get(PARAM_Q) ?? undefined
-  const limit = parseLimit(searchParams.get(PARAM_LIMIT))
+  const search =
+    searchParams.get(PARAM_SEARCH) ??
+    searchParams.get(LEGACY_PARAM_Q) ??
+    searchParams.get(LEGACY_PARAM_REMOTE) ??
+    undefined
   const cursor = searchParams.get(PARAM_CURSOR) ?? undefined
+
+  // One box, two server parameters. The rule is a pure function with its own
+  // test (`./search.ts`) rather than a condition inlined here.
+  const searchFilter = searchParamFor(search ?? '')
 
   /**
    * The trail of cursors already visited, so "previous" works.
@@ -258,9 +334,24 @@ export function CallsPage() {
    */
   const [trail, setTrail] = useState<string[]>([])
   const [exporting, setExporting] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+
+  /**
+   * The last total the server gave, and which filter it was the total OF.
+   *
+   * Only the first page asks for a count (`with_total` below), so every page
+   * after it answers `total: null`. That was invisible while a page held 1000
+   * rows; with 50 a reader reaches page two twenty times sooner and watches
+   * "Jami: 742 ta" turn into a dash, which reads as a number that got lost.
+   *
+   * Holding it costs no request. Holding it across a FILTER change would be a
+   * lie, so the filter it belongs to is stored with it and compared — a count
+   * from the previous filter is worse than no count.
+   */
+  const [heldTotal, setHeldTotal] = useState<{ key: string; total: number } | null>(null)
 
   const query: CallListQuery = {
-    limit,
+    limit: PAGE_SIZE,
     ...(cursor ? { cursor } : {}),
     // `agent_id` is a repeated parameter on the wire; the picker chooses one
     // agent, so it goes as a one-element list rather than as a bare string.
@@ -271,14 +362,28 @@ export function CallsPage() {
     ...(callType ? { call_type: callType } : {}),
     ...(dateFrom ? { date_from: dateFrom } : {}),
     ...(dateTo ? { date_to: dateTo } : {}),
-    ...(remoteNumber ? { remote_number: remoteNumber } : {}),
-    ...(nameQuery ? { q: nameQuery } : {}),
+    // Either `{ q }` or `{ remote_number }` — never both, never neither with
+    // an empty string in it.
+    ...(searchFilter ?? {}),
     // SPEC §4.0: a COUNT(*) over a filtered 500k table is affordable once per
     // filter change and not once per page, so only the first page asks.
     with_total: cursor === undefined,
   }
 
   const callsQuery = useCallsPage(query)
+
+  /**
+   * How many rows on this page actually have a recording.
+   *
+   * The button says it, and is disabled at zero. Without that, pressing it on
+   * a page where nothing was recorded hands over an archive containing only
+   * `manifest.csv` — which is correct, and reads exactly like a broken
+   * download. The manifest explains it, but nobody opens a file to find out
+   * why the file they wanted is missing. The count belongs where the decision
+   * is made, which is before the click.
+   */
+  const recordingsOnPage =
+    callsQuery.data?.items.filter((call) => call.has_audio).length ?? 0
   // Only the filter's option list needs the roster now that `agent_name`
   // arrives with the row. A `sales` user holds neither the permission nor the
   // filter, so nothing is requested for them.
@@ -286,14 +391,35 @@ export function CallsPage() {
 
   const filtered = FILTER_PARAMS.some((param) => searchParams.get(param) !== null)
 
-  function applyFilter(key: string, value: string | null) {
+  /** Every filter as one string — what the held total is allowed to outlive
+   *  (paging) and what it is not (any filter change). The cursor is
+   *  deliberately absent: that is the thing it must survive. The separator is
+   *  written as an escape and is a character no filter value can contain, so
+   *  `a` + `b` cannot collide with `ab` (`shared/lib/format.ts` gives the same
+   *  reason for never typing an invisible character into a source file). */
+  const filterKey = FILTER_PARAMS.map((param) => searchParams.get(param) ?? '').join('\u0000')
+
+  /**
+   * Write filters to the URL — one navigation, however many changed.
+   *
+   * Takes a set rather than a single key because two of them move together:
+   * the date range clears both ends at once, and doing that as two calls would
+   * be two history entries and two requests for one click.
+   */
+  function applyFilters(changes: Record<string, string | null>) {
     const next = new URLSearchParams(searchParams)
-    if (value === null || value === '') next.delete(key)
-    else next.set(key, value)
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null || value === '') next.delete(key)
+      else next.set(key, value)
+    }
     // Any filter change invalidates every cursor taken under the old filter.
     next.delete(PARAM_CURSOR)
     setTrail([])
     setSearchParams(next, { replace: true })
+  }
+
+  function applyFilter(key: string, value: string | null) {
+    applyFilters({ [key]: value })
   }
 
   function goToCursor(nextCursor: string | null, nextTrail: string[]) {
@@ -304,7 +430,17 @@ export function CallsPage() {
     setSearchParams(next)
   }
 
-  const total = callsQuery.data?.total
+  const pageTotal = callsQuery.data?.total
+  useEffect(() => {
+    if (typeof pageTotal === 'number') setHeldTotal({ key: filterKey, total: pageTotal })
+  }, [pageTotal, filterKey])
+
+  const total =
+    typeof pageTotal === 'number'
+      ? pageTotal
+      : heldTotal?.key === filterKey
+        ? heldTotal.total
+        : undefined
 
   /**
    * The filters in force, in Uzbek, for the export dialog to read back.
@@ -340,12 +476,20 @@ export function CallsPage() {
         }),
     dateFrom ? t('calls.exportFilterOne', { field: t('calls.filterDateFrom'), value: dateFrom }) : null,
     dateTo ? t('calls.exportFilterOne', { field: t('calls.filterDateTo'), value: dateTo }) : null,
-    remoteNumber
-      ? t('calls.exportFilterOne', { field: t('calls.filterRemoteNumber'), value: remoteNumber })
-      : null,
-    nameQuery
-      ? t('calls.exportFilterOne', { field: t('calls.filterContact'), value: nameQuery })
-      : null,
+    // The dialog names the field the search actually became, not the box it
+    // was typed into: "Raqam bo'yicha: 901112233" is what the server was asked,
+    // and a dialog that promises something else is the bug UC-22 is about.
+    searchFilter === null
+      ? null
+      : 'remote_number' in searchFilter
+        ? t('calls.exportFilterOne', {
+            field: t('calls.filterRemoteNumber'),
+            value: searchFilter.remote_number,
+          })
+        : t('calls.exportFilterOne', {
+            field: t('calls.filterContact'),
+            value: searchFilter.q,
+          }),
   ].filter((line): line is string => line !== null)
 
   return (
@@ -354,135 +498,173 @@ export function CallsPage() {
         title={t('page.calls')}
         description={showAgent ? undefined : t('calls.ownScopeNote')}
         actions={
-          can(Perm.REPORTS_EXPORT) ? (
-            <Button variant="secondary" size="sm" onClick={() => setExporting(true)}>
-              <Download className="size-4" aria-hidden />
-              {t('calls.export')}
-            </Button>
-          ) : undefined
+          <>
+            {/* Two different downloads, and the labels have to say which is
+                which: one is the rows of every call the filter matches, the
+                other is the recordings of the fifty on screen. */}
+            {can(Perm.AUDIO_DOWNLOAD) ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={archiving || recordingsOnPage === 0}
+                title={
+                  recordingsOnPage === 0 ? t('calls.audioArchiveNone') : undefined
+                }
+                onClick={() => {
+                  setArchiving(true)
+                  void downloadExport(callsAudioArchiveUrl(query)).finally(() =>
+                    setArchiving(false),
+                  )
+                }}
+              >
+                <FileArchive className="size-4" aria-hidden />
+                {archiving
+                  ? t('calls.audioArchiveBusy')
+                  : recordingsOnPage === 0
+                    ? t('calls.audioArchiveNone')
+                    : t('calls.audioArchive', { count: recordingsOnPage })}
+              </Button>
+            ) : null}
+            {can(Perm.REPORTS_EXPORT) ? (
+              <Button variant="secondary" size="sm" onClick={() => setExporting(true)}>
+                <Download className="size-4" aria-hidden />
+                {t('calls.export')}
+              </Button>
+            ) : null}
+          </>
         }
       />
 
-      <Card className="flex flex-wrap items-end gap-3 p-3">
-        {showAgent ? (
-          <FilterField label={t('calls.filterAgent')}>
+      {/*
+        Two rows, and the split is the point. The search is the control people
+        reach for; the rest refine what it returned. Giving all seven the same
+        size is what made this bar read as a form somebody grew one field at a
+        time.
+      */}
+      <Card className="flex flex-col gap-3 p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SearchFilter
+            label={t('calls.search')}
+            placeholder={t('calls.searchHint')}
+            clearLabel={t('calls.searchClear')}
+            value={search}
+            // Writing the box also retires the legacy names: leaving `q=`
+            // behind would resurrect the old filter the moment the box is
+            // cleared, because the fallback would read it again.
+            onCommit={(value) =>
+              applyFilters({
+                [PARAM_SEARCH]: value,
+                [LEGACY_PARAM_Q]: null,
+                [LEGACY_PARAM_REMOTE]: null,
+              })
+            }
+            className="min-w-[16rem] flex-1 sm:max-w-md"
+          />
+          {/* The count belongs beside the search rather than at the end of the
+              filters: it is the answer to everything in this bar at once. */}
+          <span className="ms-auto whitespace-nowrap text-xs text-muted">
+            {typeof total === 'number' ? t('calls.total', { count: formatCount(total) }) : EM_DASH}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+          {showAgent ? (
+            <FilterField label={t('calls.filterAgent')}>
+              <select
+                className={SELECT_CLASS}
+                value={agentId ?? ''}
+                onChange={(event) => applyFilter(PARAM_AGENT, event.target.value || null)}
+              >
+                <option value="">{t('calls.filterAgentAll')}</option>
+                {(agentsQuery.data?.items ?? []).map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.full_name}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+          ) : null}
+
+          <EnumFilter
+            label={t('calls.filterDirection')}
+            allLabel={t('calls.filterAny')}
+            labels={DIRECTION_LABEL}
+            value={direction}
+            onChange={(value) => applyFilter(PARAM_DIRECTION, value)}
+          />
+          <EnumFilter
+            label={t('calls.filterDisposition')}
+            allLabel={t('calls.filterAny')}
+            labels={DISPOSITION_LABEL}
+            value={disposition}
+            onChange={(value) => applyFilter(PARAM_DISPOSITION, value)}
+          />
+          <EnumFilter
+            label={t('calls.filterCallType')}
+            allLabel={t('calls.filterAny')}
+            labels={CALL_TYPE_FILTER_LABEL}
+            value={callType}
+            onChange={(value) => applyFilter(PARAM_CALL_TYPE, value)}
+          />
+
+          <FilterField label={t('calls.filterAudio')}>
             <select
               className={SELECT_CLASS}
-              value={agentId ?? ''}
-              onChange={(event) => applyFilter(PARAM_AGENT, event.target.value || null)}
+              value={hasAudio === undefined ? '' : String(hasAudio)}
+              onChange={(event) => applyFilter(PARAM_AUDIO, event.target.value || null)}
             >
-              <option value="">{t('calls.filterAgentAll')}</option>
-              {(agentsQuery.data?.items ?? []).map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.full_name}
-                </option>
-              ))}
+              <option value="">{t('calls.filterAny')}</option>
+              <option value="true">{t('calls.filterAudioWith')}</option>
+              <option value="false">{t('calls.filterAudioWithout')}</option>
             </select>
           </FilterField>
-        ) : null}
 
-        <EnumFilter
-          label={t('calls.filterDirection')}
-          allLabel={t('calls.filterAny')}
-          labels={DIRECTION_LABEL}
-          value={direction}
-          onChange={(value) => applyFilter(PARAM_DIRECTION, value)}
-        />
-        <EnumFilter
-          label={t('calls.filterDisposition')}
-          allLabel={t('calls.filterAny')}
-          labels={DISPOSITION_LABEL}
-          value={disposition}
-          onChange={(value) => applyFilter(PARAM_DISPOSITION, value)}
-        />
-        <EnumFilter
-          label={t('calls.filterCallType')}
-          allLabel={t('calls.filterAny')}
-          labels={CALL_TYPE_LABEL}
-          value={callType}
-          onChange={(value) => applyFilter(PARAM_CALL_TYPE, value)}
-        />
-
-        <FilterField label={t('calls.filterAudio')}>
-          <select
-            className={SELECT_CLASS}
-            value={hasAudio === undefined ? '' : String(hasAudio)}
-            onChange={(event) => applyFilter(PARAM_AUDIO, event.target.value || null)}
-          >
-            <option value="">{t('calls.filterAny')}</option>
-            <option value="true">{t('calls.filterAudioWith')}</option>
-            <option value="false">{t('calls.filterAudioWithout')}</option>
-          </select>
-        </FilterField>
-
-        {/* Asia/Tashkent calendar dates, inclusive on both ends (SPEC §4.7).
-            A native date input speaks the browser's locale and sends
-            `yyyy-mm-dd`, which is exactly what the server parses. */}
-        <FilterField label={t('calls.filterDateFrom')}>
-          <input
-            type="date"
-            className={SELECT_CLASS}
-            value={dateFrom ?? ''}
+          {/* Asia/Tashkent calendar dates, inclusive on both ends (SPEC §4.7).
+              Still a native `<input type="date">` underneath — it sends
+              `yyyy-mm-dd`, which is exactly what the server parses, and it is
+              the only picker that is accessible and localised for free. */}
+          {/* Two independent bounds, each applying the moment it is picked.
+              `max`/`min` cross-constrain them so the picker cannot offer a
+              start after the chosen end, but neither waits for the other: a
+              start alone is "since then", an end alone is "up to then", which
+              is exactly how the server reads a missing bound. */}
+          <DateFilter
+            label={t('calls.filterDateFrom')}
+            hint={t('calls.filterDateEmpty')}
+            pickLabel={t('calls.filterDatePickFrom')}
+            clearLabel={t('calls.filterDateClearFrom')}
+            value={dateFrom}
             max={dateTo}
-            onChange={(event) => applyFilter(PARAM_DATE_FROM, event.target.value || null)}
+            onChange={(value) => applyFilter(PARAM_DATE_FROM, value)}
           />
-        </FilterField>
-        <FilterField label={t('calls.filterDateTo')}>
-          <input
-            type="date"
-            className={SELECT_CLASS}
-            value={dateTo ?? ''}
+          <DateFilter
+            label={t('calls.filterDateTo')}
+            hint={t('calls.filterDateEmpty')}
+            pickLabel={t('calls.filterDatePickTo')}
+            clearLabel={t('calls.filterDateClearTo')}
+            value={dateTo}
             min={dateFrom}
-            onChange={(event) => applyFilter(PARAM_DATE_TO, event.target.value || null)}
+            onChange={(value) => applyFilter(PARAM_DATE_TO, value)}
           />
-        </FilterField>
 
-        <TextFilter
-          label={t('calls.filterRemoteNumber')}
-          placeholder={t('calls.filterRemoteNumberHint')}
-          value={remoteNumber}
-          onCommit={(value) => applyFilter(PARAM_REMOTE, value)}
-        />
-        <TextFilter
-          label={t('calls.filterContact')}
-          placeholder={t('calls.filterContactHint')}
-          value={nameQuery}
-          onCommit={(value) => applyFilter(PARAM_Q, value)}
-        />
-
-        <FilterField label={t('calls.pageSize')}>
-          <select
-            className={SELECT_CLASS}
-            value={String(limit)}
-            onChange={(event) => applyFilter(PARAM_LIMIT, event.target.value)}
-          >
-            {PAGE_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </FilterField>
-
-        {filtered ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              const next = new URLSearchParams(searchParams)
-              for (const param of FILTER_PARAMS) next.delete(param)
-              next.delete(PARAM_CURSOR)
-              setTrail([])
-              setSearchParams(next, { replace: true })
-            }}
-          >
-            {t('calls.filterReset')}
-          </Button>
-        ) : null}
-
-        <span className="ms-auto text-xs text-muted">
-          {typeof total === 'number' ? t('calls.total', { count: formatCount(total) }) : EM_DASH}
-        </span>
+          {filtered ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ms-auto"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams)
+                for (const param of FILTER_PARAMS) next.delete(param)
+                next.delete(PARAM_CURSOR)
+                setTrail([])
+                setSearchParams(next, { replace: true })
+              }}
+            >
+              <FilterX className="size-4" aria-hidden />
+              {t('calls.filterReset')}
+            </Button>
+          ) : null}
+        </div>
       </Card>
 
       <QueryBoundary

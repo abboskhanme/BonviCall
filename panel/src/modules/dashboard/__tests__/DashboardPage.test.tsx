@@ -150,7 +150,7 @@ describe('tiles', () => {
     expect(hrefs.some((href) => href?.startsWith('/calls'))).toBe(true)
     expect(hrefs).toContain('/devices')
     expect(hrefs).toContain('/alerts')
-    expect(hrefs).toContain('/reports/gap')
+    expect(hrefs).toContain('/calls?has_audio=false')
   })
 
   it('asks the server for today only, in Asia/Tashkent', async () => {

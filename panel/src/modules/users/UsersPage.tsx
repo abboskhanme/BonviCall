@@ -15,15 +15,14 @@
  * The buttons are disabled with an explanation, and the server still decides.
  */
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { KeyRound, Pencil, Plus, ShieldAlert } from 'lucide-react'
 
-import { agentNameLookup, useAgentDirectory } from '@/modules/agents/api'
 import { useAuth } from '@/modules/auth/store'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
-import { EM_DASH, formatInstantTitle } from '@/shared/lib/format'
+import { formatInstantTitle } from '@/shared/lib/format'
 import { relativeText } from '@/shared/lib/relativeText'
 import { Badge, Button, Card } from '@/shared/ui/primitives'
 import { EnumFilter } from '@/shared/ui/filters'
@@ -54,8 +53,6 @@ export function UsersPage() {
   const [resetting, setResetting] = useState<User | null>(null)
 
   const usersQuery = useUsers(role ? { role } : {})
-  const agentsQuery = useAgentDirectory(can(Perm.AGENTS_READ))
-  const agentName = agentNameLookup(agentsQuery.data?.items)
 
   function applyFilter(value: string | null) {
     const next = new URLSearchParams(searchParams)
@@ -102,9 +99,7 @@ export function UsersPage() {
               <THead>
                 <tr>
                   <TH>{t('users.colName')}</TH>
-                  <TH>{t('users.colEmail')}</TH>
                   <TH>{t('users.colRole')}</TH>
-                  <TH>{t('users.colAgent')}</TH>
                   <TH>{t('users.colStatus')}</TH>
                   <TH>{t('users.colLastLogin')}</TH>
                   {mayWrite ? <TH className="w-0" /> : null}
@@ -147,23 +142,8 @@ export function UsersPage() {
                           <span className="ms-2 text-2xs text-warn">{t('users.mustChange')}</span>
                         ) : null}
                       </TD>
-                      <TD className="font-mono text-xs text-muted">{user.email}</TD>
                       <TD>
                         <Badge tone={ROLE_TONE[user.role]}>{t(ROLE_LABEL[user.role])}</Badge>
-                      </TD>
-                      <TD className="whitespace-nowrap">
-                        {/* Only a `sales` account names an agent, and the link
-                            goes to the salesperson, not to another login. */}
-                        {user.agent_id ? (
-                          <Link
-                            to={`/agents/${user.agent_id}`}
-                            className="text-text underline-offset-2 hover:text-accent hover:underline"
-                          >
-                            {agentName(user.agent_id) ?? t('users.unknownAgent')}
-                          </Link>
-                        ) : (
-                          EM_DASH
-                        )}
                       </TD>
                       <TD className="whitespace-nowrap">
                         {/* One badge. `must_change_password` is a pending

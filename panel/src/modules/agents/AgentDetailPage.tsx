@@ -49,6 +49,7 @@ import { Field, FieldGrid, Section } from '@/shared/ui/detail'
 import { QueryBoundary } from '@/shared/ui/QueryBoundary'
 
 import { AgentModal } from './AgentModal'
+import { AlertHistorySection } from './AlertHistorySection'
 import { ArchiveAgentModal } from './ArchiveAgentModal'
 import { EnrolmentSection } from './EnrolmentSection'
 import { NumberSection } from './NumberSection'
@@ -247,6 +248,10 @@ function AgentCard({ agent }: { agent: Agent }) {
       ) : null}
 
       <DeviceSection agentId={agent.id} />
+
+      {/* The closed half of Ogohlantirishlar lives here since
+          2026-09-14 — see AlertHistorySection. */}
+      {can(Perm.ALERTS_READ) ? <AlertHistorySection agentId={agent.id} /> : null}
 
       {mayWrite ? (
         <AgentModal open={editing} onOpenChange={setEditing} agent={agent} />

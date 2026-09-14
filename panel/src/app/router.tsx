@@ -31,15 +31,12 @@ import { useAuth } from '@/modules/auth/store'
 import { AgentDetailPage } from '@/modules/agents/AgentDetailPage'
 import { AgentsPage } from '@/modules/agents/AgentsPage'
 import { AlertsPage } from '@/modules/alerts/AlertsPage'
-import { AuditPage } from '@/modules/audit/AuditPage'
 import { CallDetailPage } from '@/modules/calls/CallDetailPage'
 import { CallsPage } from '@/modules/calls/CallsPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
 import { DeviceDetailPage } from '@/modules/devices/DeviceDetailPage'
 import { DevicesPage } from '@/modules/devices/DevicesPage'
-import { GapReportPage } from '@/modules/reports/GapReportPage'
-import { StorageReportPage } from '@/modules/reports/StorageReportPage'
-import { AppVersionsPage } from '@/modules/appVersions/AppVersionsPage'
+import { SettingsPage } from '@/modules/settings/SettingsPage'
 import { UsersPage } from '@/modules/users/UsersPage'
 import { landingPath } from '@/shared/auth/landing'
 import { Perm, type Permission } from '@/shared/auth/permissions'
@@ -104,12 +101,14 @@ export const ROUTES: readonly RouteSpec[] = [
   { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
   { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
 
-  // ── Reports ───────────────────────────────────────────────────────────
-  { path: '/reports/gap', element: <GapReportPage />, anyOf: [Perm.REPORTS_READ] },
-  { path: '/reports/storage', element: <StorageReportPage />, anyOf: [Perm.REPORTS_READ] },
 
   // ── Administration ────────────────────────────────────────────────────
   { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },
+  //
+  // No `anyOf`: your own account is yours whatever your role. The section
+  // inside it that resets OTHER people's passwords is gated on `users:write`
+  // by the page, and by the server on every request it makes.
+  { path: '/settings', element: <SettingsPage />, anyOf: undefined },
   //
   // Removed 2026-09-05 at the client's request: `/settings`. Recording is
   // continuous and unconditional — no setting has ever gated it — so a page of
@@ -125,12 +124,6 @@ export const ROUTES: readonly RouteSpec[] = [
   // The APK surface stays, because it is distribution and not configuration:
   // without it nobody can publish a build or raise the minimum version, and a
   // fleet of personal phones cannot be updated at all (N33).
-  {
-    path: '/settings/app-versions',
-    element: <AppVersionsPage />,
-    anyOf: [Perm.APPVERSIONS_READ],
-  },
-  { path: '/audit', element: <AuditPage />, anyOf: [Perm.AUDIT_READ] },
 ]
 
 function FullPageLoader() {
