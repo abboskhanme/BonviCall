@@ -27,7 +27,13 @@ export type PublicReleaseList = components['schemas']['PublicReleaseListResponse
  *  a `Content-Disposition`, and the browser's own downloader handles that
  *  better than anything this page could do with a blob. */
 export function downloadPath(release: PublicRelease): string {
-  return `/api/v1/app/download/${release.version_code}`
+  // The VARIANT is what makes this unambiguous. Both flavours of one release
+  // carry the same version code (SPEC §7.2), so the code alone named two
+  // files and the server handed back whichever row it found first — the
+  // "Android 13 va undan yuqori" card offered the legacy build as often as
+  // not. Both install, so nothing looked wrong; what was lost is the reason
+  // the flavours exist at all (S1: targetSdk decides the recording route).
+  return `/api/v1/app/download/${release.version_code}?variant=${release.variant}`
 }
 
 export function useLatestReleases(): UseQueryResult<PublicReleaseList> {

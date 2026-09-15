@@ -425,19 +425,48 @@ class ReleaseService:
         await self.session.commit()
         log.info("app_version_discarded", version_code=row.version_code)
 
-    async def open_download(self, version_code: int) -> tuple[AppVersionModel, IO[bytes]]:
+    async def open_download(
+        self, version_code: int, variant: AppVariant | None = None
+    ) -> tuple[AppVersionModel, IO[bytes]]:
         """The bytes a phone installs. Published builds only.
 
         An unpublished row is a 404 and not a 403: this endpoint is public
         (SPEC §4.1 rule 5) and "that build exists but you may not have it" is
         information a stranger has no reason to receive.
+
+        ═══ Why ``variant`` is a parameter ════════════════════════════════════
+        **A version code does not identify a build.** The two flavours are
+        released together and carry the SAME code — 1.0.9 is code 10 as
+        ``legacy28`` and as ``modern34`` — because they are one release of one
+        product (SPEC §7.2). Selecting on the code alone therefore returned
+        whichever row the database happened to yield first, and the front
+        page's "Android 13 va undan yuqori" button handed out the legacy build
+        as often as not. Both install and both run, so nothing looked broken;
+        what was lost is the entire reason the flavours exist — S1 measured
+        ``targetSdk`` as load-bearing for the recording route, and a fleet
+        given the wrong one records the near side only.
+
+        With no variant named, ``legacy28`` wins. That is not a tie-break, it
+        is the fleet's build: it captures both voices where the OEM route is
+        unavailable, and it installs on every Android this product supports.
+        An old link with no variant therefore keeps working and keeps handing
+        out the build the rollout is built on.
         """
-        row = await self.session.scalar(
-            select(AppVersionModel).where(
-                AppVersionModel.version_code == version_code,
-                AppVersionModel.published_at.is_not(None),
-            )
+        statement = select(AppVersionModel).where(
+            AppVersionModel.version_code == version_code,
+            AppVersionModel.published_at.is_not(None),
         )
+        if variant is not None:
+            statement = statement.where(AppVersionModel.variant == variant)
+        else:
+            # Deterministic, and deterministic in the right direction: enum
+            # ordering would leave it to the declaration order of a Python
+            # class, which nobody would think to protect.
+            statement = statement.order_by(
+                (AppVersionModel.variant == AppVariant.LEGACY28).desc()
+            )
+
+        row = await self.session.scalar(statement)
         if row is None:
             raise NotFoundError()
         return row, self.store.open(row.apk_path)

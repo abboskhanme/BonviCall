@@ -148,6 +148,12 @@ export interface paths {
          *     The install landing page sends a salesperson's browser here and that
          *     browser has no session. The binary is a client and holds no secret; the
          *     enrolment code is the secret, and it guards the page that links here.
+         *
+         *     ``variant`` is what makes the answer unambiguous: both flavours of one
+         *     release carry the same ``version_code`` (SPEC §7.2), so the code alone
+         *     named two files and the caller got whichever the database returned first.
+         *     Omitted, it hands out ``legacy28`` — the fleet's build, and the one that
+         *     installs on every supported Android.
          */
         get: operations["download_version_api_v1_app_download__version_code__get"];
         put?: never;
@@ -2951,7 +2957,9 @@ export interface operations {
     };
     download_version_api_v1_app_download__version_code__get: {
         parameters: {
-            query?: never;
+            query?: {
+                variant?: components["schemas"]["AppVariant"] | null;
+            };
             header?: never;
             path: {
                 version_code: number;

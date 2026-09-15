@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from src.core import ratelimit
 from src.core.deps import SessionDep
+from src.core.enums import AppVariant
 from src.modules.enrolment.landing import (
     render_apk_missing,
     render_invitation,
@@ -29,7 +30,7 @@ router = APIRouter(tags=["Install"], include_in_schema=False)
 #: app-versions task; the landing page redirects to it rather than streaming
 #: the bytes itself, so the funnel signal is one row and the file is served
 #: once, from one place.
-APK_PATH = "/api/v1/app/download/{version_code}"
+APK_PATH = "/api/v1/app/download/{version_code}?variant={variant}"
 
 
 def _client_ip(request: Request) -> str | None:
@@ -90,4 +91,12 @@ async def install_apk(code: str, request: Request, session: SessionDep):
     version_code = context[3]
     if version_code is None:
         return HTMLResponse(render_apk_missing(), status_code=404)
-    return RedirectResponse(APK_PATH.format(version_code=version_code), status_code=302)
+    # The fleet's flavour, named rather than left to the database's row order:
+    # both flavours of one release carry the same version code (SPEC §7.2), and
+    # S1 measured targetSdk as load-bearing for the recording route. A
+    # salesperson following an admin's link must get the build the rollout was
+    # measured on.
+    return RedirectResponse(
+        APK_PATH.format(version_code=version_code, variant=AppVariant.LEGACY28.value),
+        status_code=302,
+    )

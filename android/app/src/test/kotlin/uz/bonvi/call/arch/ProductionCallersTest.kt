@@ -87,6 +87,19 @@ class ProductionCallersTest {
             "an OEM battery manager stops the service and nothing restarts it (UC-05)",
         ),
         Triple(
+            "CaptureCoordinator.kt", "capture.releaseAll()",
+            "a capture the call's end never stopped goes on holding the MICROPHONE — " +
+                "on a targetSdk 28 build the platform grants that hold, so every " +
+                "other app on the employee's own phone records silence until they " +
+                "reboot (reported by the fleet on 2026-09-15: Telegram could not " +
+                "place a call and its voice messages came out empty)",
+        ),
+        Triple(
+            "CapabilityRefresh.kt", "capabilities.ifChanged(",
+            "a permission granted after enrolment is never noticed: the panel goes " +
+                "on showing the phone as blocked while it is working",
+        ),
+        Triple(
             "ContactNameResolver.kt", "contactNames.resolve(",
             "every call ships with contact_name = null: the panel shows a raw " +
                 "number instead of the name the employee gave the customer, which " +

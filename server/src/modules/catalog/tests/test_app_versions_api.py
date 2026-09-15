@@ -234,6 +234,71 @@ async def test_the_download_is_public_and_serves_the_bytes(client, admin) -> Non
     assert "bonvicall-modern34-140.apk" in response.headers["content-disposition"]
 
 
+async def test_each_variant_of_one_release_downloads_its_own_bytes(
+    client, admin
+) -> None:
+    """**A version code does not identify a build** (SPEC §7.2).
+
+    The two flavours are one release and carry the same code, so selecting on
+    the code alone returned whichever row the database yielded first — and the
+    front page's "Android 13 va undan yuqori" button handed out the legacy
+    build as often as not. Both install and both run, which is why nothing
+    looked broken; what was lost is the reason the flavours exist, since S1
+    measured ``targetSdk`` as deciding the recording route.
+    """
+    legacy_payload = signed_apk(b"a certificate for the legacy28 build")
+    modern_payload = signed_apk(b"a certificate for the modern34 build")
+    legacy = (
+        await _upload(admin, legacy_payload, variant="legacy28")
+    ).json()["version"]
+    modern = (
+        await _upload(admin, modern_payload, variant="modern34")
+    ).json()["version"]
+    await admin.post(f"/api/v1/app/versions/{legacy['id']}/publish")
+    await admin.post(f"/api/v1/app/versions/{modern['id']}/publish")
+
+    for variant, payload in (("legacy28", legacy_payload), ("modern34", modern_payload)):
+        response = await client.get(f"/api/v1/app/download/140?variant={variant}")
+        assert response.status_code == 200, variant
+        assert response.content == payload, variant
+        assert f"bonvicall-{variant}-140.apk" in response.headers["content-disposition"]
+
+
+async def test_a_download_with_no_variant_hands_out_the_fleets_build(
+    client, admin
+) -> None:
+    """``legacy28``, deterministically.
+
+    Not a tie-break: it is the build the rollout is measured on — it captures
+    both voices where the OEM route is unavailable, and it installs on every
+    Android this product supports. An old link that names no variant therefore
+    keeps handing out the right file.
+    """
+    legacy_payload = signed_apk(b"a certificate for the legacy28 build")
+    modern = (
+        await _upload(
+            admin,
+            signed_apk(b"a certificate for the modern34 build"),
+            variant="modern34",
+        )
+    ).json()
+    legacy = (await _upload(admin, legacy_payload, variant="legacy28")).json()
+    await admin.post(f"/api/v1/app/versions/{modern['version']['id']}/publish")
+    await admin.post(f"/api/v1/app/versions/{legacy['version']['id']}/publish")
+
+    response = await client.get("/api/v1/app/download/140")
+    assert response.status_code == 200
+    assert response.content == legacy_payload
+
+
+async def test_a_variant_that_was_never_published_is_404(client, admin) -> None:
+    version = (await _upload(admin, variant="modern34")).json()["version"]
+    await admin.post(f"/api/v1/app/versions/{version['id']}/publish")
+
+    refused = await client.get("/api/v1/app/download/140?variant=legacy28")
+    assert refused.status_code == 404
+
+
 async def test_an_unpublished_build_is_404_not_403(client, admin) -> None:
     """The endpoint is public, so "it exists but not for you" is information a
     stranger has no reason to receive."""

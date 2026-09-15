@@ -218,8 +218,8 @@ android {
         // paths, so it is a build variant that M0 settles with measurements,
         // not a constant someone edits at 2 a.m.
 
-        versionCode = 10
-        versionName = "1.0.9"
+        versionCode = 11
+        versionName = "1.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

@@ -196,5 +196,7 @@ private object NoCapture : uz.bonvi.call.service.CallCapture {
     override fun start(callId: String) = Unit
     override fun stop(callId: String): uz.bonvi.call.service.CaptureOutcome? = null
     override fun discard(callId: String) = Unit
+    override fun releaseAll() = Unit
+    override fun isCapturing(): Boolean = false
     override fun workDir(): java.io.File = java.io.File("build/tmp")
 }

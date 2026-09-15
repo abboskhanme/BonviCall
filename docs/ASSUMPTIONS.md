@@ -1180,6 +1180,19 @@ every other control in the product. Item 6, backups, is untouched.
 - [2026-09-15] **The release default server was `https://bonvicall.uz`, a name that has never resolved** → set to `https://call.bonvi.uz` (the deployment in DEPLOY.md), and made overridable with `-Pbonvicall.releaseBaseUrl=` for a second deployment. It only matters when there is no deep link to learn the host from — an APK taken from the front page with a code typed by hand, which is precisely what the front page exists to serve.
 - [2026-09-15] **`versionCode` 8 → 9, `versionName` 1.0.7 → 1.0.8** → the fleet's update check compares codes, and republishing the same code is not an update.
 
+## The app was holding the microphone (2026-09-15)
+
+- [2026-09-15] **The fleet reported that Telegram could not place a call and recorded voice messages as silence after installing this app**, and that reinstalling with the `modern34` flavour fixed it. The flavour did not fix the bug, it hid it: on `targetSdk 28` the platform grants a legacy app an exclusive hold on the microphone, so a `MediaRecorder` this app failed to release starved every other app on somebody's personal phone; `targetSdk 34` refuses the hold.
+- [2026-09-15] **`CaptureService.onDestroy` did not stop an in-flight capture** → the coordinator is a `@Singleton` that outlives the service, and an OEM battery manager destroys that service mid-call on most of this fleet. The recording was lost either way; the microphone was not released until the process died. `releaseAll()` is now the first thing `onDestroy` does.
+- [2026-09-15] **A watchdog releases the microphone when the line is idle and a capture is still running** → a capture is stopped by the call ending, and MIUI sometimes never delivers that. Two consecutive idle readings, twenty seconds apart, because a stop is asynchronous and cutting a legitimate capture mid-write would corrupt the recording this product exists for.
+- [2026-09-15] **The watchdog treats "cannot read the call state" as NOT idle** → a watchdog that guesses cuts live calls, which is a worse failure than the one it prevents.
+
+## The download link ignored the variant (2026-09-15)
+
+- [2026-09-15] **A version code does not identify a build**: both flavours of one release carry the same code (SPEC §7.2), so `/api/v1/app/download/{code}` returned whichever row the database yielded first, and the front page's "Android 13 va undan yuqori" card handed out the legacy build as often as not. Both install and both run, which is why nobody saw it; what was lost is the reason the flavours exist at all, since S1 measured `targetSdk` as deciding the recording route.
+- [2026-09-15] **`variant` is now a query parameter, and omitting it hands out `legacy28`** → not a tie-break: it is the fleet's build, it captures both voices where the OEM route is unavailable, and it installs on every Android this product supports. Every old link therefore keeps working and keeps handing out the right file.
+- [2026-09-15] **The per-agent install link (`/i/<code>/apk`) names `legacy28` explicitly** rather than leaving the choice to row order.
+
 ## The app notices a permission granted later (2026-09-15)
 
 - [2026-09-15] **Capabilities were reported in exactly two moments — enrolment, and an admin's `recheck` command.** An agent who skipped "all files access" and granted it afterwards from the system settings fixed their own capture, and the panel went on showing the phone as blocked indefinitely. `CapabilityRefresh` now re-checks on every app open and every heartbeat; `PermissionsScreen` re-checks on every resume, which is the moment somebody comes back from the settings app.

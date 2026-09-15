@@ -32,6 +32,28 @@ interface CallCapture {
     /** Rejected, or the process is going down. */
     fun discard(callId: String)
 
+    /**
+     * Release EVERY running capture, now.
+     *
+     * ═══════════════════════════════════════════════════════════════════════
+     * The microphone is a shared, exclusive resource on a phone somebody else
+     * owns. A `MediaRecorder` left running does not merely waste battery: on a
+     * `targetSdk 28` build the platform lets this app hold the microphone
+     * outright, so Telegram records silence and cannot start a call — which is
+     * exactly what the fleet reported on 2026-09-15, and the kind of thing
+     * whose fix is "uninstall that app".
+     *
+     * A capture is stopped by the call ending. This is for every other way it
+     * can be left behind: the service destroyed mid-call by an OEM battery
+     * manager (most of this fleet), a phone-state IDLE that MIUI never
+     * delivered, a service restarted inside a process that is still alive.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    fun releaseAll()
+
+    /** Is a capture running right now? The watchdog's question. */
+    fun isCapturing(): Boolean
+
     /** Where the transcoder may work. */
     fun workDir(): File
 }
@@ -146,6 +168,28 @@ class CaptureCoordinator @Inject constructor(
             }
         }
     }
+
+    override fun releaseAll() {
+        prepared.clear()
+        val abandoned = running.keys.toList()
+        for (callId in abandoned) {
+            running.remove(callId)?.let { router ->
+                @Suppress("TooGenericExceptionCaught")
+                try {
+                    router.stop()
+                } catch (error: Exception) {
+                    // The file is lost either way; the microphone is not, and
+                    // that is what this method is for.
+                    Timber.w(error, "Abandoned capture would not stop cleanly")
+                }
+            }
+        }
+        if (abandoned.isNotEmpty()) {
+            Timber.w("Released %d capture(s) that nothing had stopped", abandoned.size)
+        }
+    }
+
+    override fun isCapturing(): Boolean = running.isNotEmpty()
 
     /** Where the transcoder works. App-private, and cleared as it goes. */
     override fun workDir(): File = File(context.filesDir, WORK_DIR).apply { mkdirs() }

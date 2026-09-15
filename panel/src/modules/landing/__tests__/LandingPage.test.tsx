@@ -116,7 +116,21 @@ describe('what it offers', () => {
     const link = await screen.findByRole('link', { name: t('landing.download') })
     // An anchor, not a fetch: a 30 MB stream with a Content-Disposition is the
     // browser's own downloader's job.
-    expect(link).toHaveAttribute('href', '/api/v1/app/download/8')
+    //
+    // And it names the VARIANT. Both flavours of one release carry the same
+    // version code, so the code alone named two files and the server handed
+    // back whichever it found first — this card could offer the other build.
+    expect(link).toHaveAttribute('href', '/api/v1/app/download/8?variant=legacy28')
+  })
+
+  it('offers each card its OWN variant, not whichever the server picks', async () => {
+    world([release('legacy28', 8), release('modern34', 8)])
+    renderPage()
+
+    const links = await screen.findAllByRole('link', { name: t('landing.download') })
+    const hrefs = links.map((link) => link.getAttribute('href'))
+    expect(hrefs).toContain('/api/v1/app/download/8?variant=legacy28')
+    expect(hrefs).toContain('/api/v1/app/download/8?variant=modern34')
   })
 
   it('names the version and the size, so a phone on mobile data knows', async () => {

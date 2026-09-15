@@ -131,7 +131,12 @@ async def test_the_download_link_redirects_to_the_published_build(
     code = await enrolment_code_factory()
     response = await client.get(f"/i/{code.code}/apk", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/api/v1/app/download/100"
+    # The VARIANT is named. Both flavours of one release carry the same version
+    # code (SPEC §7.2), so a link without it hands out whichever row the
+    # database returns first — and S1 measured targetSdk as deciding the
+    # recording route, so a salesperson following an admin's link must get the
+    # build the rollout was measured on.
+    assert response.headers["location"] == "/api/v1/app/download/100?variant=legacy28"
 
 
 async def test_without_a_published_build_the_page_says_so_in_uzbek(

@@ -500,5 +500,7 @@ private class FakeCapture(private val outcome: CaptureOutcome? = null) : CallCap
     }
 
     override fun discard(callId: String) = Unit
+    override fun releaseAll() = Unit
+    override fun isCapturing(): Boolean = false
     override fun workDir(): java.io.File = java.io.File("build/tmp")
 }

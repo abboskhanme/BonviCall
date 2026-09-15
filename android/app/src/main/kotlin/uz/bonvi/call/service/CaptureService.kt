@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.telephony.TelephonyManager
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -15,6 +16,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import uz.bonvi.call.R
@@ -62,6 +65,9 @@ class CaptureService : Service() {
 
     /** UC-16's five-second bar. Held open for as long as this service lives. */
     @Inject lateinit var realtime: RealtimeChannel
+
+    /** Held to release the microphone, never to start anything from here. */
+    @Inject lateinit var capture: CallCapture
 
     /** Held for the whole service lifetime — see [acquireWakeLock]. */
     private var wakeLock: PowerManager.WakeLock? = null
@@ -141,7 +147,68 @@ class CaptureService : Service() {
         ReconcileWorker.enqueueAfterCall(this)
 
         resumeInFlightCalls()
+        watchForAbandonedCapture()
     }
+
+    /**
+     * Release the microphone when the line is idle and something is still
+     * recording.
+     *
+     * ═══════════════════════════════════════════════════════════════════════
+     * A capture is stopped by the call ending — when the app is told the call
+     * ended. On MIUI it sometimes is not: the state callback is throttled or
+     * dropped while the app is in the background, and the recorder then runs
+     * against an idle line for ever. That is not a lost recording, which the
+     * gap report would at least show: it is this app holding a microphone that
+     * belongs to somebody's personal phone, and every other app on it —
+     * Telegram was the one the fleet noticed — recording silence until they
+     * reboot.
+     *
+     * Two consecutive idle checks, not one: a stop is asynchronous, so the
+     * line is briefly idle while the legitimate capture finishes writing its
+     * file, and cutting that would corrupt the recording this product exists
+     * for.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private fun watchForAbandonedCapture() {
+        scope.launch {
+            var idleChecks = 0
+            while (isActive) {
+                delay(ABANDONED_CHECK_MS)
+                if (!capture.isCapturing()) {
+                    idleChecks = 0
+                    continue
+                }
+                if (!lineIsIdle()) {
+                    idleChecks = 0
+                    continue
+                }
+                idleChecks++
+                if (idleChecks >= ABANDONED_CHECKS) {
+                    Timber.w("Capture still running on an idle line; releasing the microphone")
+                    @Suppress("TooGenericExceptionCaught")
+                    try {
+                        capture.releaseAll()
+                    } catch (error: Exception) {
+                        Timber.w(error, "Could not release an abandoned capture")
+                    }
+                    idleChecks = 0
+                }
+            }
+        }
+    }
+
+    /** True when the telephony stack says no call is in progress. Unknown
+     *  counts as NOT idle: a watchdog that guesses would cut live calls. */
+    private fun lineIsIdle(): Boolean =
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            val telephony = getSystemService(TelephonyManager::class.java)
+            telephony?.callState == TelephonyManager.CALL_STATE_IDLE
+        } catch (error: Exception) {
+            Timber.w(error, "Could not read the call state")
+            false
+        }
 
     /**
      * UC-05. The service is killed between a call ending and its audio being
@@ -167,6 +234,27 @@ class CaptureService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+
+        // ⚠️ THE MICROPHONE FIRST. This service is destroyed mid-call on any
+        // handset with an aggressive battery manager, which is most of this
+        // fleet — and the coordinator is a singleton that outlives it, so a
+        // `MediaRecorder` started for that call went on holding the microphone
+        // for as long as the PROCESS lived. On a targetSdk 28 build the
+        // platform grants that hold outright: on 2026-09-15 the fleet reported
+        // that Telegram could not place a call and recorded voice messages as
+        // silence, and reinstalling with the targetSdk 34 flavour "fixed" it
+        // because the newer platform refuses the hold rather than because the
+        // leak was gone.
+        //
+        // The recording is lost either way once this service goes; the
+        // microphone must not be.
+        @Suppress("TooGenericExceptionCaught")
+        try {
+            capture.releaseAll()
+        } catch (error: Exception) {
+            Timber.w(error, "Could not release capture on service destroy")
+        }
+
         releaseWakeLock()
         callStateSource.unregister()
         realtime.disconnect()
@@ -367,6 +455,15 @@ class CaptureService : Service() {
 
         /** Long enough for the process to finish dying, short enough that a
          *  call placed straight after a swipe is still captured. */
+        /** Every 20 s while a capture is running: often enough that nobody
+         *  finishes a voice message into a blocked microphone, rare enough to
+         *  cost nothing. */
+        private const val ABANDONED_CHECK_MS = 20_000L
+
+        /** Two idle readings in a row — a stop is asynchronous, and one is
+         *  normal while a real capture is being written out. */
+        private const val ABANDONED_CHECKS = 2
+
         private const val RESTART_DELAY_MS = 1_000L
 
         /** Sent on every request and stored on every call and heartbeat, so

@@ -5077,7 +5077,7 @@
     },
     "/api/v1/app/download/{version_code}": {
       "get": {
-        "description": "The APK itself. **Public** (SPEC §4.1 rule 5), rate-limited.\n\nThe install landing page sends a salesperson's browser here and that\nbrowser has no session. The binary is a client and holds no secret; the\nenrolment code is the secret, and it guards the page that links here.",
+        "description": "The APK itself. **Public** (SPEC §4.1 rule 5), rate-limited.\n\nThe install landing page sends a salesperson's browser here and that\nbrowser has no session. The binary is a client and holds no secret; the\nenrolment code is the secret, and it guards the page that links here.\n\n``variant`` is what makes the answer unambiguous: both flavours of one\nrelease carry the same ``version_code`` (SPEC §7.2), so the code alone\nnamed two files and the caller got whichever the database returned first.\nOmitted, it hands out ``legacy28`` — the fleet's build, and the one that\ninstalls on every supported Android.",
         "operationId": "download_version_api_v1_app_download__version_code__get",
         "parameters": [
           {
@@ -5087,6 +5087,22 @@
             "schema": {
               "title": "Version Code",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppVariant"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Variant"
             }
           }
         ],

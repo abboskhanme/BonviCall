@@ -275,15 +275,26 @@ async def latest_releases(
 
 
 @router.get("/download/{version_code}")
-async def download_version(version_code: int, request: Request, session: SessionDep):
+async def download_version(
+    version_code: int,
+    request: Request,
+    session: SessionDep,
+    variant: AppVariant | None = None,
+):
     """The APK itself. **Public** (SPEC §4.1 rule 5), rate-limited.
 
     The install landing page sends a salesperson's browser here and that
     browser has no session. The binary is a client and holds no secret; the
     enrolment code is the secret, and it guards the page that links here.
+
+    ``variant`` is what makes the answer unambiguous: both flavours of one
+    release carry the same ``version_code`` (SPEC §7.2), so the code alone
+    named two files and the caller got whichever the database returned first.
+    Omitted, it hands out ``legacy28`` — the fleet's build, and the one that
+    installs on every supported Android.
     """
     ratelimit.hit("apk_download", _client_ip(request), ratelimit.APK_DOWNLOAD_PER_IP)
-    row, handle = await ReleaseService(session).open_download(version_code)
+    row, handle = await ReleaseService(session).open_download(version_code, variant)
 
     def _stream():
         with handle:
