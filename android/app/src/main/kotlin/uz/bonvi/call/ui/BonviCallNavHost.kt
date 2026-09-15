@@ -21,6 +21,7 @@ import uz.bonvi.call.ui.enrolment.EnrolSimScreen
 import uz.bonvi.call.ui.enrolment.EnrolVerifyScreen
 import uz.bonvi.call.ui.enrolment.collectAsStateWithLifecycleCompat
 import uz.bonvi.call.ui.home.HomeScreen
+import uz.bonvi.call.ui.permissions.PermissionsScreen
 
 /**
  * The navigation graph. Declared up front, in one place, so the Phase 4 tasks
@@ -63,10 +64,15 @@ object Routes {
     const val CALLS = "calls"
     const val DIAGNOSTICS = "diagnostics"
 
+    /** E2's rows, reachable for ever rather than only during enrolment: a
+     *  permission skipped on day one is otherwise unreachable from inside the
+     *  app that needs it. */
+    const val PERMISSIONS = "permissions"
+
     /** Every destination, so a test can assert the graph has no orphan. */
     val ALL: List<String> = listOf(
         ENROL_CODE, ENROL_PERMISSIONS, ENROL_OEM_STEPS, ENROL_SIM, ENROL_VERIFY, ENROL_DONE,
-        HOME, CALLS, DIAGNOSTICS,
+        HOME, CALLS, DIAGNOSTICS, PERMISSIONS,
     )
 
     /**
@@ -211,10 +217,12 @@ fun BonviCallNavHost(
             HomeScreen(
                 onOpenCalls = { navController.navigate(Routes.CALLS) },
                 onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) },
+                onOpenPermissions = { navController.navigate(Routes.PERMISSIONS) },
                 onReEnrol = { navController.navigate(Routes.ENROL_CODE) },
             )
         }
         composable(Routes.CALLS) { MyCallsScreen() }
         composable(Routes.DIAGNOSTICS) { DiagnosticsScreen() }
+        composable(Routes.PERMISSIONS) { PermissionsScreen() }
     }
 }

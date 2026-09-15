@@ -114,6 +114,11 @@
          thinks the button did nothing when the second dialog opens. -->
     <string name="perm_allow_all">Barcha ruxsatlarni berish</string>
     <string name="perm_recheck">Qayta tekshirish</string>
+    <string name="permissions_title">Ruxsatlar</string>
+    <string name="permissions_intro">Bu yerda ilova nimaga ruxsat olganini va nimaga olmaganini ko\'rasiz. Ruxsat bermagan bo\'lsangiz, shu yerdan berishingiz mumkin — sozlamadan qaytganingizda ilova o\'zi qayta tekshiradi.</string>
+    <string name="permissions_all_good">Hamma kerakli ruxsat berilgan.</string>
+    <string name="permissions_recheck">Hammasini qayta tekshirish</string>
+    <string name="home_permissions">Ruxsatlar</string>
     <string name="perm_blocking_summary">Yana %1$d ta ruxsat yetishmayapti. Ularsiz qo\'ng\'iroqlar qayd etilmaydi.</string>
 
     <string name="enrol_permissions_intro">Quyidagi tugmani bosing va telefon ketma-ket so\'raydigan oynalarda «Ruxsat berish»ni tanlang. Har bir ruxsat nima uchun kerakligi pastda yozilgan.</string>
@@ -219,7 +224,7 @@
     <string name="calls_incoming">Kiruvchi</string>
     <string name="calls_outgoing">Chiquvchi</string>
     <string name="calls_play">Tinglash</string>
-    <string name="calls_stop">To\'xtatish</string>
+    <string name="calls_pause">Pauza</string>
     <string name="calls_duration">%1$d:%2$02d</string>
     <string name="calls_load_more">Yana ko\'rsatish</string>
 

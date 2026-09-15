@@ -119,6 +119,11 @@ class NavGraphTest {
         assertThat(navHostSource).contains(
             "onOpenDiagnostics = { navController.navigate(Routes.DIAGNOSTICS) }",
         )
+        // The permissions screen has the same failure mode as those two had:
+        // built, tested, and reachable from nowhere the agent can see.
+        assertThat(navHostSource).contains(
+            "onOpenPermissions = { navController.navigate(Routes.PERMISSIONS) }",
+        )
     }
 
     @Test
@@ -136,6 +141,7 @@ class NavGraphTest {
         Routes.HOME -> "HOME"
         Routes.CALLS -> "CALLS"
         Routes.DIAGNOSTICS -> "DIAGNOSTICS"
+        Routes.PERMISSIONS -> "PERMISSIONS"
         else -> error("Route $route is in Routes.ALL but has no constant mapping in this test")
     }
 

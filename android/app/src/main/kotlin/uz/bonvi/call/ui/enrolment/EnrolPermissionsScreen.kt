@@ -150,7 +150,10 @@ fun EnrolPermissionsScreen(viewModel: EnrolmentViewModel) {
 
 /** One capability, and what the check actually found. */
 @Composable
-private fun CapabilityRow(
+// `internal`, not private: the standalone "Ruxsatlar" screen draws the same
+// rows. One row means one set of words and one definition of what green means
+// — two would drift the day somebody fixes a state label in only one of them.
+internal fun CapabilityRow(
     capability: Capability,
     result: uz.bonvi.call.domain.CapabilityResult?,
     checking: Boolean,
@@ -158,6 +161,9 @@ private fun CapabilityRow(
     onOpenSettings: () -> Unit,
     onRecheck: () -> Unit,
     onContinueWithout: () -> Unit,
+    /** E2 offers "continue without"; the standalone Ruxsatlar screen is not a
+     *  step, so there is nothing there to continue TO. */
+    showContinueWithout: Boolean = true,
 ) {
     val working = result?.isWorking == true
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -224,16 +230,18 @@ private fun CapabilityRow(
                 text = stringResource(CapabilityConsequence.of(capability).costRes()),
                 style = MaterialTheme.typography.bodySmall,
             )
-            TextButton(onClick = onContinueWithout) {
-                Text(
-                    stringResource(
-                        if (CapabilityConsequence.of(capability) == CapabilityConsequence.NONE) {
-                            R.string.common_skip
-                        } else {
-                            R.string.perm_continue_without
-                        },
-                    ),
-                )
+            if (showContinueWithout) {
+                TextButton(onClick = onContinueWithout) {
+                    Text(
+                        stringResource(
+                            if (CapabilityConsequence.of(capability) == CapabilityConsequence.NONE) {
+                                R.string.common_skip
+                            } else {
+                                R.string.perm_continue_without
+                            },
+                        ),
+                    )
+                }
             }
         }
     }

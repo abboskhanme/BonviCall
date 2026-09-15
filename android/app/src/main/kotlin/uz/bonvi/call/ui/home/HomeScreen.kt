@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +43,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onOpenCalls: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    /** The way back to a permission that was skipped on the first day. */
+    onOpenPermissions: () -> Unit = {},
     /** Only offered to a revoked handset: the admin retired this installation,
      *  and a new code — from a link or read out over the phone — is how the
      *  same person carries on working (UC-07, UC-08). */
@@ -139,6 +142,14 @@ fun HomeScreen(
 
                 Button(onClick = onOpenCalls, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.home_my_calls))
+                }
+
+                // A door to E2's rows that stays open. Before this, a
+                // permission skipped during enrolment could only be found by
+                // an admin reading the panel and telling the agent, over the
+                // phone, which Android settings screen to open.
+                OutlinedButton(onClick = onOpenPermissions, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.home_permissions))
                 }
 
                 TextButton(onClick = onOpenDiagnostics, modifier = Modifier.fillMaxWidth()) {

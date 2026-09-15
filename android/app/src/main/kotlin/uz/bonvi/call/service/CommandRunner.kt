@@ -7,12 +7,9 @@ import uz.bonvi.call.data.remote.api.DeviceCommandApi
 import uz.bonvi.call.data.remote.dto.DeviceAckIn
 import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.di.IoDispatcher
-import uz.bonvi.call.domain.CaptureReadiness
 import uz.bonvi.call.domain.CommandFailure
 import uz.bonvi.call.domain.CommandKind
 import uz.bonvi.call.domain.CommandOutcome
-import uz.bonvi.call.enrolment.CapabilityChecks
-import uz.bonvi.call.enrolment.EnrolmentRepository
 import uz.bonvi.call.core.Clock
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -40,8 +37,7 @@ import javax.inject.Singleton
 class CommandRunner @Inject constructor(
     private val api: DeviceCommandApi,
     private val dial: DialCommand,
-    private val checks: CapabilityChecks,
-    private val enrolment: EnrolmentRepository,
+    private val capabilities: CapabilityRefresh,
     private val revocation: Revocation,
     private val session: SessionStore,
     @IoDispatcher private val io: CoroutineDispatcher,
@@ -112,16 +108,19 @@ class CommandRunner @Inject constructor(
      * an OS update — and until this ran, the panel could only ever show what
      * the phone looked like on the day it was installed.
      */
-    private suspend fun executeRecheck(): Ack {
-        val results = CaptureReadiness.E2_ORDER.map { checks.check(it) }
-        return when (enrolment.reportCapabilities(results)) {
-            is EnrolmentRepository.Result.Ok -> Ack(null)
+    private suspend fun executeRecheck(): Ack =
+        // Every check including the microphone, reported whether or not it
+        // changed: an admin pressing this has asked a question and is owed an
+        // answer. The unattended pass is `CapabilityRefresh.ifChanged`, which
+        // runs on every heartbeat and skips both of those.
+        if (capabilities.full().reported) {
+            Ack(null)
+        } else {
             // The checks ran; the report did not arrive. Saying `device_offline`
             // is the honest version — the next heartbeat carries the state
             // anyway, so nothing is lost.
-            else -> Ack(CommandFailure.DEVICE_OFFLINE)
+            Ack(CommandFailure.DEVICE_OFFLINE)
         }
-    }
 
     /**
      * Collect everything waiting over REST, run it, and acknowledge it.

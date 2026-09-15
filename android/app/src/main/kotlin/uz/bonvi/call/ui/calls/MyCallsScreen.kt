@@ -8,20 +8,39 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import uz.bonvi.call.R
 import uz.bonvi.call.domain.AudioMissingReason
+import uz.bonvi.call.domain.AudioPlayback
 import uz.bonvi.call.domain.AudioState
 import uz.bonvi.call.domain.CallDirection
 import uz.bonvi.call.domain.MyCall
@@ -51,6 +70,7 @@ import java.util.Locale
 @Composable
 fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycleCompat()
+    val playback by viewModel.playback.collectAsStateWithLifecycleCompat()
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -81,9 +101,13 @@ fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
                     items(state.calls, key = { it.id }) { call ->
                         CallRow(
                             call = call,
-                            playing = state.playingId == call.id,
+                            // Only the row being played reads the progress, so
+                            // a slider moving five times a second recomposes
+                            // one card rather than the list.
+                            progress = playback.takeIf { it.callId == call.id },
                             onPlay = viewModel::play,
-                            onStop = viewModel::stop,
+                            onPause = viewModel::pause,
+                            onSeek = viewModel::seekTo,
                         )
                     }
                     if (state.hasMore) {
@@ -102,46 +126,100 @@ fun MyCallsScreen(viewModel: MyCallsViewModel = hiltViewModel()) {
     }
 }
 
+/**
+ * One call, as the person who made it reads it.
+ *
+ * ═══ What the row leads with, and why ══════════════════════════════════════
+ * The NAME where the phone resolved one at capture time (T139) and the number
+ * underneath it — not one or the other. The name alone is unusable when two
+ * people share a name in a contact list; the number alone is what the row used
+ * to show for every contact the phone could not match, and an employee
+ * scanning for "the call with Anvar" was reading twelve digits at a time.
+ *
+ * Then the facts in one line: which way the call went, when it started, and
+ * how long it lasted.
+ */
 @Composable
 private fun CallRow(
     call: MyCall,
-    playing: Boolean,
+    progress: AudioPlayback.Progress?,
     onPlay: (MyCall) -> Unit,
-    onStop: () -> Unit,
+    onPause: () -> Unit,
+    onSeek: (Long) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            // The name where one resolved (T139), the number otherwise. Never
-            // both, and never a placeholder that looks like a missing name.
+            val name = call.contactName
             Text(
-                text = call.contactName ?: call.remoteNumber.orEmpty(),
+                text = name ?: call.remoteNumber.orEmpty(),
                 style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The number sits under the name only when a name was found —
+            // repeating it as its own subtitle would read as two numbers.
+            if (name != null && !call.remoteNumber.isNullOrBlank()) {
                 Text(
-                    stringResource(
-                        if (call.direction == CallDirection.INCOMING) {
-                            R.string.calls_incoming
-                        } else {
-                            R.string.calls_outgoing
-                        },
-                    ),
+                    text = call.remoteNumber,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(TIME.format(Date(call.startedAtEpochMillis)))
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                DirectionChip(call.direction)
                 Text(
-                    stringResource(
+                    text = TIME.format(Date(call.startedAtEpochMillis)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(
                         R.string.calls_duration,
                         call.durationSec / 60,
                         call.durationSec % 60,
                     ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            AudioRow(call, playing, onPlay, onStop)
+            AudioRow(call, progress, onPlay, onPause, onSeek)
         }
+    }
+}
+
+/** Kiruvchi / Chiquvchi, as a chip rather than a word in a row of words. */
+@Composable
+private fun DirectionChip(direction: CallDirection) {
+    val incoming = direction == CallDirection.INCOMING
+    Surface(
+        color = if (incoming) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.tertiaryContainer
+        },
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = stringResource(
+                if (incoming) R.string.calls_incoming else R.string.calls_outgoing,
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (incoming) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            },
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
     }
 }
 
@@ -170,18 +248,13 @@ private fun Centre(content: @Composable () -> Unit) {
 @Composable
 private fun AudioRow(
     call: MyCall,
-    playing: Boolean,
+    progress: AudioPlayback.Progress?,
     onPlay: (MyCall) -> Unit,
-    onStop: () -> Unit,
+    onPause: () -> Unit,
+    onSeek: (Long) -> Unit,
 ) {
     when (call.audioState) {
-        AudioState.RECORDED -> TextButton(
-            onClick = { if (playing) onStop() else onPlay(call) },
-        ) {
-            Text(
-                stringResource(if (playing) R.string.calls_stop else R.string.calls_play),
-            )
-        }
+        AudioState.RECORDED -> Player(call, progress, onPlay, onPause, onSeek)
 
         AudioState.EXPIRED -> Muted(stringResource(R.string.audio_expired))
         AudioState.QUEUED -> Muted(stringResource(R.string.audio_queued))
@@ -197,6 +270,131 @@ private fun AudioRow(
             ),
         )
     }
+}
+
+/**
+ * The player: a control, a position, and the two numbers that make it legible.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * It was one `TextButton` whose label flipped between "Tinglash" and
+ * "To'xtatish". Sound came out of the phone and nothing else was knowable —
+ * not how long the recording is, not where in it the playback had reached, not
+ * whether it had ended or stalled. "What did I promise at the end of that
+ * call" meant listening to the whole call again.
+ *
+ * So the row draws what a player is: play/pause, a **seekable** bar, and
+ * `position / duration`. Seeking is real — ExoPlayer issues a `Range` request
+ * for the new offset (N43), so dragging to the last minute of a twenty-minute
+ * call fetches that minute rather than the twenty.
+ *
+ * The bar appears only on the row being played. A slider on every row would
+ * suggest twelve recordings are loaded when one is, and only one can be: the
+ * player holds a single codec, and two conversations out loud at once is
+ * nobody's intention.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+@Composable
+private fun Player(
+    call: MyCall,
+    progress: AudioPlayback.Progress?,
+    onPlay: (MyCall) -> Unit,
+    onPause: () -> Unit,
+    onSeek: (Long) -> Unit,
+) {
+    val loaded = progress != null
+    val playing = progress?.playing == true
+
+    // While the thumb is held, the bar follows the FINGER and not the player:
+    // a slider that keeps jumping back to the playhead cannot be dragged.
+    var scrubbing by remember(call.id) { mutableStateOf<Float?>(null) }
+    val fraction = scrubbing ?: progress?.fraction ?: 0f
+    val durationMs = progress?.durationMs ?: (call.durationSec * 1000L)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+    ) {
+        FilledTonalIconButton(
+            onClick = { if (playing) onPause() else onPlay(call) },
+        ) {
+            // TalkBack reads what the control does NOW, not what it is called.
+            val label = stringResource(if (playing) R.string.calls_pause else R.string.calls_play)
+            if (playing) {
+                PauseGlyph(label)
+            } else {
+                Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = label)
+            }
+        }
+
+        if (loaded) {
+            Slider(
+                value = fraction,
+                onValueChange = { scrubbing = it },
+                onValueChangeFinished = {
+                    scrubbing?.let { onSeek((it * durationMs).toLong()) }
+                    scrubbing = null
+                },
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${clock(fraction * durationMs)} / ${clock(durationMs.toFloat())}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            // Not loaded yet: the label is the invitation, and the duration is
+            // already known from the call itself.
+            Text(
+                text = stringResource(R.string.calls_play),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = clock(durationMs.toFloat()),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Two bars, drawn rather than imported.
+ *
+ * `Icons.Filled.Pause` lives in `material-icons-extended`, and adding that
+ * dependency to ship one glyph would put every Material icon on the phones of
+ * fifteen people whose data allowance pays for the APK. This is the icon.
+ */
+@Composable
+private fun PauseGlyph(label: String) {
+    val colour = LocalContentColor.current
+    Canvas(modifier = Modifier.size(20.dp).semantics { contentDescription = label }) {
+        val barWidth = size.width * 0.28f
+        val gap = size.width * 0.16f
+        val height = size.height * 0.78f
+        val top = (size.height - height) / 2
+        val left = (size.width - (barWidth * 2 + gap)) / 2
+        drawRoundRect(
+            color = colour,
+            topLeft = Offset(left, top),
+            size = Size(barWidth, height),
+            cornerRadius = CornerRadius(barWidth / 3),
+        )
+        drawRoundRect(
+            color = colour,
+            topLeft = Offset(left + barWidth + gap, top),
+            size = Size(barWidth, height),
+            cornerRadius = CornerRadius(barWidth / 3),
+        )
+    }
+}
+
+/** `07:24`. Minutes past an hour keep counting — a 70-minute call reads 70:12
+ *  rather than starting again at 10:12. */
+private fun clock(millis: Float): String {
+    val total = (millis / 1000).toLong().coerceAtLeast(0)
+    return "%02d:%02d".format(Locale.US, total / 60, total % 60)
 }
 
 @Composable

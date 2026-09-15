@@ -18,6 +18,7 @@ import timber.log.Timber
 import uz.bonvi.call.data.repository.CallQueueRepository
 import uz.bonvi.call.data.session.SessionStore
 import uz.bonvi.call.domain.UpdateReadiness
+import uz.bonvi.call.service.CapabilityRefresh
 import uz.bonvi.call.service.CaptureService
 import uz.bonvi.call.service.CommandRunner
 import uz.bonvi.call.service.Heartbeat
@@ -61,6 +62,7 @@ class HeartbeatWorker @AssistedInject constructor(
     @Assisted parameters: WorkerParameters,
     private val heartbeat: Heartbeat,
     private val commands: CommandRunner,
+    private val capabilities: CapabilityRefresh,
     private val updater: AppUpdater,
     private val revocation: Revocation,
     private val session: SessionStore,
@@ -98,6 +100,12 @@ class HeartbeatWorker @AssistedInject constructor(
         // helps calls captured from now on, and the ones already parked — 39 of
         // them on the first real handset — would stay on the phone for ever.
         queue.unparkUnreachable()
+
+        // A permission granted from the system settings — after the agent
+        // skipped it during enrolment — is otherwise invisible until somebody
+        // presses "recheck" in the panel. This is the pass that notices, and
+        // it sends nothing at all while the answers are unchanged.
+        capabilities.ifChanged("heartbeat")
 
         if (result.pendingCommands > 0) {
             val handled = commands.drain()

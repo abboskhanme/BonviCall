@@ -42,9 +42,6 @@ class MyCallsViewModel @Inject constructor(
         val nextCursor: String? = null,
         val hasMore: Boolean = false,
         val message: Message? = null,
-        /** Which row is sounding, so the screen can show a stop control on it
-         *  and only on it. */
-        val playingId: String? = null,
     ) {
         val isEmpty: Boolean get() = !loading && calls.isEmpty() && message == null
     }
@@ -56,6 +53,16 @@ class MyCallsViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    /**
+     * Where the recording being played has reached.
+     *
+     * Exposed as the player's own flow rather than copied into [UiState]: it
+     * changes five times a second while a recording sounds, and folding that
+     * into the list's state would recompose every row for a slider on one of
+     * them.
+     */
+    val playback: StateFlow<uz.bonvi.call.domain.AudioPlayback.Progress> = player.progress
 
     init {
         viewModelScope.launch {
@@ -108,17 +115,25 @@ class MyCallsViewModel @Inject constructor(
      */
     fun play(call: MyCall) {
         if (!call.playable) return
+        // Already loaded, just paused: continue where the employee left it
+        // rather than fetching the recording again from the beginning.
+        if (playback.value.callId == call.id) {
+            player.resume()
+            return
+        }
         viewModelScope.launch {
             val url = gateway.audioUrl(call.id) ?: return@launch
-            _state.value = _state.value.copy(playingId = call.id)
-            player.play(url)
+            player.play(call.id, url)
         }
     }
 
-    fun stop() {
-        player.pause()
-        _state.value = _state.value.copy(playingId = null)
-    }
+    fun pause() = player.pause()
+
+    /** Drag on the progress bar. */
+    fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+
+    /** Close the player on this row entirely. */
+    fun stop() = player.stop()
 
     override fun onCleared() {
         // A leaked player keeps a codec and, worse, keeps playing a

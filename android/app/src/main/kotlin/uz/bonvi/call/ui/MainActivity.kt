@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var session: uz.bonvi.call.data.session.SessionStore
 
+    @Inject lateinit var capabilities: uz.bonvi.call.service.CapabilityRefresh
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyDeepLinkServer(intent)
@@ -71,6 +73,15 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (session.snapshot.installationId == null) return
+
+        // The other thing opening the app proves: what the permissions are NOW.
+        // An agent who skipped "all files access" at enrolment and granted it
+        // afterwards from the system settings comes back through this exact
+        // callback, and until it ran the panel went on showing the phone as
+        // blocked — for as long as nobody pressed "recheck". Nothing is sent
+        // while the answers are unchanged.
+        lifecycleScope.launch { capabilities.ifChanged("app opened") }
+
         if (CaptureService.isRunning) return
         @Suppress("TooGenericExceptionCaught")
         try {
