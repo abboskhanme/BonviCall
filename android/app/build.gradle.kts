@@ -40,6 +40,26 @@ val devBaseUrl: String? = (project.findProperty("bonvicall.devBaseUrl") as Strin
     }.getOrNull()
 
 /**
+ * Where a RELEASE build looks for the server when it has no deep link to learn
+ * the host from — an APK taken from the front page, with the enrolment code
+ * typed by hand.
+ *
+ * A constant with an override rather than a hardcoded literal, because the
+ * literal was wrong for a whole release: it said `bonvicall.uz`, a name that
+ * does not resolve, while the deployment has always been `call.bonvi.uz`. The
+ * override (`-Pbonvicall.releaseBaseUrl=…`, or `local.properties`) is what a
+ * second deployment uses instead of editing this file.
+ */
+val releaseBaseUrl: String = ((project.findProperty("bonvicall.releaseBaseUrl") as String?)
+    ?: runCatching {
+        Properties().apply {
+            rootProject.file("local.properties").inputStream().use(::load)
+        }.getProperty("bonvicall.releaseBaseUrl")
+    }.getOrNull())
+    ?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "https://call.bonvi.uz"
+
+/**
  * Every address a phone on a development network may reach this laptop on.
  *
  * `bonvicall.devHost=10.31.219.102,192.168.1.23,100.69.139.120` - the hotspot,
@@ -71,6 +91,63 @@ val devHost: String? = (project.findProperty("bonvicall.devHost") as String?)
  * tracked file, which is how somebody else's IP gets committed and how a
  * "temporary" wildcard gets added.
  */
+/**
+ * Fail the build if R8 renames the class androidx.lifecycle looks up BY NAME.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * `lifecycle-runtime-compose` 2.8.x resolves Compose 1.6's LocalLifecycleOwner
+ * reflectively (see app/proguard-rules.pro), and falls back to a
+ * CompositionLocal that throws when the lookup fails. So a renamed class is
+ * not a warning and not a lint error — it is a release APK that crashes on
+ * its first screen, with nothing wrong in debug, in the tests, or in CI.
+ *
+ * That is exactly the failure this project cannot afford to discover on a
+ * handset: the fleet is fifteen personal phones, and an APK that dies on
+ * launch is uninstalled by its owner before anybody hears about it.
+ *
+ * The keep rule is one line and could be deleted by anybody tidying up. This
+ * task is what makes deleting it fail loudly, here, on the machine that built
+ * the APK.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+val verifyLifecycleReflectionSurvivesR8 by tasks.registering {
+    val mappingRoot = layout.buildDirectory.dir("outputs/mapping")
+    // The class name is the string androidx.lifecycle passes to loadClass().
+    val reflectedClass = "androidx.compose.ui.platform.AndroidCompositionLocals_androidKt"
+
+    doLast {
+        val directory = mappingRoot.get().asFile
+        val mappings = directory.walkTopDown().filter { it.name == "mapping.txt" }.toList()
+        if (mappings.isEmpty()) return@doLast
+
+        for (mapping in mappings) {
+            val line = mapping.useLines { lines ->
+                lines.firstOrNull { it.startsWith("$reflectedClass -> ") }
+            }
+            // Absent means R8 kept the name untouched and had nothing to
+            // record — or the class was shrunk away entirely, which the keep
+            // rule also prevents. Present means it was renamed to whatever
+            // follows the arrow.
+            val renamedTo = line?.substringAfter(" -> ")?.removeSuffix(":")?.trim()
+            if (renamedTo != null && renamedTo != reflectedClass) {
+                throw GradleException(
+                    "R8 renamed $reflectedClass to '$renamedTo' in " +
+                        "${mapping.parentFile.name}. androidx.lifecycle looks that class up " +
+                        "by name, so every Compose screen in this APK would die with " +
+                        "\"CompositionLocal LocalLifecycleOwner not present\". " +
+                        "Restore the -keep rule in app/proguard-rules.pro."
+                )
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    // Straight after R8 runs, on the mapping it just wrote.
+    tasks.matching { it.name.startsWith("minify") && it.name.endsWith("WithR8") }
+        .configureEach { finalizedBy(verifyLifecycleReflectionSurvivesR8) }
+}
+
 val generateDebugNetworkConfig by tasks.registering {
     val template = layout.projectDirectory.file("src/debug/network_security_config.template.xml")
     val output = layout.buildDirectory.file("generated/res/devhost/xml/network_security_config.xml")
@@ -141,8 +218,8 @@ android {
         // paths, so it is a build variant that M0 settles with measurements,
         // not a constant someone edits at 2 a.m.
 
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -203,7 +280,15 @@ android {
     buildTypes {
         release {
             // The production host. A release build never learns a LAN address.
-            buildConfigField("String", "DEFAULT_BASE_URL", "\"https://bonvicall.uz\"")
+            //
+            // It was `https://bonvicall.uz`, which has never resolved — the
+            // deployment is `call.bonvi.uz` (docs/DEPLOY.md) and always has
+            // been. It only bites when the app has NO deep link to learn the
+            // host from: an APK downloaded from the front page and a code
+            // typed by hand, which is exactly the path the front page exists
+            // to serve. Overridable for a second deployment without editing a
+            // tracked file: -Pbonvicall.releaseBaseUrl=https://…
+            buildConfigField("String", "DEFAULT_BASE_URL", "\"$releaseBaseUrl\"")
             buildConfigField("String", "BUILD_STAMP", "\"release\"")
 
             // Absent when there is no keystore, which yields -unsigned.apk
