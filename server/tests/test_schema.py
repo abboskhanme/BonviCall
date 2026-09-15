@@ -487,6 +487,11 @@ async def test_every_settings_key_is_seeded_with_its_documented_default(db) -> N
         # fleet that cannot enrol: both proving routes are frequently
         # unavailable at once on these handsets.
         "enrolment.allow_self_declared": True,
+        # Migration 009. OFF by default: the route needs a receiver on a known
+        # line, no deployment has ever had one, and the rollout page therefore
+        # led with a red "nobody can enrol" banner over a rollout that was
+        # working. A fleet that installs a receiver turns it back on here.
+        "enrolment.callback_enabled": False,
     }
     rows = await db.execute(sa.text("SELECT key, value FROM app_settings"))
     seeded = {key: value for key, value in rows}

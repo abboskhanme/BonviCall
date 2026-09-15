@@ -2414,14 +2414,19 @@ export interface components {
              * @default 0
              */
             active_receivers: number;
+            /**
+             * @description Is the callback route part of this deployment (`enrolment.callback_enabled`)? When false the panel says nothing about receivers: a route nobody installed is not an outage.
+             * @default true
+             */
+            callback_enabled: boolean;
             /** @description False means the rollout is stopped, not slow. */
             enrolment_possible: boolean;
             /** @description The number screen E5 shows the agent. */
             receiver_msisdn?: string | null;
             /** @description Which gateway, for the admin to go and look at. */
             receiver_name?: string | null;
-            /** @description up | degraded | down. Down is 5 minutes without a heartbeat. */
-            status: components["schemas"]["ReceiverStatus"];
+            /** @description up | degraded | down. Down is 5 minutes without a heartbeat. Null when the callback route is not part of this deployment. */
+            status?: components["schemas"]["ReceiverStatus"] | null;
         };
         /**
          * ReclassifyResponse

@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from src.core import ratelimit
 from src.core.enums import (
+    AlertKind,
     AuditAction,
     EnrolmentOutcome,
     FunnelStage,
@@ -224,7 +225,26 @@ async def test_a_different_number_is_a_mismatch_not_an_empty(
 # --- Verification route 2 ---------------------------------------------------
 
 
+async def _callback_route(db, *, enabled: bool) -> None:
+    """The route is off by default (migration 009): no deployment has a
+    receiver, and a permanently red banner is one nobody reads."""
+    await db.execute(
+        sa.text(
+            # CAST(), not `:value::jsonb` — the `::` next to a named parameter
+            # is parsed as part of the parameter name.
+            "UPDATE app_settings SET value = CAST(:value AS jsonb) "
+            "WHERE key = 'enrolment.callback_enabled'"
+        ),
+        {"value": "true" if enabled else "false"},
+    )
+    await db.flush()
+
+
 async def _receiver(db, token: str = "receiver-token", up: bool = True):
+    # A receiver only exists where the route is in service, so the fixture
+    # turns it on: a receiver row beside a disabled route is not a state this
+    # product has, and a test built on one would prove nothing about either.
+    await _callback_route(db, enabled=True)
     receiver = CallbackReceiverModel(
         name="Office gateway",
         msisdn="+998712000000",
@@ -357,7 +377,11 @@ async def test_the_receiver_endpoint_needs_the_callback_scope(
 
 
 async def test_the_enrolment_banner_says_when_nobody_can_enrol(db, admin) -> None:
-    """If the receiver is down the page says so before anyone tries."""
+    """If the receiver is down the page says so before anyone tries.
+
+    Only where the route is in service — see the test below for the default.
+    """
+    await _callback_route(db, enabled=True)
     down = (await admin.get("/api/v1/enrolment/receiver-status")).json()
     assert down["enrolment_possible"] is False
 
@@ -367,15 +391,75 @@ async def test_the_enrolment_banner_says_when_nobody_can_enrol(db, admin) -> Non
     assert up["receiver_msisdn"] == "+998712000000"
 
 
+async def test_with_the_route_off_the_page_says_nothing_about_receivers(
+    db, admin
+) -> None:
+    """The default (migration 009).
+
+    "Nobody can enrol" would be false — enrolment goes on through the SIM, an
+    admin's attestation and the code — and a banner that is always red is one
+    nobody reads on the day it means something.
+    """
+    status = (await admin.get("/api/v1/enrolment/receiver-status")).json()
+
+    assert status["callback_enabled"] is False
+    assert status["enrolment_possible"] is True
+    assert status["status"] is None
+    assert status["active_receivers"] == 0
+
+
+async def test_with_the_route_off_a_handset_is_refused_the_callback(
+    db, installation_factory, device_client_factory
+) -> None:
+    """The same code a handset already falls back from.
+
+    Turning the route off must need no new behaviour on fifteen phones that
+    cannot be force-updated.
+    """
+    await _receiver(db)
+    await _callback_route(db, enabled=False)
+    installation = await installation_factory(status=InstallationStatus.PENDING)
+    device = await device_client_factory(installation)
+
+    response = await device.post("/api/device/v1/enrolment/verify/callback/start")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "callback_receiver_down"
+
+
+async def test_the_receiver_health_job_does_nothing_while_the_route_is_off(
+    db,
+) -> None:
+    """An alert about a receiver nobody installed is how a fleet learns to
+    ignore its alerts."""
+    from src.modules.enrolment.jobs import receiver_health
+
+    await _receiver(db, up=False)
+    await _callback_route(db, enabled=False)
+
+    assert await receiver_health(db) == 0
+
+    from src.modules.alerts.models import AlertModel
+
+    raised = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(AlertModel)
+        .where(AlertModel.kind == AlertKind.CALLBACK_RECEIVER_DOWN)
+    )
+    assert raised == 0
+
+
 async def test_the_receiver_banner_has_a_real_type(db, admin) -> None:
     """§15: an untyped body reaches the contract as a free-form map.
 
     This is the one endpoint whose failure means nobody can enrol, so it
     should be the best-specified thing on the page rather than the least.
     """
+    await _callback_route(db, enabled=True)
     down = (await admin.get("/api/v1/enrolment/receiver-status")).json()
     assert down == {
         "enrolment_possible": False,
+        "callback_enabled": True,
         "receiver_name": None,
         "receiver_msisdn": None,
         "status": "down",

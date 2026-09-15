@@ -195,12 +195,11 @@ function CallRows({ page, showAgent }: { page: CallPage; showAgent: boolean }) {
         <THead>
           <tr>
             <TH>{t('calls.colTime')}</TH>
-            {/* The list is ordered by `received_at`, not by `started_at`
-                (SPEC §3.12: devices lie about time, and the server's receipt
-                time is what orders the page). Showing only the device's clock
-                while sorting by the server's makes a correctly ordered list
-                look shuffled — and it hides the skew, which on a phone with a
-                wrong date is days. Both columns, so the order is explainable. */}
+            {/* The list is ordered by this column — the CALL's own time,
+                newest first. `received_at` is still shown beside it, because
+                the two differ whenever a phone was off or a recovery sweep
+                found an old call, and a reader who cannot see both has no way
+                to tell a late upload from a wrong clock (SPEC §3.12). */}
             <TH title={t('calls.colReceivedHint')}>{t('calls.colReceived')}</TH>
             {/* Third: who the call belongs to comes before what the call was.
                 Hidden for own-scope, where it would be one repeated name, and
@@ -352,6 +351,24 @@ export function CallsPage() {
 
   const query: CallListQuery = {
     limit: PAGE_SIZE,
+    // ═══ Ordered by WHEN THE CALL HAPPENED, newest first ═══════════════════
+    //
+    // The server's default is `received_at` — when the upload landed — and
+    // SPEC §3.12 has the reason: devices lie about time, and receipt order is
+    // the one this server can vouch for. It reads wrong on a real fleet.
+    // Recovery sweeps upload yesterday's calls after today's (UC-13), and a
+    // phone that was off all morning arrives at lunchtime, so the top of the
+    // page kept filling with old conversations while the call somebody made
+    // five minutes ago sat further down. To a reader, that IS the list being
+    // broken.
+    //
+    // So the page asks for `started_at desc`. Both columns are still shown
+    // and the skew stays visible beside them, which is what makes a wrong
+    // device clock diagnosable rather than merely confusing. Paging stays
+    // exact: the server pairs every sort with `id` (SPEC §4.7), so a keyset
+    // page never repeats or skips a row whose timestamp ties.
+    sort: 'started_at',
+    order: 'desc',
     ...(cursor ? { cursor } : {}),
     // `agent_id` is a repeated parameter on the wire; the picker chooses one
     // agent, so it goes as a one-element list rather than as a bare string.

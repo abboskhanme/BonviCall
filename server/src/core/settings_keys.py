@@ -70,6 +70,22 @@ class SettingKey:
     #: all. See ``VerificationMethod.SELF_DECLARED``.
     ENROLMENT_ALLOW_SELF_DECLARED: Final = "enrolment.allow_self_declared"
 
+    #: Is the callback route part of THIS deployment? Default ``false``.
+    #:
+    #: The route needs a receiver — a GSM gateway or an Android handset on a
+    #: known number — registered and heartbeating (SPEC §9.4). No deployment of
+    #: this product has ever had one, so the panel's rollout page led with a
+    #: red "nobody can enrol" banner about infrastructure that does not exist,
+    #: while phones were enrolling perfectly well through the SIM, an admin's
+    #: attestation, or the code alone.
+    #:
+    #: Off, the route is simply not offered: no banner, no receiver-health
+    #: alert, and ``/verify/callback/start`` refuses. Turning it on is one row
+    #: in ``app_settings`` — nothing was deleted, because the route is the
+    #: strongest proof of a number this product has, and a fleet that installs
+    #: a receiver should get it back with a setting rather than a release.
+    ENROLMENT_CALLBACK_ENABLED: Final = "enrolment.callback_enabled"
+
     @classmethod
     def all(cls) -> frozenset[str]:
         return frozenset(

@@ -1064,3 +1064,49 @@ async def test_dates_are_ignored_for_a_preset_period(manager) -> None:
     ).json()
     assert len(body["buckets"]) == 7
     assert body["date_to"] == datetime.now(UTC).astimezone(TASHKENT).date().isoformat()
+
+
+async def test_paging_by_call_time_never_repeats_or_skips_a_row(
+    manager, call_factory
+) -> None:
+    """The panel's order (``started_at desc``), paged to the end.
+
+    Keyset paging is only safe while the sort pairs with ``id``: these five
+    calls share a minute, and a cursor on the timestamp alone would hand back
+    the tied rows again on the next page — which looks exactly like the
+    "pagination is broken" a reader reports.
+    """
+    minute = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12, minute=0, second=0)
+    made = [await call_factory(started_at=minute) for _ in range(5)]
+
+    seen: list[str] = []
+    cursor = None
+    for _ in range(len(made)):
+        url = "/api/v1/calls?limit=2&sort=started_at&order=desc" + (
+            f"&cursor={cursor}" if cursor else ""
+        )
+        body = (await manager.get(url)).json()
+        seen.extend(item["id"] for item in body["items"])
+        cursor = body["next_cursor"]
+        if not body["has_more"]:
+            break
+
+    assert len(seen) == len(set(seen)) == len(made)
+
+
+async def test_the_newest_call_is_first_even_when_an_older_one_arrived_later(
+    manager, call_factory
+) -> None:
+    """UC-13's recovery sweep uploads yesterday's calls after today's.
+
+    Ordered by receipt — the server's own default — that old call lands at the
+    top of the panel and the call made five minutes ago sits below it.
+    """
+    now = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12)
+    newest = await call_factory(started_at=now)
+    # Made yesterday, uploaded just now: later `received_at`, earlier `started_at`.
+    yesterday = await call_factory(started_at=now - timedelta(days=1))
+
+    body = (await manager.get("/api/v1/calls?sort=started_at&order=desc")).json()
+
+    assert [item["id"] for item in body["items"]][:2] == [str(newest.id), str(yesterday.id)]

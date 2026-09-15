@@ -32,6 +32,12 @@ async def receiver_health(session: AsyncSession) -> int:
     The alert is fleet-scoped rather than per-receiver: an admin does not need
     to know which gateway died, they need to know that enrolment has stopped.
     """
+    # Nothing to watch when the route is not part of this deployment — and an
+    # alert about a receiver nobody installed is how a fleet learns to ignore
+    # its alerts.
+    if not await EnrolmentService(session).callback_enabled():
+        return 0
+
     moment = clock.now()
     receivers = list(
         (

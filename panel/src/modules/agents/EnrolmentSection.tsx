@@ -68,6 +68,12 @@ function ReceiverBanner() {
   // No banner while unknown: a scary line that turns out to be a loading state
   // is worse than a moment of nothing.
   if (!status || status.enrolment_possible) return null
+  // …and none at all where the callback route is not part of this deployment.
+  // It needs a receiver on a known line, which no deployment has ever had, so
+  // this banner sat red for months over a rollout that was working — and a
+  // banner that is always red is one nobody reads on the day it means
+  // something (`enrolment.callback_enabled`).
+  if (status.callback_enabled === false) return null
   return (
     <Card className="flex items-start gap-3 border-bad/40 bg-bad/5 p-3">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />

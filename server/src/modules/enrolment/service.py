@@ -601,8 +601,13 @@ class EnrolmentService:
 
         Refusing is the point: raising a challenge the agent cannot possibly
         satisfy is worse than saying so (SPEC §9.2).
+
+        A deployment with the route switched off refuses here too, with the
+        same code: the handset already knows how to fall back from it, so
+        turning the route off needs no new behaviour on fifteen phones that
+        cannot be force-updated.
         """
-        receiver = await self.usable_receiver()
+        receiver = None if not await self.callback_enabled() else await self.usable_receiver()
         if receiver is None:
             self.session.add(
                 EnrolmentAttemptModel(
@@ -753,8 +758,31 @@ class EnrolmentService:
             .order_by(CallbackReceiverModel.last_heartbeat_at.desc())
         )
 
+    async def callback_enabled(self) -> bool:
+        """Is the callback route part of this deployment? (SPEC §9.4)
+
+        Off by default. The route needs a receiver on a known number, no
+        deployment has ever had one, and the page therefore led with a red
+        "nobody can enrol" banner about infrastructure that does not exist —
+        while phones enrolled through the SIM, an admin's attestation or the
+        code alone, all day.
+        """
+        return await self._setting_bool(SettingKey.ENROLMENT_CALLBACK_ENABLED)
+
     async def receiver_status(self) -> ReceiverStatusResponse:
         """Whether anybody can enrol right now, and through which receiver."""
+        if not await self.callback_enabled():
+            # Not "nobody can enrol": enrolment goes on through every other
+            # route. A page that shouts about a receiver this deployment never
+            # installed teaches an admin to ignore the banner that means a real
+            # outage.
+            return ReceiverStatusResponse(
+                enrolment_possible=True,
+                callback_enabled=False,
+                status=None,
+                active_receivers=0,
+            )
+
         moment = clock.now()
         receivers = list(
             (
@@ -768,6 +796,7 @@ class EnrolmentService:
         usable = await self.usable_receiver()
         return ReceiverStatusResponse(
             enrolment_possible=usable is not None,
+            callback_enabled=True,
             receiver_name=usable.name if usable else None,
             receiver_msisdn=usable.msisdn if usable else None,
             status=(

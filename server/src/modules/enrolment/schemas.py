@@ -222,14 +222,26 @@ class ReceiverStatusResponse(BaseModel):
     enrolment_possible: bool = Field(
         description="False means the rollout is stopped, not slow."
     )
+    callback_enabled: bool = Field(
+        default=True,
+        description=(
+            "Is the callback route part of this deployment "
+            "(`enrolment.callback_enabled`)? When false the panel says nothing "
+            "about receivers: a route nobody installed is not an outage."
+        ),
+    )
     receiver_name: str | None = Field(
         default=None, description="Which gateway, for the admin to go and look at."
     )
     receiver_msisdn: str | None = Field(
         default=None, description="The number screen E5 shows the agent."
     )
-    status: ReceiverStatus = Field(
-        description="up | degraded | down. Down is 5 minutes without a heartbeat."
+    status: ReceiverStatus | None = Field(
+        default=None,
+        description=(
+            "up | degraded | down. Down is 5 minutes without a heartbeat. "
+            "Null when the callback route is not part of this deployment."
+        ),
     )
     active_receivers: int = Field(
         default=0, description="More than one is a configuration change, not code."

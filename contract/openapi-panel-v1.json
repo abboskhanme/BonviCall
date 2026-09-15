@@ -3917,6 +3917,11 @@
             "description": "More than one is a configuration change, not code.",
             "type": "integer"
           },
+          "callback_enabled": {
+            "default": true,
+            "description": "Is the callback route part of this deployment (`enrolment.callback_enabled`)? When false the panel says nothing about receivers: a route nobody installed is not an outage.",
+            "type": "boolean"
+          },
           "enrolment_possible": {
             "description": "False means the rollout is stopped, not slow.",
             "type": "boolean"
@@ -3944,13 +3949,19 @@
             "description": "Which gateway, for the admin to go and look at."
           },
           "status": {
-            "$ref": "#/components/schemas/ReceiverStatus",
-            "description": "up | degraded | down. Down is 5 minutes without a heartbeat."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReceiverStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "up | degraded | down. Down is 5 minutes without a heartbeat. Null when the callback route is not part of this deployment."
           }
         },
         "required": [
-          "enrolment_possible",
-          "status"
+          "enrolment_possible"
         ],
         "title": "ReceiverStatusResponse",
         "type": "object"

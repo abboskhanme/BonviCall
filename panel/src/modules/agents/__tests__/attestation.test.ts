@@ -39,7 +39,11 @@ function attempt(overrides: Partial<Attempt> = {}): Attempt {
   }
 }
 
+// Both fixtures name `callback_enabled` explicitly: they describe a
+// deployment that HAS a receiver, which is now the exception rather than the
+// default (`enrolment.callback_enabled`).
 const RECEIVER_UP: Receiver = {
+  callback_enabled: true,
   enrolment_possible: true,
   status: 'up',
   receiver_name: 'Receiver 1',
@@ -47,6 +51,7 @@ const RECEIVER_UP: Receiver = {
   active_receivers: 1,
 }
 const RECEIVER_DOWN: Receiver = {
+  callback_enabled: true,
   enrolment_possible: false,
   status: 'down',
   receiver_name: null,

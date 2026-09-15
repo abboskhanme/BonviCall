@@ -844,6 +844,12 @@ describe('pagination', () => {
 
     const first = callsRequests()[0] ?? ''
     expect(first).toContain('limit=50')
+    // Ordered by the CALL's own time, newest first — not by when the upload
+    // landed. A recovery sweep or a phone that was off all morning otherwise
+    // fills the top of the page with old conversations while the call made
+    // five minutes ago sits below them, which reads as a broken list.
+    expect(first).toContain('sort=started_at')
+    expect(first).toContain('order=desc')
     // The first page carries no cursor, and asks for the total exactly once —
     // per filter change, not per page (SPEC §4.0).
     expect(first).not.toContain('cursor=')
@@ -855,6 +861,10 @@ describe('pagination', () => {
     const second = callsRequests().at(-1) ?? ''
     expect(second).toContain(`cursor=${encodeURIComponent(NEXT_CURSOR)}`)
     expect(second).toContain('with_total=false')
+    // The SAME order on page two. A cursor taken under one sort and spent
+    // under another is how a keyset page repeats and skips rows.
+    expect(second).toContain('sort=started_at')
+    expect(second).toContain('order=desc')
 
     // Keyset, not offset. An OFFSET skips and repeats rows while calls keep
     // arriving, which is exactly what UC-19 forbids.
