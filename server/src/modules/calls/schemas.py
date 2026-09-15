@@ -293,6 +293,52 @@ class UpdateCallNoteRequest(BaseModel):
     note: str | None = Field(default=None, max_length=4000)
 
 
+# --- The dashboard's call flow over time (UC-11) ----------------------------
+
+#: The windows the dashboard offers. The three presets are rolling and the
+#: server owns their arithmetic: a browser computing "a year ago" in its own
+#: timezone would ask for a window whose edges disagree with every business
+#: date in the product (D-10). ``custom`` is the reader's own two dates, and
+#: the only value for which ``date_from``/``date_to`` are read at all.
+CallStatsPeriod = Literal["week", "month", "year", "custom"]
+
+
+class CallStatsBucket(BaseModel):
+    """One point on the x-axis: UC-11's five classes, counted.
+
+    Every bucket in the window is returned, including the empty ones. A chart
+    that receives only the days something happened draws a straight line
+    through a silent week, which is the one thing this chart exists to show.
+    """
+
+    date_from: date = Field(description="Asia/Tashkent calendar date, inclusive.")
+    date_to: date = Field(
+        description="Inclusive, and equal to date_from for a daily bucket. "
+        "The last bucket is clipped to today, so a part-month is not drawn as "
+        "a whole one."
+    )
+    incoming_answered: int = 0
+    outgoing_answered: int = 0
+    missed: int = 0
+    rejected: int = 0
+    no_answer: int = 0
+    total: int = Field(
+        default=0,
+        description="Every call in the bucket, which is what the same filter "
+        "returns from /calls — not necessarily the sum of the five classes.",
+    )
+
+
+class CallStatsResponse(BaseModel):
+    """``GET /api/v1/calls/stats`` — the call flow the dashboard draws."""
+
+    period: CallStatsPeriod
+    granularity: Literal["day", "month"]
+    date_from: date
+    date_to: date
+    buckets: list[CallStatsBucket]
+
+
 # --- The employee's own calls, on their phone (docs/DEVICE-READ-API.md) -----
 
 

@@ -8,7 +8,7 @@
  * other in both directions, not just spot-checked.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -25,8 +25,8 @@ import { t } from '@/shared/i18n'
  * genuine cross-check and not the page agreeing with itself.
  */
 const TILE_PERMISSIONS: ReadonlyArray<[Permission, string]> = [
-  [Perm.CALLS_READ, 'dashboard.callsToday'],
-  [Perm.CALLS_READ_OWN, 'dashboard.callsToday'],
+  [Perm.CALLS_READ, 'dashboard.callsInPeriod'],
+  [Perm.CALLS_READ_OWN, 'dashboard.callsInPeriod'],
   [Perm.DEVICES_READ, 'dashboard.devicesNeedingAttention'],
   [Perm.DEVICES_READ_OWN, 'dashboard.devicesNeedingAttention'],
   [Perm.ALERTS_READ, 'dashboard.openAlerts'],
@@ -42,9 +42,36 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
+/** One well-formed `/calls/stats` window: three daily buckets, one call each. */
+function stats(period = 'week') {
+  const buckets = ['2026-09-13', '2026-09-14', '2026-09-15'].map((day) => ({
+    date_from: day,
+    date_to: day,
+    incoming_answered: 1,
+    outgoing_answered: 0,
+    missed: 0,
+    rejected: 0,
+    no_answer: 0,
+    total: 1,
+  }))
+  return {
+    period,
+    granularity: 'day',
+    date_from: '2026-09-13',
+    date_to: '2026-09-15',
+    buckets,
+  }
+}
+
 function world() {
   fetchMock.mockImplementation((input) => {
     const url = String(input)
+    // Before the list branch: `/calls/stats` starts with `/calls`, and the two
+    // shapes are nothing alike.
+    if (url.includes('/api/v1/calls/stats')) {
+      const period = new URL(url, 'http://localhost').searchParams.get('period') ?? 'week'
+      return Promise.resolve(jsonResponse(stats(period)))
+    }
     if (url.includes('/api/v1/calls')) {
       return Promise.resolve(jsonResponse({ items: [], next_cursor: null, has_more: false, total: 7 }))
     }
@@ -144,26 +171,37 @@ describe('tiles', () => {
     signIn(DASHBOARD_PERMISSIONS)
     const { container } = renderPage()
 
-    await screen.findByText(t('dashboard.callsToday'))
+    await screen.findByText(t('dashboard.callsInPeriod'))
     const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'))
     // A number with no route is trivia (SPEC §5.2).
     expect(hrefs.some((href) => href?.startsWith('/calls'))).toBe(true)
     expect(hrefs).toContain('/devices')
     expect(hrefs).toContain('/alerts')
-    expect(hrefs).toContain('/calls?has_audio=false')
+    expect(hrefs.some((href) => href?.startsWith('/calls?has_audio=false'))).toBe(true)
   })
 
-  it('asks the server for today only, in Asia/Tashkent', async () => {
+  /**
+   * The window is the server's arithmetic, and the page must not do its own:
+   * a browser working out "a week ago" does it in ITS timezone, and every
+   * business date here is an Asia/Tashkent calendar date (D-10).
+   */
+  it('asks for a named period and takes the dates from the answer', async () => {
     signIn([Perm.CALLS_READ])
     renderPage()
 
-    await screen.findByText(t('dashboard.callsToday'))
-    const url = String(fetchMock.mock.calls.find(([i]) => String(i).includes('/calls'))?.[0] ?? '')
-    expect(url).toMatch(/date_from=\d{4}-\d{2}-\d{2}/)
-    // Same day boundary as every other business date in the system (D-10).
-    const from = /date_from=(\d{4}-\d{2}-\d{2})/.exec(url)?.[1]
-    const to = /date_to=(\d{4}-\d{2}-\d{2})/.exec(url)?.[1]
-    expect(from).toBe(to)
+    await screen.findByText(t('dashboard.callsInPeriod'))
+    const url = String(
+      fetchMock.mock.calls.find(([i]) => String(i).includes('/calls/stats'))?.[0] ?? '',
+    )
+    expect(url).toContain('period=week')
+    expect(url).not.toMatch(/date_from=/)
+    // …and the tile links to the window the server named, not to one it made up.
+    await waitFor(() => {
+      const link = [...document.querySelectorAll('a')]
+        .map((a) => a.getAttribute('href'))
+        .find((href) => href?.startsWith('/calls?date_from='))
+      expect(link).toBe('/calls?date_from=2026-09-13&date_to=2026-09-15')
+    })
   })
 
   it('says so plainly when a role has nothing to show', () => {

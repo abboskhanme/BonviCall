@@ -156,11 +156,16 @@ function CapabilityMatrix({ capabilities }: { capabilities: CapabilityState[] })
                     {t(CAPABILITY_STATE_LABEL[capability.state])}
                   </Badge>
                 </TD>
+                {/* Null until there is a state to have changed FROM: a required
+                    capability a phone has never reported is listed as `unknown`
+                    with no timestamps rather than being absent from the matrix. */}
                 <TD
                   className="whitespace-nowrap text-muted"
-                  title={formatInstantTitle(capability.changed_at)}
+                  title={
+                    capability.changed_at ? formatInstantTitle(capability.changed_at) : undefined
+                  }
                 >
-                  {relativeText(capability.changed_at)}
+                  {capability.changed_at ? relativeText(capability.changed_at) : EM_DASH}
                 </TD>
                 <TD className="text-xs text-muted">{capability.detail ?? EM_DASH}</TD>
               </TR>

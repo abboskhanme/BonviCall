@@ -96,6 +96,45 @@ export const AUDIO_MISSING_REASON_LABEL: Record<AudioMissingReason, MessageKey> 
   attribution_failed: 'calls.noAudioReason.attribution_failed',
 }
 
+/**
+ * UC-11's five classes — direction x disposition — as the chart draws them.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * The names are the server's: `CallStatsBucket` carries one counter per key
+ * below, so `Record<CallClass, …>` over a type taken from `types.gen.ts` means
+ * a sixth class added on the server stops this file compiling rather than
+ * appearing as a line nobody labelled.
+ *
+ * Each class also carries the FILTER that selects it, because every point on
+ * the chart links through to the calls it was drawn from. Written once here,
+ * so the line called "Rad etilgan" and the list behind it cannot mean two
+ * different things.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export type CallClass = Exclude<
+  keyof components['schemas']['CallStatsBucket'],
+  'date_from' | 'date_to' | 'total'
+>
+
+export const CALL_CLASS_LABEL: Record<CallClass, MessageKey> = {
+  incoming_answered: 'calls.class.incoming_answered',
+  outgoing_answered: 'calls.class.outgoing_answered',
+  missed: 'calls.class.missed',
+  rejected: 'calls.class.rejected',
+  no_answer: 'calls.class.no_answer',
+}
+
+export const CALL_CLASS_FILTER: Record<
+  CallClass,
+  { direction: CallDirection; disposition: CallDisposition }
+> = {
+  incoming_answered: { direction: 'incoming', disposition: 'answered' },
+  outgoing_answered: { direction: 'outgoing', disposition: 'answered' },
+  missed: { direction: 'incoming', disposition: 'missed' },
+  rejected: { direction: 'incoming', disposition: 'rejected' },
+  no_answer: { direction: 'outgoing', disposition: 'no_answer' },
+}
+
 export type BadgeTone = 'neutral' | 'good' | 'warn' | 'bad' | 'accent'
 
 export const DISPOSITION_TONE: Record<CallDisposition, BadgeTone> = {

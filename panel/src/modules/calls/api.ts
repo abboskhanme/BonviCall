@@ -23,6 +23,12 @@ import type { components, operations } from '@/shared/api/types.gen'
 export type Call = components['schemas']['CallResponse']
 export type CallPage = components['schemas']['CallListResponse']
 export type UpdateCallNoteRequest = components['schemas']['UpdateCallNoteRequest']
+export type CallStats = components['schemas']['CallStatsResponse']
+export type CallStatsBucket = components['schemas']['CallStatsBucket']
+export type CallStatsPeriod = CallStats['period']
+export type CallStatsQuery = NonNullable<
+  operations['call_stats_api_v1_calls_stats_get']['parameters']['query']
+>
 
 /**
  * The query string `GET /api/v1/calls` accepts, generated from the contract.
@@ -77,6 +83,30 @@ export function useCallsPage(params: CallListQuery): UseQueryResult<CallPage> {
     queryKey: queryKey('calls', 'list', params),
     queryFn: () => api.get<CallPage>('/calls', toQuery(params)),
     placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * The call flow over time — UC-11's five classes, per day or per month.
+ *
+ * The WINDOW is the server's arithmetic: this hook sends a period name, never
+ * a pair of dates. A browser computing "a year ago" would do it in its own
+ * timezone, and every business date in this product is an Asia/Tashkent
+ * calendar date (D-10) — so the two would disagree for five hours a day and
+ * nobody would be able to say which was right.
+ *
+ * Own-scope is not applied here either: the server narrows the same query the
+ * list uses, so a salesperson's chart is their own calls (UC-21).
+ */
+export function useCallStats(params: CallStatsQuery): UseQueryResult<CallStats> {
+  // `custom` is the only period that reads dates, and it needs BOTH: asking
+  // with one of them would be a 400 fired on every keystroke of the second.
+  const ready = params.period !== 'custom' || Boolean(params.date_from && params.date_to)
+  return useQuery({
+    queryKey: queryKey('calls', 'stats', { ...params }),
+    queryFn: () => api.get<CallStats>('/calls/stats', { ...params }),
+    placeholderData: keepPreviousData,
+    enabled: ready,
   })
 }
 

@@ -99,6 +99,11 @@ export interface paths {
         /**
          * List Alerts
          * @description Severity, cause, agent, device, first/last seen and the repeat count.
+         *
+         *     ``agent_id`` is what the agent's own card reads. The alerts page shows the
+         *     open list and nothing else since 2026-09-14 — an inbox that never empties
+         *     is an inbox nobody works — so one person's closed history is answered here
+         *     instead of by a second page.
          */
         get: operations["list_alerts_api_v1_alerts_get"];
         put?: never;
@@ -145,6 +150,39 @@ export interface paths {
          *     enrolment code is the secret, and it guards the page that links here.
          */
         get: operations["download_version_api_v1_app_download__version_code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest Releases
+         * @description The current published build of each variant. **Public**, rate-limited.
+         *
+         *     What the site's front page reads, so that somebody sent to this server can
+         *     install the app without an account. It is the same permission decision SPEC
+         *     §4.1 rule 5 already made for the APK itself: the binary is a client and
+         *     holds no secret, and a version number beside it tells an attacker nothing
+         *     the file would not.
+         *
+         *     It answers an EMPTY list before the first publish, and that is a real
+         *     answer rather than a 404 — a fresh server has no build, and the page says
+         *     so in Uzbek instead of offering a button that goes nowhere.
+         *
+         *     ``PublicReleaseResponse`` is a narrow model on purpose: the admin-facing
+         *     one names the member of staff who uploaded the build.
+         */
+        get: operations["latest_releases_api_v1_app_latest_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -348,7 +386,12 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Public. A wrong e-mail and a wrong password give the same answer.
+         * @description Public, rate-limited. A wrong e-mail and a wrong password give the same answer.
+         *
+         *     Two windows, both SPEC §4.0 and both counting **failures only**
+         *     (``core/ratelimit.py`` says why): 20 an hour from one address, and 10 in
+         *     five minutes against one login from that address. Somebody who knows their
+         *     own password is never refused by either, however often they sign in.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -528,6 +571,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calls/audio-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Audio Archive
+         * @description The recordings of **the page the reader is looking at**, as one ZIP.
+         *
+         *     Deliberately a page and not a filter. The button sits under fifty rows and
+         *     hands over those fifty rows; "everything since January" is a different
+         *     product decision, and one whose size nobody can see before pressing it.
+         *     It therefore takes the same ``cursor``, ``limit`` and sort as the list, so
+         *     the archive and the screen cannot disagree about which calls they mean.
+         *
+         *     ``limit`` is clamped exactly as the list clamps it, so hand-editing the URL
+         *     widens nothing.
+         *
+         *     Every recording it contains is one this principal may already download one
+         *     at a time: the page comes from the same scoped query, so own-scope means
+         *     own recordings. **One audit row per archive**, not one per file — the
+         *     question this action answers is "who took a copy, and of what", and seven
+         *     hundred rows would bury the log the way open alerts once buried the alerts
+         *     page.
+         */
+        get: operations["download_audio_archive_api_v1_calls_audio_archive_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calls/export": {
         parameters: {
             query?: never;
@@ -547,6 +626,41 @@ export interface paths {
          *     because the same scoped query builds it.
          */
         get: operations["export_calls_api_v1_calls_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calls/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Call Stats
+         * @description Calls per day (or per month) per class, for the dashboard's chart.
+         *
+         *     Declared **above** ``/{call_id}``: that route takes a UUID, so a request
+         *     for ``/calls/stats`` matched against it answers 422 rather than reaching
+         *     this one.
+         *
+         *     A preset window is the server's arithmetic and not the caller's — the
+         *     browser asking for "a year" in its own timezone would draw a chart whose
+         *     edges disagree with every other date in the product (D-10) — so
+         *     ``date_from``/``date_to`` are read only for ``period=custom``, and both are
+         *     required there. The granularity of a custom range is derived from its span,
+         *     not chosen: two dates are the question, and a second control before an
+         *     answer is one decision too many.
+         *
+         *     Own-scope applies exactly as it does to the list, because it is the same
+         *     query.
+         */
+        get: operations["call_stats_api_v1_calls_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1143,36 +1257,21 @@ export interface components {
         ActorType: "user" | "service" | "device" | "system";
         /** AgentListResponse */
         AgentListResponse: {
-            /** Items */
             items: components["schemas"]["AgentResponse"][];
-            /** Total */
             total: number;
         };
         /** AgentResponse */
         AgentResponse: {
-            /** Archived At */
             archived_at: string | null;
-            /** Color */
             color: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /** Employee Code */
             employee_code: string | null;
-            /** Full Name */
             full_name: string;
-            /** Hired At */
             hired_at: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Is Active */
             is_active: boolean;
-            /** Note */
             note: string | null;
         };
         /**
@@ -1188,14 +1287,9 @@ export interface components {
         AlertKind: "capture_disabled" | "permission_lost_microphone" | "permission_lost_phone_state" | "permission_lost_call_log" | "battery_optimisation_reenabled" | "app_force_stopped" | "install_disappeared" | "recording_route_lost" | "service_not_running" | "device_offline" | "device_silent" | "fleet_silent" | "capture_rate_regression" | "queue_full" | "storage_low" | "poisoned_record" | "auth_expired" | "credential_replay" | "installation_rebound" | "callback_receiver_down" | "enrolment_stalled" | "attribution_out_of_range" | "attribution_discarded_spike" | "retention_job_failed" | "backup_failed" | "storage_capacity_low" | "min_version_refusals";
         /** AlertListResponse */
         AlertListResponse: {
-            /** Items */
             items: components["schemas"]["AlertResponse"][];
-            /**
-             * Open Count
-             * @description Neither acknowledged nor resolved.
-             */
+            /** @description Neither acknowledged nor resolved. */
             open_count: number;
-            /** Total */
             total: number;
         };
         /**
@@ -1203,53 +1297,29 @@ export interface components {
          * @description One open or acknowledged alert, as the inbox renders it.
          */
         AlertResponse: {
-            /** Acknowledged At */
             acknowledged_at: string | null;
-            /** Acknowledged By */
             acknowledged_by: string | null;
-            /** Agent Id */
             agent_id: string | null;
-            /**
-             * Body Uz
-             * @description What to do about it. Derived from `kind`, not stored.
-             */
+            /** @description What to do about it. Derived from `kind`, not stored. */
             body_uz: string | null;
-            /** Detail */
             detail: Record<string, unknown> | null;
-            /** Device Model */
             device_model: string | null;
-            /**
-             * First Seen At
-             * Format: date-time
-             */
+            /** Format: date-time */
             first_seen_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Installation Id */
             installation_id: string | null;
+            /** @description Status of the installation this alert is about. New alerts are not raised against a superseded phone and its open ones are closed when it is replaced — this is here so a page can also tell at a glance, without a second query, for alerts raised before that rule existed. */
+            installation_status?: components["schemas"]["InstallationStatus"] | null;
             kind: components["schemas"]["AlertKind"];
-            /**
-             * Last Seen At
-             * Format: date-time
-             */
+            /** Format: date-time */
             last_seen_at: string;
-            /** Number Id */
             number_id: string | null;
-            /**
-             * Occurrence Count
-             * @description Repeats bump this rather than inserting a row: a phone reporting every two minutes must not produce 720 rows a day.
-             */
+            /** @description Repeats bump this rather than inserting a row: a phone reporting every two minutes must not produce 720 rows a day. */
             occurrence_count: number;
-            /** Resolved At */
             resolved_at: string | null;
             severity: components["schemas"]["AlertSeverity"];
-            /**
-             * Title Uz
-             * @description What happened, in Uzbek. Derived from `kind`, not stored.
-             */
+            /** @description What happened, in Uzbek. Derived from `kind`, not stored. */
             title_uz: string;
         };
         /**
@@ -1268,14 +1338,9 @@ export interface components {
         AppVariant: "legacy28" | "modern34";
         /** AppVersionListResponse */
         AppVersionListResponse: {
-            /** Items */
             items: components["schemas"]["AppVersionResponse"][];
-            /**
-             * Signing Sha256 Configured
-             * @description Whether a signing fingerprint is configured. False means uploads are accepted without the key check — see docs/APK-SIGNING.md.
-             */
+            /** @description Whether a signing fingerprint is configured. False means uploads are accepted without the key check — see docs/APK-SIGNING.md. */
             signing_sha256_configured: boolean;
-            /** Total */
             total: number;
         };
         /**
@@ -1283,51 +1348,28 @@ export interface components {
          * @description One build in the distribution record.
          */
         AppVersionResponse: {
-            /**
-             * Apk Sha256
-             * @description Computed server-side, never accepted.
-             */
+            /** @description Computed server-side, never accepted. */
             apk_sha256: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /** Created By */
             created_by: string | null;
             /**
-             * Created By Name
              * @description Who uploaded it, resolved server-side. The id alone would make every page re-solve it through `GET /users`, which a manager cannot read — so a manager would see a bare uuid.
              * @default
              */
             created_by_name: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Is Current */
             is_current: boolean;
-            /** Is Mandatory */
             is_mandatory: boolean;
-            /** Min Api Level */
             min_api_level: number;
-            /**
-             * Published At
-             * @description NULL means uploaded but not published — reaches nobody.
-             */
+            /** @description NULL means uploaded but not published — reaches nobody. */
             published_at: string | null;
-            /** Release Notes Uz */
             release_notes_uz: string | null;
-            /**
-             * Size Bytes
-             * Format: int64
-             */
+            /** Format: int64 */
             size_bytes: number;
             variant: components["schemas"]["AppVariant"];
-            /** Version */
             version: string;
-            /** Version Code */
             version_code: number;
         };
         /**
@@ -1335,41 +1377,22 @@ export interface components {
          * @description Full history for a number — this is the timeline the agent page renders.
          */
         AssignmentListResponse: {
-            /** Items */
             items: components["schemas"]["AssignmentResponse"][];
-            /** Total */
             total: number;
         };
         /** AssignmentResponse */
         AssignmentResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Note */
             note: string | null;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
-            /**
-             * Valid From
-             * Format: date-time
-             */
+            /** Format: date-time */
             valid_from: string;
-            /** Valid To */
             valid_to: string | null;
         };
         /**
@@ -1381,7 +1404,6 @@ export interface components {
          *     mistake six months later.
          */
         AttestRequest: {
-            /** Reason */
             reason: string;
         };
         /**
@@ -1415,9 +1437,7 @@ export interface components {
         AuditAction: "login_succeeded" | "login_failed" | "logout" | "password_changed" | "password_reset" | "user_created" | "user_updated" | "user_deactivated" | "agent_created" | "agent_updated" | "agent_archived" | "agents_imported" | "number_created" | "number_updated" | "assignment_created" | "assignment_closed" | "calls_reattributed" | "enrolment_code_issued" | "enrolment_code_revoked" | "installation_attested" | "installation_self_declared" | "installation_revoked" | "installation_rebound" | "command_issued" | "call_note_updated" | "calls_exported" | "audio_play" | "audio_download" | "audio_deleted" | "alert_acknowledged" | "setting_updated" | "retention_changed" | "line_directory_updated" | "supported_model_updated" | "app_version_uploaded" | "app_version_published" | "service_token_created" | "service_token_revoked" | "export_read";
         /** AuditListResponse */
         AuditListResponse: {
-            /** Items */
             items: components["schemas"]["AuditResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -1426,59 +1446,34 @@ export interface components {
          */
         AuditResponse: {
             action: components["schemas"]["AuditAction"];
-            /** Actor Service Token Id */
             actor_service_token_id: string | null;
             actor_type: components["schemas"]["ActorType"];
-            /** Actor User Id */
             actor_user_id: string | null;
-            /**
-             * At
-             * Format: date-time
-             */
+            /** Format: date-time */
             at: string;
-            /**
-             * Detail
-             * @description Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply.
-             */
+            /** @description Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply. */
             detail?: Record<string, unknown> | null;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Ip */
             ip: string | null;
-            /** Object Id */
             object_id: string | null;
-            /** Object Type */
             object_type: string;
-            /** User Agent */
             user_agent: string | null;
         };
         /** Body_upload_version_api_v1_app_versions_post */
         Body_upload_version_api_v1_app_versions_post: {
             /**
-             * Apk
              * Format: binary
              * @description The signed APK.
              */
             apk: string;
-            /**
-             * Is Mandatory
-             * @default false
-             */
+            /** @default false */
             is_mandatory: boolean;
-            /**
-             * Min Api Level
-             * @default 26
-             */
+            /** @default 26 */
             min_api_level: number;
-            /** Release Notes Uz */
             release_notes_uz?: string | null;
             variant: components["schemas"]["AppVariant"];
-            /** Version */
             version: string;
-            /** Version Code */
             version_code: number;
         };
         /**
@@ -1495,35 +1490,21 @@ export interface components {
         CallAudioSummary: {
             /** @description Closed enum, never free text (N5). */
             audio_missing_reason?: components["schemas"]["AudioMissingReason"] | null;
-            /**
-             * Available
-             * @description Playable now — stored and not yet expired.
-             */
+            /** @description Playable now — stored and not yet expired. */
             available: boolean;
             /** @description Which strategy produced it (S1, M0, UC-23). */
             capture_route?: components["schemas"]["CaptureRoute"] | null;
-            /**
-             * Capture Route Detail
-             * @description The folder name only, never a path from the phone.
-             */
+            /** @description The folder name only, never a path from the phone. */
             capture_route_detail?: string | null;
             /**
-             * Duration Mismatch
              * @description The file's length disagrees with the call log (UC-14).
              * @default false
              */
             duration_mismatch: boolean;
-            /** Duration Ms */
             duration_ms?: number | null;
-            /**
-             * Expired At
-             * @description Removed by retention; playback answers 410 (UC-26).
-             */
+            /** @description Removed by retention; playback answers 410 (UC-26). */
             expired_at?: string | null;
-            /**
-             * Url
-             * @description Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43).
-             */
+            /** @description Path to stream from, present only when the recording is available. A path and never a signed or public URL (N20): the endpoint is token-protected, and the panel reaches it through the Service Worker bridge because a plain <audio src> cannot send an Authorization header (T153, N43). */
             url?: string | null;
         };
         /**
@@ -1553,13 +1534,9 @@ export interface components {
          *     500k table is affordable once per filter change and not once per page.
          */
         CallListResponse: {
-            /** Has More */
             has_more: boolean;
-            /** Items */
             items: components["schemas"]["CallResponse"][];
-            /** Next Cursor */
             next_cursor: string | null;
-            /** Total */
             total?: number | null;
         };
         /**
@@ -1572,91 +1549,49 @@ export interface components {
          *     panel cannot show.
          */
         CallResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /**
-             * Agent Name
-             * @description Resolved server-side; the panel renders it.
-             */
+            /** @description Resolved server-side; the panel renders it. */
             agent_name: string;
-            /** Answered At */
             answered_at: string | null;
             app_variant: components["schemas"]["AppVariant"];
-            /** App Version */
             app_version: string;
             audio: components["schemas"]["CallAudioSummary"];
-            /** Audio Duration Mismatch */
             audio_duration_mismatch: boolean;
             audio_missing_reason: components["schemas"]["AudioMissingReason"] | null;
             call_type: components["schemas"]["CallType"];
-            /** Clock Skew Sec */
             clock_skew_sec: number;
-            /** Contact Name */
             contact_name: string | null;
-            /**
-             * Device Model
-             * @description 'Xiaomi Redmi Note 12'. The device_model filter needs it.
-             */
+            /** @description 'Xiaomi Redmi Note 12'. The device_model filter needs it. */
             device_model?: string | null;
-            /** Device Timezone */
             device_timezone: string;
             direction: components["schemas"]["CallDirection"];
             disposition: components["schemas"]["CallDisposition"];
-            /** Duration Sec */
             duration_sec: number;
-            /** Ended At */
             ended_at: string | null;
-            /** Has Audio */
             has_audio: boolean;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
-            /** Note */
             note: string | null;
-            /**
-             * Number E164
-             * @description The registered line the call happened on.
-             */
+            /** @description The registered line the call happened on. */
             number_e164: string;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
             /**
-             * Received At
              * Format: date-time
              * @description Authoritative for ordering (N36).
              */
             received_at: string;
-            /** Reconciled With Call Log */
             reconciled_with_call_log: boolean;
-            /** Remote Number */
             remote_number: string | null;
-            /** Remote Number Key */
             remote_number_key: string | null;
-            /** Ring Sec */
             ring_sec: number | null;
-            /**
-             * Seq
-             * Format: int64
-             */
+            /** Format: int64 */
             seq: number;
             source: components["schemas"]["CallSource"];
-            /**
-             * Started At
-             * Format: date-time
-             */
+            /** Format: date-time */
             started_at: string;
         };
         /**
@@ -1665,6 +1600,56 @@ export interface components {
          * @enum {string}
          */
         CallSource: "live_capture" | "call_log_recovery" | "provider";
+        /**
+         * CallStatsBucket
+         * @description One point on the x-axis: UC-11's five classes, counted.
+         *
+         *     Every bucket in the window is returned, including the empty ones. A chart
+         *     that receives only the days something happened draws a straight line
+         *     through a silent week, which is the one thing this chart exists to show.
+         */
+        CallStatsBucket: {
+            /**
+             * Format: date
+             * @description Asia/Tashkent calendar date, inclusive.
+             */
+            date_from: string;
+            /**
+             * Format: date
+             * @description Inclusive, and equal to date_from for a daily bucket. The last bucket is clipped to today, so a part-month is not drawn as a whole one.
+             */
+            date_to: string;
+            /** @default 0 */
+            incoming_answered: number;
+            /** @default 0 */
+            missed: number;
+            /** @default 0 */
+            no_answer: number;
+            /** @default 0 */
+            outgoing_answered: number;
+            /** @default 0 */
+            rejected: number;
+            /**
+             * @description Every call in the bucket, which is what the same filter returns from /calls — not necessarily the sum of the five classes.
+             * @default 0
+             */
+            total: number;
+        };
+        /**
+         * CallStatsResponse
+         * @description ``GET /api/v1/calls/stats`` — the call flow the dashboard draws.
+         */
+        CallStatsResponse: {
+            buckets: components["schemas"]["CallStatsBucket"][];
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            /** @enum {string} */
+            granularity: "day" | "month";
+            /** @enum {string} */
+            period: "week" | "month" | "year" | "custom";
+        };
         /**
          * CallType
          * @description Internal vs external (UC-25). ``unknown`` is the mandatory default.
@@ -1692,20 +1677,19 @@ export interface components {
         /**
          * CapabilityStateResponse
          * @description One capability's current state, as the panel's matrix renders it.
+         *
+         *     A **required** capability the phone has never reported appears here as
+         *     ``unknown`` with null timestamps, rather than being absent. Absence made
+         *     the page show every row green while ``capturing`` was false, with nothing
+         *     on screen saying which capability was missing — and a phone stuck part-way
+         *     through E2 is exactly that shape.
          */
         CapabilityStateResponse: {
             capability: components["schemas"]["Capability"];
-            /**
-             * Changed At
-             * Format: date-time
-             */
-            changed_at: string;
-            /**
-             * Checked At
-             * Format: date-time
-             */
-            checked_at: string;
-            /** Detail */
+            /** @description Null until there is a state to have changed from. */
+            changed_at?: string | null;
+            /** @description Null when this capability has never been checked. */
+            checked_at?: string | null;
             detail: string | null;
             state: components["schemas"]["CapabilityState"];
         };
@@ -1722,15 +1706,9 @@ export interface components {
          * @description ``POST /api/v1/auth/password`` — the user's own password.
          */
         ChangePasswordRequest: {
-            /**
-             * Current Password
-             * @description Wrong value gives 401.
-             */
+            /** @description Wrong value gives 401. */
             current_password: string;
-            /**
-             * New Password
-             * @description Minimum 10 characters and no other composition rule (SPEC §4.7): a rule people cannot follow is a rule they write on a sticky note.
-             */
+            /** @description Minimum 10 characters and no other composition rule (SPEC §4.7): a rule people cannot follow is a rule they write on a sticky note. */
             new_password: string;
         };
         /**
@@ -1738,10 +1716,8 @@ export interface components {
          * @description ``PATCH /api/v1/assignments/{id}`` — end a holding period.
          */
         CloseAssignmentRequest: {
-            /** Note */
             note?: string | null;
             /**
-             * Valid To
              * Format: date-time
              * @description Must be after valid_from.
              */
@@ -1761,45 +1737,25 @@ export interface components {
         CommandKind: "dial" | "config" | "logout" | "ping" | "recheck";
         /** CommandListResponse */
         CommandListResponse: {
-            /** Items */
             items: components["schemas"]["CommandResponse"][];
-            /** Total */
             total: number;
         };
         /** CommandResponse */
         CommandResponse: {
-            /** Acked At */
             acked_at: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
+            /** Format: date-time */
             expires_at: string;
             failure_reason: components["schemas"]["CommandFailureReason"] | null;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
             kind: components["schemas"]["CommandKind"];
-            /**
-             * Latency Ms
-             * @description acked_at - created_at, stored so UC-16's five-second bar is **measured** rather than assumed. R3 flags that bar as possibly unachievable on doze-restricted OEMs; this column is what turns that into a conversation with evidence.
-             */
+            /** @description acked_at - created_at, stored so UC-16's five-second bar is **measured** rather than assumed. R3 flags that bar as possibly unachievable on doze-restricted OEMs; this column is what turns that into a conversation with evidence. */
             latency_ms: number | null;
-            /** Result Call Id */
             result_call_id: string | null;
-            /** Sent At */
             sent_at: string | null;
             status: components["schemas"]["CommandStatus"];
         };
@@ -1813,18 +1769,11 @@ export interface components {
          * @description ``POST /api/v1/agents``. Creating an agent never creates a login.
          */
         CreateAgentRequest: {
-            /** Color */
             color?: string | null;
-            /**
-             * Employee Code
-             * @description The roster import key; unique where set.
-             */
+            /** @description The roster import key; unique where set. */
             employee_code?: string | null;
-            /** Full Name */
             full_name: string;
-            /** Hired At */
             hired_at?: string | null;
-            /** Note */
             note?: string | null;
         };
         /**
@@ -1832,22 +1781,12 @@ export interface components {
          * @description ``POST /api/v1/numbers/{id}/assignments`` — hand a line to an agent.
          */
         CreateAssignmentRequest: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /** Note */
             note?: string | null;
-            /**
-             * Valid From
-             * @description Defaults to now. The period is [valid_from, valid_to).
-             */
+            /** @description Defaults to now. The period is [valid_from, valid_to). */
             valid_from?: string | null;
-            /**
-             * Valid To
-             * @description NULL means open-ended — they hold it now.
-             */
+            /** @description NULL means open-ended — they hold it now. */
             valid_to?: string | null;
         };
         /**
@@ -1856,12 +1795,8 @@ export interface components {
          */
         CreateCommandRequest: {
             kind: components["schemas"]["CommandKind"];
-            /**
-             * Number
-             * @description For kind='dial'. Named, not a free-form payload map (§8).
-             */
+            /** @description For kind='dial'. Named, not a free-form payload map (§8). */
             number?: string | null;
-            /** Reason */
             reason?: string | null;
         };
         /**
@@ -1870,12 +1805,8 @@ export interface components {
          */
         CreateDirectoryEntryRequest: {
             kind: components["schemas"]["DirectoryRuleKind"];
-            /** Label */
             label?: string | null;
-            /**
-             * Pattern
-             * @description Digits to match. UC-25's '*700' is the suffix rule '700'.
-             */
+            /** @description Digits to match. UC-25's '*700' is the suffix rule '700'. */
             pattern: string;
         };
         /**
@@ -1887,20 +1818,12 @@ export interface components {
          *     ``phone_key`` column, not on this string.
          */
         CreateNumberRequest: {
-            /**
-             * E164
-             * @description Any format; normalised here.
-             */
+            /** @description Any format; normalised here. */
             e164: string;
-            /** Label */
             label?: string | null;
-            /**
-             * Operator
-             * @description beeline | ucell | mobiuz | uzmobile | other. A reporting axis (R19).
-             */
+            /** @description beeline | ucell | mobiuz | uzmobile | other. A reporting axis (R19). */
             operator?: string | null;
             /**
-             * Sim Owner
              * @description R10: which SIM relationships are not Bonvi's to keep.
              * @default company
              */
@@ -1911,19 +1834,11 @@ export interface components {
          * @description ``POST /api/v1/users`` — creates a **login**, not a salesperson.
          */
         CreateUserRequest: {
-            /**
-             * Agent Id
-             * @description Required when role='sales' — it is what own-scope narrowing filters on, and the database has a CHECK saying so.
-             */
+            /** @description Required when role='sales' — it is what own-scope narrowing filters on, and the database has a CHECK saying so. */
             agent_id?: string | null;
-            /**
-             * Email
-             * Format: email
-             */
+            /** Format: email */
             email: string;
-            /** Full Name */
             full_name: string;
-            /** Password */
             password: string;
             role: components["schemas"]["UserRole"];
         };
@@ -1936,42 +1851,23 @@ export interface components {
          *     thing to forget to update.
          */
         CurrentUserResponse: {
-            /**
-             * Agent Id
-             * @description Set for a 'sales' account; what own-scope filters on.
-             */
+            /** @description Set for a 'sales' account; what own-scope filters on. */
             agent_id?: string | null;
-            /** Email */
             email: string;
-            /** Full Name */
             full_name: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Must Change Password
-             * @description The panel forces the change before anything else loads.
-             */
+            /** @description The panel forces the change before anything else loads. */
             must_change_password: boolean;
-            /**
-             * Permissions
-             * @description Resolved from the role, sorted.
-             */
+            /** @description Resolved from the role, sorted. */
             permissions: string[];
             role: components["schemas"]["UserRole"];
         };
         /** DataUsageResponse */
         DataUsageResponse: {
-            /**
-             * Cap Bytes Month
-             * Format: int64
-             */
+            /** Format: int64 */
             cap_bytes_month: number;
-            /** Items */
             items: components["schemas"]["DataUsageRowOut"][];
-            /** Total */
             total: number;
         };
         /**
@@ -1979,34 +1875,17 @@ export interface components {
          * @description One installation's traffic against the cap the employee pays for.
          */
         DataUsageRowOut: {
-            /** Agent Name */
             agent_name: string;
-            /**
-             * Cap Bytes Month
-             * Format: int64
-             */
+            /** Format: int64 */
             cap_bytes_month: number;
-            /**
-             * Cellular Bytes Month
-             * Format: int64
-             */
+            /** Format: int64 */
             cellular_bytes_month: number;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
-            /**
-             * Over Cap
-             * @description Past N14's cap: the app stops uploading audio over cellular.
-             */
+            /** @description Past N14's cap: the app stops uploading audio over cellular. */
             over_cap: boolean;
-            /** Requests Month */
             requests_month: number;
-            /**
-             * Wifi Bytes Month
-             * Format: int64
-             */
+            /** Format: int64 */
             wifi_bytes_month: number;
         };
         /**
@@ -2014,103 +1893,60 @@ export interface components {
          * @description Device health plus its capability matrix (UC-17's device page).
          */
         DeviceDetailResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /** Android Release */
             android_release: string | null;
-            /** Api Level */
             api_level: number | null;
             app_variant: components["schemas"]["AppVariant"] | null;
-            /** App Version */
             app_version: string | null;
-            /** Battery Charging */
             battery_charging: boolean | null;
-            /** Battery Level */
             battery_level: number | null;
-            /** Battery Optimisation Exempt */
             battery_optimisation_exempt: boolean | null;
-            /**
-             * Capabilities
-             * @description Empty for a phone that has never reported — not missing.
-             */
+            /** @description When this installation was bound to the number. */
+            bound_at?: string | null;
+            /** @description Empty for a phone that has never reported — not missing. */
             capabilities?: components["schemas"]["CapabilityStateResponse"][];
-            /** Capture Enabled */
             capture_enabled: boolean | null;
             /**
-             * Capturing
              * @description UC-03's never-false-ready rule: every required capability working, a verified installation and a live service. One function computes it, so the phone and the panel cannot disagree.
              * @default false
              */
             capturing: boolean;
-            /** Cellular Bytes Month */
             cellular_bytes_month: number | null;
-            /** Clock Skew Sec */
             clock_skew_sec: number | null;
-            /** Device Timezone */
+            /** @description When the row was created. With `installation_status` it is what distinguishes a live binding from one superseded an hour ago. */
+            created_at?: string | null;
             device_timezone: string | null;
-            /** Free Storage Bytes */
             free_storage_bytes: number | null;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
             installation_status: components["schemas"]["InstallationStatus"];
-            /**
-             * Is Online
-             * @description Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.
-             */
+            /** @description Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs. */
             is_online: boolean;
-            /** Last Call At */
             last_call_at: string | null;
-            /** Last Heartbeat At */
             last_heartbeat_at: string | null;
-            /** Manufacturer */
             manufacturer: string | null;
-            /** Model */
             model: string | null;
             network_type: components["schemas"]["NetworkType"] | null;
-            /**
-             * Never Reported
-             * @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.
-             */
+            /** @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with. */
             never_reported: boolean;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
-            /** Parked Records */
             parked_records: number | null;
-            /** Power Save Mode */
             power_save_mode: boolean | null;
-            /** Queue Bytes */
             queue_bytes: number | null;
-            /** Queue Oldest At */
             queue_oldest_at: string | null;
-            /** Queue Records */
             queue_records: number | null;
             recording_route: components["schemas"]["CaptureRoute"] | null;
-            /** Recording Route Ok */
             recording_route_ok: boolean | null;
-            /** Service Running */
             service_running: boolean | null;
-            /** Updated At */
             updated_at: string | null;
-            /**
-             * Ws Connected
-             * @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.
-             */
+            /** @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine. */
             ws_connected?: boolean | null;
         };
         /** DeviceHealthListResponse */
         DeviceHealthListResponse: {
-            /** Items */
             items: components["schemas"]["DeviceHealthResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -2118,112 +1954,66 @@ export interface components {
          * @description Every UC-17 field, plus the identity the panel needs to name a person.
          */
         DeviceHealthResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /** Android Release */
             android_release: string | null;
-            /** Api Level */
             api_level: number | null;
             app_variant: components["schemas"]["AppVariant"] | null;
-            /** App Version */
             app_version: string | null;
-            /** Battery Charging */
             battery_charging: boolean | null;
-            /** Battery Level */
             battery_level: number | null;
-            /** Battery Optimisation Exempt */
             battery_optimisation_exempt: boolean | null;
-            /** Capture Enabled */
+            /** @description When this installation was bound to the number. */
+            bound_at?: string | null;
             capture_enabled: boolean | null;
-            /** Cellular Bytes Month */
+            /** @description Whether this phone is recording **right now**: every required capability working, the installation verified, the service alive (UC-03). Never null — a phone that has told us nothing is not recording, and a null here reads as 'no problem' to any check asking whether it is false. */
+            capturing: boolean;
             cellular_bytes_month: number | null;
-            /** Clock Skew Sec */
             clock_skew_sec: number | null;
-            /** Device Timezone */
+            /** @description When the row was created. With `installation_status` it is what distinguishes a live binding from one superseded an hour ago. */
+            created_at?: string | null;
             device_timezone: string | null;
-            /** Free Storage Bytes */
             free_storage_bytes: number | null;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
             installation_status: components["schemas"]["InstallationStatus"];
-            /**
-             * Is Online
-             * @description Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs.
-             */
+            /** @description Derived, never stored: last_heartbeat_at is inside the alerts.device_offline_minutes window. Storing it would need a job to keep it false, and it would be wrong between runs. */
             is_online: boolean;
-            /** Last Call At */
             last_call_at: string | null;
-            /** Last Heartbeat At */
             last_heartbeat_at: string | null;
-            /** Manufacturer */
             manufacturer: string | null;
-            /** Model */
             model: string | null;
             network_type: components["schemas"]["NetworkType"] | null;
-            /**
-             * Never Reported
-             * @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with.
-             */
+            /** @description Bound and never sent a heartbeat. Kept distinct from ``is_online: false`` because the next action differs: never started is a person waiting for help right now; worked once and stopped is a phone in a lift or a battery manager to argue with. */
             never_reported: boolean;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
-            /** Parked Records */
             parked_records: number | null;
-            /** Power Save Mode */
             power_save_mode: boolean | null;
-            /** Queue Bytes */
             queue_bytes: number | null;
-            /** Queue Oldest At */
             queue_oldest_at: string | null;
-            /** Queue Records */
             queue_records: number | null;
             recording_route: components["schemas"]["CaptureRoute"] | null;
-            /** Recording Route Ok */
             recording_route_ok: boolean | null;
-            /** Service Running */
             service_running: boolean | null;
-            /** Updated At */
             updated_at: string | null;
-            /**
-             * Ws Connected
-             * @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine.
-             */
+            /** @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine. */
             ws_connected?: boolean | null;
         };
         /** DirectoryEntryListResponse */
         DirectoryEntryListResponse: {
-            /** Items */
             items: components["schemas"]["DirectoryEntryResponse"][];
-            /** Total */
             total: number;
         };
         /** DirectoryEntryResponse */
         DirectoryEntryResponse: {
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Is Active */
             is_active: boolean;
             kind: components["schemas"]["DirectoryRuleKind"];
-            /** Label */
             label: string | null;
-            /** Pattern */
             pattern: string;
         };
         /**
@@ -2240,9 +2030,7 @@ export interface components {
         EnrolmentAttemptKind: "code_redeem" | "msisdn_check" | "callback_start" | "callback_match" | "admin_attest" | "step_timing";
         /** EnrolmentAttemptListResponse */
         EnrolmentAttemptListResponse: {
-            /** Items */
             items: components["schemas"]["EnrolmentAttemptResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -2250,38 +2038,23 @@ export interface components {
          * @description Where UC-01's failures appear, with timestamps.
          */
         EnrolmentAttemptResponse: {
-            /** Agent Id */
             agent_id: string | null;
-            /** App Version */
             app_version: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /** Device Model */
             device_model: string | null;
-            /** Duration Ms */
             duration_ms: number | null;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Installation Id */
             installation_id: string | null;
             kind: components["schemas"]["EnrolmentAttemptKind"];
-            /** Number Id */
             number_id: string | null;
             outcome: components["schemas"]["EnrolmentOutcome"];
-            /** Step */
             step: string | null;
         };
         /** EnrolmentCodeListResponse */
         EnrolmentCodeListResponse: {
-            /** Items */
             items: components["schemas"]["EnrolmentCodeResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -2289,38 +2062,19 @@ export interface components {
          * @description The code plus everything the admin has to pass on.
          */
         EnrolmentCodeResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /** Attempt Count */
             attempt_count: number;
-            /** Code */
             code: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
+            /** Format: date-time */
             expires_at: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
-            /** Redeemed At */
             redeemed_at: string | null;
-            /** Revoked At */
             revoked_at: string | null;
         };
         /**
@@ -2329,6 +2083,34 @@ export interface components {
          * @enum {string}
          */
         EnrolmentOutcome: "ok" | "code_not_found" | "code_already_used" | "code_expired" | "code_revoked" | "number_mismatch" | "msisdn_empty" | "no_caller_id" | "timeout" | "receiver_down" | "already_bound" | "rejected";
+        /**
+         * ErrorBody
+         * @description The body of every non-2xx answer (N35, SPEC §4.0).
+         *
+         *     A model rather than a fragment hand-written in the exporter, so the shape
+         *     clients generate against is the shape ``main.error_envelope`` builds.
+         *     ``tests/test_conformance.py`` drives real requests through both.
+         */
+        ErrorBody: {
+            /** @description The stable machine value. Clients branch on this. */
+            code: string;
+            /**
+             * @description Machine-readable context; its shape follows `code`.
+             * @default null
+             */
+            detail: unknown;
+            /** @description Uzbek, for a person. Never branched on (§4.0). */
+            message: string;
+            /** @description Echoed from X-Request-Id; quote it in a bug report. */
+            request_id: string;
+        };
+        /**
+         * ErrorResponse
+         * @description ``{"error": {...}}`` — the envelope itself, and the only error shape.
+         */
+        ErrorResponse: {
+            error: components["schemas"]["ErrorBody"];
+        };
         /**
          * FunnelStage
          * @description Where an agent is in the rollout (UC-17, SPEC §10.1).
@@ -2341,53 +2123,29 @@ export interface components {
         FunnelStage: "invited" | "installed" | "permitted" | "number_verified" | "verified_by_admin" | "self_declared" | "capturing" | "needs_assisted_install" | "install_disappeared" | "revoked";
         /** GapByAgentOut */
         GapByAgentOut: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
-            /** Agent Name */
             agent_name: string;
-            /** Answered Calls */
             answered_calls: number;
-            /** Calls With Audio */
             calls_with_audio: number;
-            /**
-             * Capture Rate
-             * @description Percent. NUMERIC, never float.
-             */
+            /** @description Percent. NUMERIC, never float. */
             capture_rate: string | null;
         };
         /** GapByModelOut */
         GapByModelOut: {
-            /** Answered Calls */
             answered_calls: number;
-            /**
-             * Api Level
-             * @description Part of the M0 baseline's identity.
-             */
+            /** @description Part of the M0 baseline's identity. */
             api_level: number;
             /** @description Capture rate is per variant, not only per model (D-06). */
             app_variant: components["schemas"]["AppVariant"];
-            /**
-             * Baseline Rate
-             * @description From the M0 baseline (T14).
-             */
+            /** @description From the M0 baseline (T14). */
             baseline_rate: string | null;
-            /** Calls With Audio */
             calls_with_audio: number;
-            /** Capture Rate */
             capture_rate: string | null;
-            /**
-             * Delta Pp
-             * @description Below the threshold raises N4's alert.
-             */
+            /** @description Below the threshold raises N4's alert. */
             delta_pp: string | null;
-            /** Manufacturer */
             manufacturer: string;
-            /** Model */
             model: string;
-            /** Regression */
             regression: boolean;
         };
         /**
@@ -2395,12 +2153,8 @@ export interface components {
          * @description Why audio is missing, and how often. The closed enum, never free text.
          */
         GapByReasonOut: {
-            /** Calls */
             calls: number;
-            /**
-             * Counts Against Capture Rate
-             * @description ``pending_upload`` and ``not_expected`` are excluded from the denominator: an unanswered call in it makes '% of answered calls with audio' meaningless (SPEC §3.9).
-             */
+            /** @description ``pending_upload`` and ``not_expected`` are excluded from the denominator: an unanswered call in it makes '% of answered calls with audio' meaningless (SPEC §3.9). */
             counts_against_capture_rate: boolean;
             reason: components["schemas"]["AudioMissingReason"];
         };
@@ -2409,24 +2163,14 @@ export interface components {
          * @description UC-23. Totals reconcile exactly with ``/calls?has_audio=false``.
          */
         GapReportResponse: {
-            /** Answered Calls */
             answered_calls: number;
-            /** By Agent */
             by_agent: components["schemas"]["GapByAgentOut"][];
-            /** By Model */
             by_model: components["schemas"]["GapByModelOut"][];
-            /** By Reason */
             by_reason: components["schemas"]["GapByReasonOut"][];
-            /** Calls With Audio */
             calls_with_audio: number;
-            /** Capture Rate */
             capture_rate: string | null;
-            /**
-             * Missing Total
-             * @description Matches the filtered call list, because the same rows are counted.
-             */
+            /** @description Matches the filtered call list, because the same rows are counted. */
             missing_total: number;
-            /** Open Deltas */
             open_deltas: components["schemas"]["OpenDeltaOut"][];
         };
         /**
@@ -2434,16 +2178,8 @@ export interface components {
          * @description Process liveness.
          */
         HealthResponse: {
-            /**
-             * Status
-             * @description Always 'ok' when the process is serving.
-             */
+            /** @description Always 'ok' when the process is serving. */
             status: string;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
         };
         /**
          * ImportAgentsRequest
@@ -2454,13 +2190,9 @@ export interface components {
          *     and asking somebody to save a file first is a step that fails.
          */
         ImportAgentsRequest: {
-            /**
-             * Csv
-             * @description Header row plus data: full_name[,employee_code[,hired_at]].
-             */
+            /** @description Header row plus data: full_name[,employee_code[,hired_at]]. */
             csv: string;
             /**
-             * Dry Run
              * @description Default true, deliberately: the diff is shown before anything is written, because a roster import that half-succeeded is worse than one that did not run.
              * @default true
              */
@@ -2468,17 +2200,11 @@ export interface components {
         };
         /** ImportAgentsResponse */
         ImportAgentsResponse: {
-            /** Created */
             created: number;
-            /** Dry Run */
             dry_run: boolean;
-            /** Errors */
             errors: number;
-            /** Rows */
             rows: components["schemas"]["ImportRowResult"][];
-            /** Skipped */
             skipped: number;
-            /** Updated */
             updated: number;
         };
         /**
@@ -2486,28 +2212,17 @@ export interface components {
          * @description What would happen, or did happen, to one roster line.
          */
         ImportRowResult: {
-            /**
-             * Action
-             * @description create | update | skip | error
-             */
+            /** @description create | update | skip | error */
             action: string;
-            /** Employee Code */
             employee_code: string | null;
-            /** Full Name */
             full_name: string;
-            /** Line */
             line: number;
-            /**
-             * Reason
-             * @description Why it was skipped or refused.
-             */
+            /** @description Why it was skipped or refused. */
             reason?: string | null;
         };
         /** InstallationListResponse */
         InstallationListResponse: {
-            /** Items */
             items: components["schemas"]["InstallationResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -2515,61 +2230,32 @@ export interface components {
          * @description One installation, as the panel reads it.
          */
         InstallationResponse: {
-            /**
-             * Agent Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             agent_id: string;
             app_variant: components["schemas"]["AppVariant"] | null;
-            /** App Version */
             app_version: string | null;
-            /** Attest Reason */
             attest_reason: string | null;
-            /** Bound At */
             bound_at: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /**
-             * Device Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             device_id: string;
-            /**
-             * Funnel Changed At
-             * Format: date-time
-             */
+            /** Format: date-time */
             funnel_changed_at: string;
             funnel_stage: components["schemas"]["FunnelStage"];
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Number Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             number_id: string;
-            /** Replaced At */
             replaced_at: string | null;
-            /** Revoke Confirmed At */
             revoke_confirmed_at: string | null;
-            /** Revoke Pending Bytes */
             revoke_pending_bytes: number | null;
-            /** Revoke Pending Records */
             revoke_pending_records: number | null;
-            /** Revoked At */
             revoked_at: string | null;
-            /** Sim Slot */
             sim_slot: number | null;
-            /** Sim Subscription Id */
             sim_subscription_id: number | null;
             status: components["schemas"]["InstallationStatus"];
             verification_method: components["schemas"]["VerificationMethod"] | null;
-            /** Verified At */
             verified_at: string | null;
         };
         /**
@@ -2583,16 +2269,9 @@ export interface components {
          * @description ``POST /api/v1/auth/login`` — public, rate-limited.
          */
         LoginRequest: {
-            /**
-             * Email
-             * Format: email
-             * @description Case-insensitive; the column is CITEXT.
-             */
+            /** @description The login identifier, matched verbatim against ``users.email``. Case-insensitive; the column is CITEXT. */
             email: string;
-            /**
-             * Password
-             * @description Never logged, never echoed.
-             */
+            /** @description Never logged, never echoed. */
             password: string;
         };
         /**
@@ -2600,39 +2279,20 @@ export interface components {
          * @description The user *and* their access token, so the panel needs one round trip.
          */
         LoginResponse: {
-            /** Access Token */
             access_token: string;
-            /**
-             * Agent Id
-             * @description Set for a 'sales' account; what own-scope filters on.
-             */
+            /** @description Set for a 'sales' account; what own-scope filters on. */
             agent_id?: string | null;
-            /** Email */
             email: string;
-            /** Expires In */
             expires_in: number;
-            /** Full Name */
             full_name: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /**
-             * Must Change Password
-             * @description The panel forces the change before anything else loads.
-             */
+            /** @description The panel forces the change before anything else loads. */
             must_change_password: boolean;
-            /**
-             * Permissions
-             * @description Resolved from the role, sorted.
-             */
+            /** @description Resolved from the role, sorted. */
             permissions: string[];
             role: components["schemas"]["UserRole"];
-            /**
-             * Token Type
-             * @default bearer
-             */
+            /** @default bearer */
             token_type: string;
         };
         /**
@@ -2642,37 +2302,21 @@ export interface components {
         NetworkType: "wifi" | "cellular" | "none";
         /** NumberListResponse */
         NumberListResponse: {
-            /** Items */
             items: components["schemas"]["NumberResponse"][];
-            /** Total */
             total: number;
         };
         /** NumberResponse */
         NumberResponse: {
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /** E164 */
             e164: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Is Active */
             is_active: boolean;
-            /** Label */
             label: string | null;
-            /** Operator */
             operator: string | null;
-            /**
-             * Phone Key
-             * @description Last 9 digits, generated by the database (N37).
-             */
+            /** @description Last 9 digits, generated by the database (N37). */
             phone_key: string;
-            /** Sim Owner */
             sim_owner: string;
         };
         /**
@@ -2680,49 +2324,66 @@ export interface components {
          * @description A device whose own call-log count never reconciled (N3, §4.1 B).
          */
         OpenDeltaOut: {
-            /** Agent Name */
             agent_name: string;
-            /** Delta */
             delta: number;
-            /** Device Counted */
             device_counted: number;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
-            /**
-             * Period Date
-             * Format: date
-             */
+            /** Format: date */
             period_date: string;
-            /**
-             * Subscription Unknown Count
-             * @description Never folded into either side of the rate — the fail-closed rule made visible.
-             */
+            /** @description Never folded into either side of the rate — the fail-closed rule made visible. */
             subscription_unknown_count: number;
-            /** Uploaded Count */
             uploaded_count: number;
+        };
+        /**
+         * PublicReleaseListResponse
+         * @description The current build of each variant. Empty before the first publish.
+         *
+         *     ``total`` can only ever be 0, 1 or 2 — there are two variants — and it is
+         *     here anyway, because every list response in this API carries the same two
+         *     fields and a generated client that has to special-case one of them is worse
+         *     than a field that is always ``len(items)``.
+         */
+        PublicReleaseListResponse: {
+            items: components["schemas"]["PublicReleaseResponse"][];
+            total: number;
+        };
+        /**
+         * PublicReleaseResponse
+         * @description One published build, as an anonymous visitor may see it.
+         *
+         *     A deliberately NARROW copy of :class:`AppVersionResponse` rather than a
+         *     reuse of it. That model carries ``created_by`` and ``created_by_name`` —
+         *     which member of staff uploaded the build — and a public page has no
+         *     business naming an employee. Widening this model is how that would happen
+         *     by accident, so it lists its fields rather than inheriting them.
+         *
+         *     Everything here is already public by another route: the bytes and their
+         *     SHA-256 come back from ``GET /api/v1/app/download/{version_code}``, which
+         *     SPEC §4.1 rule 5 makes public, and the version is printed inside the APK.
+         */
+        PublicReleaseResponse: {
+            /** @description So a download can be checked against what the server holds. */
+            apk_sha256: string;
+            min_api_level: number;
+            published_at: string | null;
+            release_notes_uz: string | null;
+            /** Format: int64 */
+            size_bytes: number;
+            variant: components["schemas"]["AppVariant"];
+            version: string;
+            version_code: number;
         };
         /**
          * ReadyResponse
          * @description Dependency readiness, one flag per dependency.
          */
         ReadyResponse: {
-            /**
-             * Database
-             * @description A trivial query succeeded.
-             */
+            /** @description A trivial query succeeded. */
             database: boolean;
-            /**
-             * Status
-             * @description 'ok' when every dependency is usable.
-             */
+            /** @description 'ok' when every dependency is usable. */
             status: string;
-            /**
-             * Storage
-             * @description The audio root exists and is writable.
-             */
+            /** @description The audio root exists and is writable. */
             storage: boolean;
         };
         /**
@@ -2743,88 +2404,25 @@ export interface components {
          */
         ReceiverStatusResponse: {
             /**
-             * Active Receivers
              * @description More than one is a configuration change, not code.
              * @default 0
              */
             active_receivers: number;
-            /**
-             * Enrolment Possible
-             * @description False means the rollout is stopped, not slow.
-             */
+            /** @description False means the rollout is stopped, not slow. */
             enrolment_possible: boolean;
-            /**
-             * Receiver Msisdn
-             * @description The number screen E5 shows the agent.
-             */
+            /** @description The number screen E5 shows the agent. */
             receiver_msisdn?: string | null;
-            /**
-             * Receiver Name
-             * @description Which gateway, for the admin to go and look at.
-             */
+            /** @description Which gateway, for the admin to go and look at. */
             receiver_name?: string | null;
             /** @description up | degraded | down. Down is 5 minutes without a heartbeat. */
             status: components["schemas"]["ReceiverStatus"];
-        };
-        /**
-         * PublicReleaseListResponse
-         * @description The current build of each variant. Empty before the first publish.
-         *
-         *     `total` can only ever be 0, 1 or 2 — there are two variants — and it is
-         *     here anyway, because every list response in this API carries the same two
-         *     fields and a generated client that has to special-case one of them is worse
-         *     than a field that is always `len(items)`.
-         */
-        PublicReleaseListResponse: {
-            /** Items */
-            items: components["schemas"]["PublicReleaseResponse"][];
-            /** Total */
-            total: number;
-        };
-        /**
-         * PublicReleaseResponse
-         * @description One published build, as an anonymous visitor may see it.
-         *
-         *     A deliberately NARROW copy of `AppVersionResponse` rather than a
-         *     reuse of it. That model carries `created_by` and `created_by_name` —
-         *     which member of staff uploaded the build — and a public page has no
-         *     business naming an employee.
-         */
-        PublicReleaseResponse: {
-            /**
-             * Apk Sha256
-             * @description So a download can be checked against what the server holds.
-             */
-            apk_sha256: string;
-            /** Min Api Level */
-            min_api_level: number;
-            /**
-             * Published At
-             * Format: date-time
-             */
-            published_at: string | null;
-            /** Release Notes Uz */
-            release_notes_uz: string | null;
-            /**
-             * Size Bytes
-             * Format: int64
-             */
-            size_bytes: number;
-            variant: components["schemas"]["AppVariant"];
-            /** Version */
-            version: string;
-            /** Version Code */
-            version_code: number;
         };
         /**
          * ReclassifyResponse
          * @description A directory change is only half done until the calls agree with it.
          */
         ReclassifyResponse: {
-            /**
-             * Calls Reclassified
-             * @description Calls whose call_type changed as a result of this edit.
-             */
+            /** @description Calls whose call_type changed as a result of this edit. */
             calls_reclassified: number;
             entry: components["schemas"]["DirectoryEntryResponse"];
         };
@@ -2833,7 +2431,6 @@ export interface components {
          * @description ``POST /api/v1/installations/{id}/revoke`` (UC-08).
          */
         RevokeRequest: {
-            /** Reason */
             reason?: string | null;
         };
         /**
@@ -2845,21 +2442,12 @@ export interface components {
          *     back and says the local audio is gone.
          */
         RevokeResponse: {
-            /** Confirmed */
             confirmed: boolean;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
-            /** Pending Bytes */
             pending_bytes: number | null;
-            /** Pending Records */
             pending_records: number | null;
-            /**
-             * Revoked At
-             * Format: date-time
-             */
+            /** Format: date-time */
             revoked_at: string;
             status: components["schemas"]["InstallationStatus"];
         };
@@ -2872,19 +2460,13 @@ export interface components {
          *     looking and deciding, which is when the admin's picture is stale.
          */
         SetMinimumVersionRequest: {
-            /**
-             * Acknowledged Stranded
-             * @description The stranded count you just saw. Must still be true.
-             */
+            /** @description The stranded count you just saw. Must still be true. */
             acknowledged_stranded: number;
-            /** Version Code */
             version_code: number;
         };
         /** SetMinimumVersionResponse */
         SetMinimumVersionResponse: {
-            /** Stranded Count */
             stranded_count: number;
-            /** Version Code */
             version_code: number;
         };
         /**
@@ -2892,32 +2474,21 @@ export interface components {
          * @description ``POST /api/v1/users/{id}/password`` — an admin resetting somebody else's.
          */
         SetPasswordRequest: {
-            /** Password */
             password: string;
         };
         /** SettingListResponse */
         SettingListResponse: {
-            /** Items */
             items: components["schemas"]["SettingResponse"][];
-            /** Total */
             total: number;
         };
         /** SettingResponse */
         SettingResponse: {
-            /** Description Uz */
             description_uz: string | null;
-            /** Key */
             key: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
+            /** Format: date-time */
             updated_at: string;
-            /** Updated By */
             updated_by: string | null;
-            /** Value */
             value: unknown;
-            /** Value Type */
             value_type: string;
         };
         /**
@@ -2925,27 +2496,14 @@ export interface components {
          * @description One day of the growth curve.
          */
         StoragePointOut: {
-            /**
-             * Audio Bytes Total
-             * Format: int64
-             */
+            /** Format: int64 */
             audio_bytes_total: number;
-            /** Audio Files */
             audio_files: number;
-            /**
-             * Bytes Added
-             * Format: int64
-             */
+            /** Format: int64 */
             bytes_added: number;
-            /**
-             * Bytes Deleted
-             * Format: int64
-             */
+            /** Format: int64 */
             bytes_deleted: number;
-            /**
-             * Period Date
-             * Format: date
-             */
+            /** Format: date */
             period_date: string;
         };
         /**
@@ -2953,22 +2511,13 @@ export interface components {
          * @description N18: current usage, 30-day growth, and the projection it implies.
          */
         StorageReportResponse: {
-            /**
-             * Audio Bytes Total
-             * Format: int64
-             */
+            /** Format: int64 */
             audio_bytes_total: number;
-            /** Audio Files */
             audio_files: number;
-            /**
-             * Bytes Added 30D
-             * Format: int64
-             */
+            /** Format: int64 */
             bytes_added_30d: number;
-            /** History */
             history: components["schemas"]["StoragePointOut"][];
             /**
-             * Projected Bytes 12M
              * Format: int64
              * @description Today's total plus a year at the last 30 days' rate. The provision is 250 GB, and this is what says whether that is enough.
              */
@@ -2979,20 +2528,12 @@ export interface components {
          * @description One phone a proposed minimum version would refuse.
          */
         StrandedInstallationOut: {
-            /** Agent Name */
             agent_name: string;
-            /** App Version */
             app_version: string | null;
-            /** App Version Code */
             app_version_code: number | null;
-            /** Device */
             device: string;
-            /**
-             * Installation Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             installation_id: string;
-            /** Last Heartbeat At */
             last_heartbeat_at: string | null;
             status: components["schemas"]["InstallationStatus"];
         };
@@ -3001,17 +2542,11 @@ export interface components {
          * @description ``PATCH /api/v1/agents/{id}``. Absent fields are unchanged.
          */
         UpdateAgentRequest: {
-            /** Color */
             color?: string | null;
-            /** Employee Code */
             employee_code?: string | null;
-            /** Full Name */
             full_name?: string | null;
-            /** Hired At */
             hired_at?: string | null;
-            /** Is Active */
             is_active?: boolean | null;
-            /** Note */
             note?: string | null;
         };
         /**
@@ -3019,7 +2554,6 @@ export interface components {
          * @description ``PATCH /api/v1/calls/{id}`` — the note and nothing else.
          */
         UpdateCallNoteRequest: {
-            /** Note */
             note?: string | null;
         };
         /**
@@ -3027,13 +2561,9 @@ export interface components {
          * @description ``PATCH /api/v1/numbers/{id}``. The number itself is not editable.
          */
         UpdateNumberRequest: {
-            /** Is Active */
             is_active?: boolean | null;
-            /** Label */
             label?: string | null;
-            /** Operator */
             operator?: string | null;
-            /** Sim Owner */
             sim_owner?: string | null;
         };
         /**
@@ -3046,14 +2576,11 @@ export interface components {
          */
         UpdateSettingRequest: {
             /**
-             * Confirm
              * @description Required when the change would delete data that still exists.
              * @default false
              */
             confirm: boolean;
-            /** Key */
             key: string;
-            /** Value */
             value: unknown;
         };
         /**
@@ -3061,11 +2588,8 @@ export interface components {
          * @description ``PATCH /api/v1/users/{id}``. Every field optional; absent means unchanged.
          */
         UpdateUserRequest: {
-            /** Agent Id */
             agent_id?: string | null;
-            /** Full Name */
             full_name?: string | null;
-            /** Is Active */
             is_active?: boolean | null;
             role?: components["schemas"]["UserRole"] | null;
         };
@@ -3074,15 +2598,9 @@ export interface components {
          * @description What the upload found in the file, alongside the row it created.
          */
         UploadReleaseResponse: {
-            /**
-             * Signer Sha256
-             * @description SHA-256 of the signing certificate, read from the APK's v2/v3 signing block. Compare it against docs/APK-SIGNING.md by eye if no fingerprint is configured yet — a build signed by another key cannot be installed as an update, only as an uninstall that destroys the phone's unsent queue.
-             */
+            /** @description SHA-256 of the signing certificate, read from the APK's v2/v3 signing block. Compare it against docs/APK-SIGNING.md by eye if no fingerprint is configured yet — a build signed by another key cannot be installed as an update, only as an uninstall that destroys the phone's unsent queue. */
             signer_sha256: string;
-            /**
-             * Signer Verified
-             * @description True when it was checked against the configured fingerprint.
-             */
+            /** @description True when it was checked against the configured fingerprint. */
             signer_verified: boolean;
             version: components["schemas"]["AppVersionResponse"];
         };
@@ -3091,9 +2609,7 @@ export interface components {
          * @description A page of accounts. Small table, so no cursor: the panel shows them all.
          */
         UserListResponse: {
-            /** Items */
             items: components["schemas"]["UserResponse"][];
-            /** Total */
             total: number;
         };
         /**
@@ -3101,27 +2617,15 @@ export interface components {
          * @description A panel account. Never carries the hash.
          */
         UserResponse: {
-            /** Agent Id */
             agent_id: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
+            /** Format: date-time */
             created_at: string;
-            /** Email */
             email: string;
-            /** Full Name */
             full_name: string;
-            /**
-             * Id
-             * Format: uuid
-             */
+            /** Format: uuid */
             id: string;
-            /** Is Active */
             is_active: boolean;
-            /** Last Login At */
             last_login_at: string | null;
-            /** Must Change Password */
             must_change_password: boolean;
             role: components["schemas"]["UserRole"];
         };
@@ -3139,18 +2643,22 @@ export interface components {
          * @enum {string}
          */
         UserRole: "admin" | "manager" | "sales";
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
         /**
          * VerificationMethod
          * @description How we proved the phone holds the registered number (UC-04, T142).
+         *
+         *     Ordered strongest to weakest, and the order is load-bearing: SPEC §9.3
+         *     requires the identity anchor to degrade visibly, so every place that
+         *     renders a binding renders which of these it rests on.
+         *
+         *     ``self_declared`` is the weakest. It says only that whoever held the
+         *     single-use code an admin issued for this number typed it into this handset
+         *     — no line was proven. It exists because on this fleet the two proving
+         *     routes are frequently both unavailable: Uzbek SIMs leave
+         *     ``getLine1Number()`` empty, and the callback route needs a receiver line.
+         *     Without it those handsets have no path to ``active`` at all, which is
+         *     strictly worse: an unenrolled phone reports nothing, so nobody can even see
+         *     that it is unverified. Governed by ``enrolment.allow_self_declared``.
          * @enum {string}
          */
         VerificationMethod: "sim_msisdn" | "callback" | "admin_attested" | "self_declared";
@@ -3164,21 +2672,12 @@ export interface components {
          *     of a decision, and the panel shows it before the button.
          */
         VersionGateImpactResponse: {
-            /** Current Min Version Code */
             current_min_version_code: number;
-            /** Stranded */
             stranded: components["schemas"]["StrandedInstallationOut"][];
-            /** Stranded Count */
             stranded_count: number;
-            /**
-             * Unknown Version Count
-             * @description Active phones that have never reported a version code. The gate lets these through, so they are not counted as stranded — but each one might be below the floor and we cannot say.
-             */
+            /** @description Active phones that have never reported a version code. The gate lets these through, so they are not counted as stranded — but each one might be below the floor and we cannot say. */
             unknown_version_count: number;
-            /**
-             * Version Code
-             * @description The minimum being considered.
-             */
+            /** @description The minimum being considered. */
             version_code: number;
         };
     };
@@ -3211,13 +2710,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3244,13 +2743,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3275,13 +2774,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3310,13 +2809,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3341,13 +2840,13 @@ export interface operations {
                     "application/json": components["schemas"]["AgentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3374,13 +2873,13 @@ export interface operations {
                     "application/json": components["schemas"]["ImportAgentsResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3388,11 +2887,10 @@ export interface operations {
     list_alerts_api_v1_alerts_get: {
         parameters: {
             query?: {
+                agent_id?: string | null;
                 limit?: number;
                 open_only?: boolean;
                 severity?: components["schemas"]["AlertSeverity"] | null;
-                /** Agent Id */
-                agent_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -3409,13 +2907,13 @@ export interface operations {
                     "application/json": components["schemas"]["AlertListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3440,13 +2938,13 @@ export interface operations {
                     "application/json": components["schemas"]["AlertResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3471,13 +2969,33 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    latest_releases_api_v1_app_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicReleaseListResponse"];
                 };
             };
         };
@@ -3504,13 +3022,13 @@ export interface operations {
                     "application/json": components["schemas"]["SetMinimumVersionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3535,13 +3053,13 @@ export interface operations {
                     "application/json": components["schemas"]["VersionGateImpactResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3588,13 +3106,13 @@ export interface operations {
                     "application/json": components["schemas"]["UploadReleaseResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3619,13 +3137,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3650,13 +3168,13 @@ export interface operations {
                     "application/json": components["schemas"]["AppVersionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3681,13 +3199,13 @@ export interface operations {
                     "application/json": components["schemas"]["AssignmentListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3716,13 +3234,13 @@ export interface operations {
                     "application/json": components["schemas"]["AssignmentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3751,13 +3269,13 @@ export interface operations {
                     "application/json": components["schemas"]["AuditListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3784,13 +3302,13 @@ export interface operations {
                     "application/json": components["schemas"]["LoginResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3855,13 +3373,13 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3927,13 +3445,13 @@ export interface operations {
                     "application/json": components["schemas"]["CallListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3958,13 +3476,13 @@ export interface operations {
                     "application/json": components["schemas"]["CallResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -3989,13 +3507,13 @@ export interface operations {
                     "application/json": null;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4024,13 +3542,13 @@ export interface operations {
                     "application/json": components["schemas"]["CallResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4059,13 +3577,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4090,13 +3608,64 @@ export interface operations {
                     "application/json": null;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    download_audio_archive_api_v1_calls_audio_archive_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                app_variant?: components["schemas"]["AppVariant"] | null;
+                audio_missing_reason?: components["schemas"]["AudioMissingReason"][] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                capture_route?: components["schemas"]["CaptureRoute"][] | null;
+                cursor?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                device_model?: string | null;
+                direction?: components["schemas"]["CallDirection"] | null;
+                disposition?: components["schemas"]["CallDisposition"] | null;
+                has_audio?: boolean | null;
+                installation_id?: string | null;
+                limit?: number;
+                max_duration_sec?: number | null;
+                min_duration_sec?: number | null;
+                number_id?: string[] | null;
+                order?: "asc" | "desc";
+                q?: string | null;
+                remote_number?: string | null;
+                sort?: "received_at" | "started_at" | "duration_sec";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4137,13 +3706,46 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    call_stats_api_v1_calls_stats_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                period?: "week" | "month" | "year" | "custom";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallStatsResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4168,13 +3770,13 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4219,13 +3821,13 @@ export interface operations {
                     "application/json": components["schemas"]["DeviceDetailResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4250,13 +3852,13 @@ export interface operations {
                     "application/json": components["schemas"]["CommandListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4285,13 +3887,13 @@ export interface operations {
                     "application/json": components["schemas"]["CommandResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4317,13 +3919,13 @@ export interface operations {
                     "application/json": components["schemas"]["EnrolmentCodeListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4348,13 +3950,13 @@ export interface operations {
                     "application/json": components["schemas"]["EnrolmentCodeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4380,13 +3982,13 @@ export interface operations {
                     "application/json": components["schemas"]["EnrolmentAttemptListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4432,13 +4034,13 @@ export interface operations {
                     "application/json": components["schemas"]["InstallationListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4463,13 +4065,13 @@ export interface operations {
                     "application/json": components["schemas"]["InstallationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4498,13 +4100,13 @@ export interface operations {
                     "application/json": components["schemas"]["InstallationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4533,13 +4135,13 @@ export interface operations {
                     "application/json": components["schemas"]["RevokeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4586,13 +4188,13 @@ export interface operations {
                     "application/json": components["schemas"]["ReclassifyResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4617,13 +4219,13 @@ export interface operations {
                     "application/json": components["schemas"]["ReclassifyResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4648,13 +4250,13 @@ export interface operations {
                     "application/json": components["schemas"]["NumberListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4681,13 +4283,13 @@ export interface operations {
                     "application/json": components["schemas"]["NumberResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4712,13 +4314,13 @@ export interface operations {
                     "application/json": components["schemas"]["NumberResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4747,13 +4349,13 @@ export interface operations {
                     "application/json": components["schemas"]["NumberResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4778,13 +4380,13 @@ export interface operations {
                     "application/json": components["schemas"]["AssignmentListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4813,13 +4415,13 @@ export interface operations {
                     "application/json": components["schemas"]["AssignmentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4844,13 +4446,13 @@ export interface operations {
                     "application/json": components["schemas"]["EnrolmentCodeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4896,13 +4498,13 @@ export interface operations {
                     "application/json": components["schemas"]["GapReportResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -4969,13 +4571,13 @@ export interface operations {
                     "application/json": components["schemas"]["SettingResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5001,13 +4603,13 @@ export interface operations {
                     "application/json": components["schemas"]["UserListResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5034,13 +4636,13 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5065,13 +4667,13 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5100,13 +4702,13 @@ export interface operations {
                     "application/json": components["schemas"]["UserResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5133,13 +4735,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Validation error, in the standard envelope */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

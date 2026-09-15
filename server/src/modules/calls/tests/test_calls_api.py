@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from src.core.clock import TASHKENT
 from src.core.enums import (
     AudioMissingReason,
     CallDirection,
@@ -862,3 +863,204 @@ async def test_the_failure_message_never_carries_the_customers_number(
         "/api/device/v1/calls", json={"calls": [call_payload(duration_sec=0)]}
     )
     assert "+998935554433" not in response.text
+
+
+# --- The dashboard's call-flow chart (UC-11) --------------------------------
+
+
+async def test_the_chart_returns_every_bucket_including_the_empty_ones(
+    manager,
+) -> None:
+    """A week is seven points even when nothing happened on six of them.
+
+    Returning only the days with calls makes the chart draw a straight line
+    through a silent week — the one thing it exists to show.
+    """
+    body = (await manager.get("/api/v1/calls/stats?period=week")).json()
+    assert body["granularity"] == "day"
+    assert len(body["buckets"]) == 7
+    assert body["buckets"][0]["date_from"] == body["date_from"]
+    assert body["buckets"][-1]["date_to"] == body["date_to"]
+    assert all(point["total"] == 0 for point in body["buckets"])
+
+
+async def test_the_chart_counts_each_of_the_five_classes(
+    manager, call_factory
+) -> None:
+    """UC-11's five classes, each in its own series."""
+    today = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12, minute=0)
+    for direction, disposition in (
+        (CallDirection.INCOMING, CallDisposition.ANSWERED),
+        (CallDirection.OUTGOING, CallDisposition.ANSWERED),
+        (CallDirection.INCOMING, CallDisposition.MISSED),
+        (CallDirection.INCOMING, CallDisposition.REJECTED),
+        (CallDirection.OUTGOING, CallDisposition.NO_ANSWER),
+    ):
+        await call_factory(
+            direction=direction, disposition=disposition, started_at=today
+        )
+
+    last = (await manager.get("/api/v1/calls/stats?period=week")).json()["buckets"][-1]
+    assert last["incoming_answered"] == 1
+    assert last["outgoing_answered"] == 1
+    assert last["missed"] == 1
+    assert last["rejected"] == 1
+    assert last["no_answer"] == 1
+    assert last["total"] == 5
+
+
+async def test_the_chart_buckets_on_the_call_not_the_upload(
+    manager, call_factory
+) -> None:
+    """D-08 again: a call made yesterday belongs to yesterday's point.
+
+    The factory stamps ``received_at`` with now(), so a row landing in
+    yesterday's bucket can only have been placed there by ``started_at``.
+    """
+    yesterday = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12) - timedelta(days=1)
+    await call_factory(started_at=yesterday)
+    buckets = (await manager.get("/api/v1/calls/stats?period=week")).json()["buckets"]
+    assert buckets[-2]["total"] == 1 and buckets[-1]["total"] == 0
+
+
+async def test_the_chart_totals_equal_the_list_total_for_the_same_window(
+    manager, call_factory
+) -> None:
+    """The point clicked and the list behind it must not disagree."""
+    now = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12)
+    for offset in range(3):
+        await call_factory(started_at=now - timedelta(days=offset))
+
+    body = (await manager.get("/api/v1/calls/stats?period=month")).json()
+    charted = sum(point["total"] for point in body["buckets"])
+    listed = (
+        await manager.get(
+            f"/api/v1/calls?with_total=true&limit=1"
+            f"&date_from={body['date_from']}&date_to={body['date_to']}"
+        )
+    ).json()["total"]
+    assert charted == listed == 3
+
+
+async def test_a_year_is_twelve_monthly_buckets_ending_today(manager) -> None:
+    """365 daily points on a dashboard card is noise, so a year is months."""
+    body = (await manager.get("/api/v1/calls/stats?period=year")).json()
+    assert body["granularity"] == "month"
+    assert len(body["buckets"]) == 12
+    # The current month is clipped to today rather than drawn as a whole month
+    # that happens to be missing three weeks of calls.
+    assert body["buckets"][-1]["date_to"] == body["date_to"]
+    assert body["buckets"][-1]["date_from"].endswith("-01")
+
+
+async def test_the_chart_is_narrowed_for_sales(
+    db, sales, call_factory, installation_factory
+) -> None:
+    """UC-21: a salesperson's chart is their own calls, from the same query."""
+    from src.modules.agents.models import AgentModel
+
+    own_agent = await db.get(AgentModel, sales.principal.agent_id)
+    await call_factory(installation=await installation_factory(agent=own_agent))
+    await call_factory()
+
+    body = (await sales.get("/api/v1/calls/stats?period=week")).json()
+    assert sum(point["total"] for point in body["buckets"]) == 1
+
+
+async def test_an_unknown_period_is_refused(manager) -> None:
+    assert (await manager.get("/api/v1/calls/stats?period=decade")).status_code == 422
+
+
+async def test_the_chart_without_a_token_is_401(client) -> None:
+    assert (await client.get("/api/v1/calls/stats")).status_code == 401
+
+
+async def test_a_service_token_cannot_read_the_chart(service_token) -> None:
+    """UC-29: the machine reads the export, never the panel's own aggregates."""
+    assert (await service_token.get("/api/v1/calls/stats")).status_code == 403
+
+
+async def test_a_custom_range_is_bucketed_by_day(manager, call_factory) -> None:
+    """Two dates the reader chose, inclusive at both ends."""
+    day = datetime.now(UTC).astimezone(TASHKENT).replace(hour=12) - timedelta(days=3)
+    await call_factory(started_at=day)
+    date = day.date().isoformat()
+
+    body = (
+        await manager.get(f"/api/v1/calls/stats?period=custom&date_from={date}&date_to={date}")
+    ).json()
+    assert body["period"] == "custom"
+    assert body["granularity"] == "day"
+    assert len(body["buckets"]) == 1
+    assert body["buckets"][0]["total"] == 1
+
+
+async def test_a_long_custom_range_switches_to_monthly_buckets(manager) -> None:
+    """A year of daily points is a smear nobody can pick a day out of."""
+    today = datetime.now(UTC).astimezone(TASHKENT).date()
+    start = (today - timedelta(days=200)).isoformat()
+    body = (
+        await manager.get(
+            f"/api/v1/calls/stats?period=custom&date_from={start}&date_to={today.isoformat()}"
+        )
+    ).json()
+    assert body["granularity"] == "month"
+    # The first bucket starts on the day that was asked for, not on the 1st.
+    assert body["buckets"][0]["date_from"] == start
+    assert body["buckets"][-1]["date_to"] == today.isoformat()
+
+
+async def test_a_partial_first_month_still_counts_its_calls(
+    manager, call_factory
+) -> None:
+    """The bucket is labelled by the range and keyed by the month underneath it."""
+    today = datetime.now(UTC).astimezone(TASHKENT)
+    start = today - timedelta(days=200)
+    await call_factory(started_at=start + timedelta(days=1, hours=2))
+
+    body = (
+        await manager.get(
+            f"/api/v1/calls/stats?period=custom"
+            f"&date_from={start.date().isoformat()}&date_to={today.date().isoformat()}"
+        )
+    ).json()
+    assert sum(point["total"] for point in body["buckets"]) == 1
+    assert body["buckets"][0]["total"] == 1
+
+
+async def test_a_custom_range_without_both_dates_is_refused(manager) -> None:
+    """Silently falling back to a week would label a chart it does not describe."""
+    response = await manager.get("/api/v1/calls/stats?period=custom&date_from=2026-09-01")
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_request"
+
+
+async def test_a_backwards_custom_range_is_refused(manager) -> None:
+    response = await manager.get(
+        "/api/v1/calls/stats?period=custom&date_from=2026-09-10&date_to=2026-09-01"
+    )
+    assert response.status_code == 400
+
+
+async def test_a_custom_range_ending_in_the_future_stops_at_today(manager) -> None:
+    """Empty future buckets read as a collapse in call volume."""
+    today = datetime.now(UTC).astimezone(TASHKENT).date()
+    body = (
+        await manager.get(
+            f"/api/v1/calls/stats?period=custom"
+            f"&date_from={today.isoformat()}&date_to={(today + timedelta(days=30)).isoformat()}"
+        )
+    ).json()
+    assert body["date_to"] == today.isoformat()
+    assert len(body["buckets"]) == 1
+
+
+async def test_dates_are_ignored_for_a_preset_period(manager) -> None:
+    """A link saying `week` must not be able to show a year."""
+    body = (
+        await manager.get(
+            "/api/v1/calls/stats?period=week&date_from=2020-01-01&date_to=2020-12-31"
+        )
+    ).json()
+    assert len(body["buckets"]) == 7
+    assert body["date_to"] == datetime.now(UTC).astimezone(TASHKENT).date().isoformat()

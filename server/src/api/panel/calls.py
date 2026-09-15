@@ -35,6 +35,8 @@ from src.modules.calls.schemas import (
     CallFilters,
     CallListResponse,
     CallResponse,
+    CallStatsPeriod,
+    CallStatsResponse,
     UpdateCallNoteRequest,
 )
 from src.modules.calls.service import CallService
@@ -246,6 +248,36 @@ async def download_audio_archive(
         headers={
             "Content-Disposition": f'attachment; filename="bonvicall-{stamp}.zip"'
         },
+    )
+
+
+@router.get("/stats", response_model=CallStatsResponse, dependencies=[Depends(_read_any)])
+async def call_stats(
+    principal: PrincipalDep,
+    session: SessionDep,
+    period: CallStatsPeriod = "week",
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> CallStatsResponse:
+    """Calls per day (or per month) per class, for the dashboard's chart.
+
+    Declared **above** ``/{call_id}``: that route takes a UUID, so a request
+    for ``/calls/stats`` matched against it answers 422 rather than reaching
+    this one.
+
+    A preset window is the server's arithmetic and not the caller's — the
+    browser asking for "a year" in its own timezone would draw a chart whose
+    edges disagree with every other date in the product (D-10) — so
+    ``date_from``/``date_to`` are read only for ``period=custom``, and both are
+    required there. The granularity of a custom range is derived from its span,
+    not chosen: two dates are the question, and a second control before an
+    answer is one decision too many.
+
+    Own-scope applies exactly as it does to the list, because it is the same
+    query.
+    """
+    return await CallService(session).stats(
+        principal, period, date_from=date_from, date_to=date_to
     )
 
 

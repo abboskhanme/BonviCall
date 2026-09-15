@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Date, Select, func, select
+from sqlalchemy import cast as sa_cast
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,16 +48,22 @@ from src.modules.alerts.service import AlertService
 from src.modules.audio.service import AudioService
 from src.modules.calls.models import CallModel
 from src.modules.calls.rules import (
+    STATS_MAX_DAYS,
     LineDirectory,
+    call_class,
     classify_call_type,
     clock_skew_seconds,
+    custom_buckets,
     device_audio_state,
     resolve_audio_reason,
+    stats_buckets,
 )
 from src.modules.calls.schemas import (
     CallAudioSummary,
     CallFilters,
     CallResponse,
+    CallStatsBucket,
+    CallStatsResponse,
     DeviceCallIn,
     DeviceCallOut,
     DeviceCallResultOut,
@@ -456,6 +463,119 @@ class CallService:
             has_more=has_more,
             total=total,
         )
+
+    async def stats(
+        self,
+        principal: Principal,
+        period: str,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> CallStatsResponse:
+        """Calls per bucket per class, for the dashboard's chart (UC-11).
+
+        It goes through ``_filtered`` like everything else, so the chart is
+        scoped the way the list is — a salesperson's line is their own calls —
+        and a point clicked through to ``/calls?date_from=…&date_to=…`` lands
+        on exactly the rows it was drawn from. That is the whole reason this
+        does not get its own query: a chart that disagrees with the list it
+        links to is worse than no chart (the gap report's rule, T53).
+
+        One GROUP BY, not one query per class: five classes x thirty buckets is
+        150 round trips, and the answer is the same.
+
+        ``date_from``/``date_to`` are read **only** for ``period="custom"``.
+        Ignoring them for a preset is deliberate: a preset whose dates could be
+        overridden would let a link say ``week`` and show a year, and the label
+        on screen would be a lie.
+        """
+        today = clock.today_tashkent()
+        if period == "custom":
+            date_from, date_to = self._custom_window(date_from, date_to, today)
+            granularity, buckets = custom_buckets(date_from, date_to)
+        else:
+            granularity, buckets = stats_buckets(period, today)
+            date_from, date_to = buckets[0][0], buckets[-1][1]
+
+        # Bucketed in Asia/Tashkent, because the business day is (D-10). The
+        # expression is computed in an inner SELECT and grouped in the outer
+        # one: repeating it in GROUP BY would emit the bind parameters a second
+        # time, and PostgreSQL does not recognise $3 as the same expression as
+        # $1 — "column must appear in the GROUP BY clause" at runtime.
+        bucket = sa_cast(
+            func.date_trunc(
+                granularity, func.timezone(TASHKENT.key, CallModel.started_at)
+            ),
+            Date,
+        ).label("bucket")
+        inner = (
+            self._filtered(
+                principal, CallFilters(date_from=date_from, date_to=date_to)
+            )
+            .with_only_columns(bucket, CallModel.direction, CallModel.disposition)
+            .subquery()
+        )
+        rows = (
+            await self.session.execute(
+                select(inner.c.bucket, inner.c.direction, inner.c.disposition, func.count())
+                .group_by(inner.c.bucket, inner.c.direction, inner.c.disposition)
+            )
+        ).all()
+
+        # Keyed by what ``date_trunc`` returns, which for a month is always the
+        # 1st — a custom range starting on the 20th still has its first bucket
+        # labelled the 20th, and looking it up by that label would drop every
+        # call in it.
+        counted = {
+            self._bucket_key(start, granularity): CallStatsBucket(date_from=start, date_to=end)
+            for start, end in buckets
+        }
+        for bucket_date, direction, disposition, count in rows:
+            point = counted.get(bucket_date)
+            if point is None:
+                # Only reachable if the window arithmetic and the SQL bucketing
+                # disagree. Dropping the row keeps the chart drawable; the test
+                # that would catch it is `stats_buckets`'s own.
+                continue
+            point.total += count
+            series = call_class(direction.value, disposition.value)
+            if series is not None:
+                setattr(point, series, getattr(point, series) + count)
+
+        return CallStatsResponse(
+            period=period,
+            granularity=granularity,
+            date_from=date_from,
+            date_to=date_to,
+            buckets=list(counted.values()),
+        )
+
+    @staticmethod
+    def _bucket_key(start: date, granularity: str) -> date:
+        """What ``date_trunc(granularity, …)`` returns for a call in this bucket."""
+        return start.replace(day=1) if granularity == "month" else start
+
+    @staticmethod
+    def _custom_window(
+        date_from: date | None, date_to: date | None, today: date
+    ) -> tuple[date, date]:
+        """Validate the reader's own two dates (400, never a silent correction).
+
+        The end is clipped to today because a chart of the future is a row of
+        empty buckets that reads as a collapse in call volume. Everything else
+        is refused rather than repaired: a range the server quietly changed is
+        a chart whose title does not describe it.
+        """
+        if date_from is None or date_to is None:
+            missing = "date_from" if date_from is None else "date_to"
+            raise BadRequestError(ErrorCode.BAD_REQUEST, detail={"field": missing})
+        if date_from > date_to:
+            raise BadRequestError(ErrorCode.BAD_REQUEST, detail={"field": "date_from"})
+        if date_from > today:
+            raise BadRequestError(ErrorCode.BAD_REQUEST, detail={"field": "date_from"})
+        date_to = min(date_to, today)
+        if (date_to - date_from).days + 1 > STATS_MAX_DAYS:
+            raise BadRequestError(ErrorCode.BAD_REQUEST, detail={"field": "date_from"})
+        return date_from, date_to
 
     async def views(self, calls: list[CallModel]) -> list[CallResponse]:
         """Attach the display fields and the audio summary, in two queries.

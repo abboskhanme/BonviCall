@@ -33,24 +33,26 @@ import {
   useInstallations,
 } from '@/modules/devices/api'
 import { FLEET_STATE_LABEL } from '@/modules/devices/labels'
-import { useCallsPage } from '@/modules/calls/api'
+import { useCallStats } from '@/modules/calls/api'
+import { CallFlowChart } from './CallFlowChart'
+import { isoDateLabel } from './chart'
+import {
+  PERIODS,
+  PERIOD_LABEL,
+  isComplete,
+  useDashboardPeriod,
+  usePeriodWindow,
+  type PeriodControl,
+  type PeriodSelection,
+} from './period'
 import { useGapReport } from './api'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { Page, PageHeader } from '@/shared/layout/Page'
+import { cn } from '@/shared/lib/cn'
 import { EM_DASH, formatCount } from '@/shared/lib/format'
 import { Badge, Card } from '@/shared/ui/primitives'
-
-/** Today, as an Asia/Tashkent calendar date — the same day boundary every
- *  business date in this system uses (D-10). */
-function todayInTashkent(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tashkent',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now)
-}
+import { DateFilter } from '@/shared/ui/filters'
 
 function Tile({
   icon,
@@ -82,19 +84,40 @@ function Tile({
   )
 }
 
-/** Calls received today. `calls:read` or `calls:read:own` — the server
- *  narrows the rows, so a salesperson sees their own count. */
-function CallsTile() {
-  const today = todayInTashkent()
-  const query = useCallsPage({ date_from: today, date_to: today, with_total: true, limit: 1 })
-  const total = query.data?.total
+/**
+ * Calls in the chosen period. `calls:read` or `calls:read:own` — the server
+ * narrows the rows, so a salesperson sees their own count.
+ *
+ * It counts the chart's own buckets rather than asking `/calls` for a total:
+ * one request, and the headline and the line drawn under it are then the same
+ * arithmetic on the same rows. A tile that disagreed with the chart beside it
+ * would be the first thing anybody noticed.
+ */
+function CallsTile({ selection }: { selection: PeriodSelection }) {
+  const query = useCallStats(selection)
+  // Nothing while a custom range is half-chosen: the query still holds the
+  // previous window's answer (`keepPreviousData`), and a count dated to a
+  // period the reader has just left is worse than a dash.
+  const stats = isComplete(selection) ? query.data : undefined
+  const total = stats?.buckets.reduce((sum, bucket) => sum + bucket.total, 0)
   return (
     <Tile
       icon={<Phone className="size-4" aria-hidden />}
-      label={t('dashboard.callsToday')}
+      label={t('dashboard.callsInPeriod')}
       value={typeof total === 'number' ? formatCount(total) : EM_DASH}
-      hint={t('dashboard.callsTodayHint')}
-      to={`/calls?date_from=${today}&date_to=${today}`}
+      hint={
+        stats
+          ? t('dashboard.chart.range', {
+              from: isoDateLabel(stats.date_from),
+              to: isoDateLabel(stats.date_to),
+            })
+          : t(PERIOD_LABEL[selection.period])
+      }
+      to={
+        stats
+          ? `/calls?date_from=${stats.date_from}&date_to=${stats.date_to}`
+          : '/calls'
+      }
     />
   )
 }
@@ -165,11 +188,21 @@ function AlertsTile() {
   )
 }
 
-/** Capture rate, which is the one number that says whether the product is
- *  doing its job at all. */
-function CaptureTile() {
-  const query = useGapReport({})
+/**
+ * Capture rate, which is the one number that says whether the product is
+ * doing its job at all — over the chosen period.
+ *
+ * The window comes from `/calls/stats` rather than from the browser's clock,
+ * so "yozib olish darajasi" and the line above it cover the same days. Until
+ * it arrives the report is unfiltered: all of time is a true answer to a
+ * slightly different question, where a guessed fortnight is a false answer to
+ * this one.
+ */
+function CaptureTile({ selection }: { selection: PeriodSelection }) {
+  const window = usePeriodWindow(selection)
+  const query = useGapReport(window ?? {})
   const report = query.data
+  const range = window ? `&date_from=${window.date_from}&date_to=${window.date_to}` : ''
   return (
     <Tile
       icon={<FileWarning className="size-4" aria-hidden />}
@@ -182,14 +215,76 @@ function CaptureTile() {
       }
       // `/reports/gap` was removed on 2026-09-14; the same question is the
       // calls list filtered to the recordings that are missing.
-      to="/calls?has_audio=false"
+      to={`/calls?has_audio=false${range}`}
     />
+  )
+}
+
+/**
+ * Hafta / oy / yil / o'z davri. It governs the whole page, so it sits in the
+ * header rather than on the chart.
+ *
+ * The two date fields appear only under `custom`, and picking either one
+ * selects `custom` — so the reader who reaches for a date does not have to
+ * press a mode button first, and the three presets stay one click away.
+ */
+function PeriodTabs({ control }: { control: PeriodControl }) {
+  const { selection, setPeriod, setBound } = control
+  return (
+    <div className="flex flex-wrap items-end justify-end gap-2">
+      <div className="flex rounded-md border border-border bg-surface p-0.5" role="group">
+        {PERIODS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setPeriod(option)}
+            aria-pressed={option === selection.period}
+            className={cn(
+              'rounded-sm px-3 py-1 text-xs font-medium transition-colors',
+              option === selection.period
+                ? 'bg-accent-soft text-accent'
+                : 'text-muted hover:text-text',
+            )}
+          >
+            {t(PERIOD_LABEL[option])}
+          </button>
+        ))}
+      </div>
+
+      {selection.period === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-2">
+          {/* The calls list's own two bounds, reused rather than re-invented:
+              the same control, the same words, and the same cross-constraint
+              so the picker cannot offer a backwards range. */}
+          <DateFilter
+            label={t('calls.filterDateFrom')}
+            hint={t('calls.filterDateEmpty')}
+            pickLabel={t('calls.filterDatePickFrom')}
+            clearLabel={t('calls.filterDateClearFrom')}
+            value={selection.date_from}
+            max={selection.date_to}
+            onChange={(value) => setBound('date_from', value)}
+          />
+          <DateFilter
+            label={t('calls.filterDateTo')}
+            hint={t('calls.filterDateEmpty')}
+            pickLabel={t('calls.filterDatePickTo')}
+            clearLabel={t('calls.filterDateClearTo')}
+            value={selection.date_to}
+            min={selection.date_from}
+            onChange={(value) => setBound('date_to', value)}
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }
 
 export function DashboardPage() {
   const can = useAuth((state) => state.can)
   const user = useAuth((state) => state.user)
+  const periodControl = useDashboardPeriod()
+  const selection = periodControl.selection
 
   // Each tile is shown only for a permission listed in DASHBOARD_PERMISSIONS.
   // `dashboard.tiles.test.tsx` asserts the two lists agree.
@@ -204,14 +299,26 @@ export function DashboardPage() {
       <PageHeader
         title={t('page.dashboard')}
         description={user ? t('dashboard.greeting', { name: user.full_name }) : undefined}
+        // In the header rather than on the chart, because it is not the
+        // chart's control: the two date-based tiles read the same window.
+        actions={showCalls || showReports ? <PeriodTabs control={periodControl} /> : undefined}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {showCalls ? <CallsTile /> : null}
+        {showCalls ? <CallsTile selection={selection} /> : null}
+        {/* Fleet state and open alerts are "right now" questions and ignore
+            the period on purpose — there is no useful reading of "phones that
+            were silent last March", and filtering them by date would invent
+            one. */}
         {showDevices ? <DevicesTile /> : null}
         {showAlerts ? <AlertsTile /> : null}
-        {showReports ? <CaptureTile /> : null}
+        {showReports ? <CaptureTile selection={selection} /> : null}
       </div>
+
+      {/* The tiles answer "how are we right now"; the chart answers "and is
+          that normal" — the same permission, because it is the same rows
+          (`calls:read` / `calls:read:own`, narrowed server-side). */}
+      {showCalls ? <CallFlowChart selection={selection} /> : null}
 
       {nothingToShow ? (
         // Reachable only if the permission registry gains a role with none of

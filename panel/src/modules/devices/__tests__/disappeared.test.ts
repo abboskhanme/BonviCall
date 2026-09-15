@@ -57,6 +57,7 @@ function health(overrides: Partial<DeviceHealth> = {}): DeviceHealth {
     battery_optimisation_exempt: true,
     power_save_mode: false,
     capture_enabled: true,
+    capturing: true,
     service_running: true,
     recording_route: 'oem_file_harvest',
     recording_route_ok: true,

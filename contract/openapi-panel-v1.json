@@ -1141,6 +1141,96 @@
         "title": "CallSource",
         "type": "string"
       },
+      "CallStatsBucket": {
+        "description": "One point on the x-axis: UC-11's five classes, counted.\n\nEvery bucket in the window is returned, including the empty ones. A chart\nthat receives only the days something happened draws a straight line\nthrough a silent week, which is the one thing this chart exists to show.",
+        "properties": {
+          "date_from": {
+            "description": "Asia/Tashkent calendar date, inclusive.",
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "description": "Inclusive, and equal to date_from for a daily bucket. The last bucket is clipped to today, so a part-month is not drawn as a whole one.",
+            "format": "date",
+            "type": "string"
+          },
+          "incoming_answered": {
+            "default": 0,
+            "type": "integer"
+          },
+          "missed": {
+            "default": 0,
+            "type": "integer"
+          },
+          "no_answer": {
+            "default": 0,
+            "type": "integer"
+          },
+          "outgoing_answered": {
+            "default": 0,
+            "type": "integer"
+          },
+          "rejected": {
+            "default": 0,
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "description": "Every call in the bucket, which is what the same filter returns from /calls — not necessarily the sum of the five classes.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to"
+        ],
+        "title": "CallStatsBucket",
+        "type": "object"
+      },
+      "CallStatsResponse": {
+        "description": "``GET /api/v1/calls/stats`` — the call flow the dashboard draws.",
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/CallStatsBucket"
+            },
+            "type": "array"
+          },
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "granularity": {
+            "enum": [
+              "day",
+              "month"
+            ],
+            "type": "string"
+          },
+          "period": {
+            "enum": [
+              "week",
+              "month",
+              "year",
+              "custom"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "period",
+          "granularity",
+          "date_from",
+          "date_to",
+          "buckets"
+        ],
+        "title": "CallStatsResponse",
+        "type": "object"
+      },
       "CallType": {
         "description": "Internal vs external (UC-25). ``unknown`` is the mandatory default.\n\nAn empty line directory yields ``unknown``, never ``external``:\nBonviZvonki defaulted to external and 82 of 98 calls were mislabelled.",
         "enum": [
@@ -6716,6 +6806,90 @@
           }
         },
         "summary": "Export Calls",
+        "tags": [
+          "Calls"
+        ]
+      }
+    },
+    "/api/v1/calls/stats": {
+      "get": {
+        "description": "Calls per day (or per month) per class, for the dashboard's chart.\n\nDeclared **above** ``/{call_id}``: that route takes a UUID, so a request\nfor ``/calls/stats`` matched against it answers 422 rather than reaching\nthis one.\n\nA preset window is the server's arithmetic and not the caller's — the\nbrowser asking for \"a year\" in its own timezone would draw a chart whose\nedges disagree with every other date in the product (D-10) — so\n``date_from``/``date_to`` are read only for ``period=custom``, and both are\nrequired there. The granularity of a custom range is derived from its span,\nnot chosen: two dates are the question, and a second control before an\nanswer is one decision too many.\n\nOwn-scope applies exactly as it does to the list, because it is the same\nquery.",
+        "operationId": "call_stats_api_v1_calls_stats_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "week",
+              "enum": [
+                "week",
+                "month",
+                "year",
+                "custom"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Call Stats",
         "tags": [
           "Calls"
         ]

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 #: Below this many digits a number is a PBX extension, not a phone number.
 #: The same threshold as ``core.phone.EXTENSION_MAX_DIGITS``; repeated here
@@ -168,3 +169,107 @@ def device_audio_state(
     if audio_missing_reason == "not_expected":
         return "not_expected"
     return "missing"
+
+
+#: UC-11's five classes, as ``(direction, disposition) -> series``. The chart on
+#: the dashboard draws one line per value here, so the map is the vocabulary of
+#: the whole feature and lives beside the validity rule above rather than in a
+#: query.
+CALL_CLASSES: dict[tuple[str, str], str] = {
+    ("incoming", "answered"): "incoming_answered",
+    ("outgoing", "answered"): "outgoing_answered",
+    ("incoming", "missed"): "missed",
+    ("incoming", "rejected"): "rejected",
+    ("outgoing", "no_answer"): "no_answer",
+}
+
+
+def call_class(direction: str, disposition: str) -> str | None:
+    """Which of UC-11's five classes a call falls in, or ``None``.
+
+    ``None`` is unreachable while the ``call_direction_disposition`` CHECK
+    holds — :func:`is_valid_combination` is the same table read the other way.
+    It is still returned rather than raised, because a chart is a summary: a
+    row nobody can classify must not make the whole period unreadable, and the
+    bucket's ``total`` counts it either way.
+    """
+    return CALL_CLASSES.get((direction, disposition))
+
+
+#: How many buckets each period draws, and how wide one bucket is. Rolling
+#: windows, not calendar ones: "this month" on the 1st is a single day and a
+#: dashboard that goes blank at midnight on the 1st teaches people to distrust
+#: it. ``year`` is the exception in shape only — twelve months back, each
+#: bucket a whole month, because 365 daily points on a 900px card is noise.
+STATS_PERIODS: dict[str, tuple[str, int]] = {
+    "week": ("day", 7),
+    "month": ("day", 30),
+    "year": ("month", 12),
+}
+
+
+#: Above this many days a chosen range is drawn in months. 92 days is a
+#: quarter: three months of daily points is still readable on a card, and a
+#: year of them is a smear nobody can pick a day out of.
+STATS_DAILY_MAX_DAYS = 92
+
+#: The longest range the chart will draw at all. Five years of monthly buckets
+#: is sixty points; beyond that the answer is a report, not a dashboard.
+STATS_MAX_DAYS = 1827
+
+
+def stats_buckets(period: str, today: date) -> tuple[str, list[tuple[date, date]]]:
+    """The x-axis of a **preset** period: ``(granularity, [(from, to), ...])``.
+
+    Inclusive dates, oldest first, and the last bucket ends **today** — a month
+    bucket is clipped there too, so the current month is not drawn as a full
+    month that happens to be missing three weeks of calls.
+
+    Pure, so the window is testable without a database: every off-by-one in a
+    chart lives here, and a fixture would hide it.
+    """
+    granularity, count = STATS_PERIODS[period]
+    if granularity == "day":
+        first = today - timedelta(days=count - 1)
+        return granularity, [
+            (first + timedelta(days=offset),) * 2 for offset in range(count)
+        ]
+
+    months = [_add_months(today.replace(day=1), offset) for offset in range(1 - count, 1)]
+    return granularity, [
+        (start, min(_add_months(start, 1) - timedelta(days=1), today)) for start in months
+    ]
+
+
+def custom_buckets(
+    date_from: date, date_to: date
+) -> tuple[str, list[tuple[date, date]]]:
+    """The x-axis of a range the reader chose themselves.
+
+    The granularity is **derived from the span, not asked for**: somebody
+    picking two dates is answering "what happened between these", not "draw me
+    monthly buckets", and a control for it would be a second decision to make
+    before seeing an answer.
+
+    The end months are clipped to the range at both ends, so a range starting
+    on the 20th does not report that month's first nineteen days as part of it.
+    """
+    span = (date_to - date_from).days + 1
+    if span <= STATS_DAILY_MAX_DAYS:
+        return "day", [(date_from + timedelta(days=offset),) * 2 for offset in range(span)]
+
+    starts: list[date] = []
+    cursor = date_from.replace(day=1)
+    while cursor <= date_to:
+        starts.append(cursor)
+        cursor = _add_months(cursor, 1)
+    return "month", [
+        (max(start, date_from), min(_add_months(start, 1) - timedelta(days=1), date_to))
+        for start in starts
+    ]
+
+
+def _add_months(start: date, months: int) -> date:
+    """``start`` moved by whole months. ``start`` is always the 1st here."""
+    total = start.year * 12 + (start.month - 1) + months
+    return start.replace(year=total // 12, month=total % 12 + 1)
