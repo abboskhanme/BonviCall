@@ -616,6 +616,7 @@
   "dashboard.captureHint": "{n} ta qo'ng'iroq yozuvsiz qolgan",
   "dashboard.captureHintEmpty": "Ma'lumot yetarli emas",
   "dashboard.callsInPeriod": "Davrdagi qo'ng'iroqlar",
+  "dashboard.openLanding": "Bosh sahifa",
   "dashboard.chart.title": "Qo'ng'iroqlar oqimi",
   "dashboard.chart.hint": "Nuqtaga bosing — o'sha davr qo'ng'iroqlari ro'yxati ochiladi",
   "dashboard.chart.period.week": "Hafta",

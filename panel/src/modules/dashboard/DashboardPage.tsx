@@ -20,7 +20,7 @@
  */
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { BellRing, FileWarning, Phone, Smartphone } from 'lucide-react'
+import { BellRing, FileWarning, Home, Phone, Smartphone } from 'lucide-react'
 
 import { useAlerts } from '@/modules/alerts/api'
 import { ALERT_SEVERITY_LABEL, ALERT_SEVERITY_TONE } from '@/modules/alerts/routing'
@@ -52,6 +52,7 @@ import { Page, PageHeader } from '@/shared/layout/Page'
 import { cn } from '@/shared/lib/cn'
 import { EM_DASH, formatCount } from '@/shared/lib/format'
 import { Badge, Card } from '@/shared/ui/primitives'
+import { buttonClasses } from '@/shared/ui/buttonStyles'
 import { DateFilter } from '@/shared/ui/filters'
 
 function Tile({
@@ -301,7 +302,20 @@ export function DashboardPage() {
         description={user ? t('dashboard.greeting', { name: user.full_name }) : undefined}
         // In the header rather than on the chart, because it is not the
         // chart's control: the two date-based tiles read the same window.
-        actions={showCalls || showReports ? <PeriodTabs control={periodControl} /> : undefined}
+        actions={
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            {/* The public front page, which is where the APK is handed out
+                (SPEC §4.1 rule 5). An admin showing somebody the product, or
+                reinstalling after a factory reset, reaches it from here rather
+                than by typing the address — it is outside the AppShell, so the
+                menu cannot carry it. */}
+            <Link to="/" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+              <Home className="size-4" aria-hidden />
+              {t('dashboard.openLanding')}
+            </Link>
+            {showCalls || showReports ? <PeriodTabs control={periodControl} /> : null}
+          </div>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

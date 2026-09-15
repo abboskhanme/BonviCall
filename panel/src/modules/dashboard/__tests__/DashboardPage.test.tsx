@@ -204,6 +204,22 @@ describe('tiles', () => {
     })
   })
 
+  it('offers a way back to the public front page', async () => {
+    // `/` is outside the AppShell (it is full-screen and public), so the menu
+    // cannot carry it — without this button the only way there is typing the
+    // address, and it is where the APK is handed out.
+    signIn([Perm.CALLS_READ])
+    renderPage()
+    const link = await screen.findByRole('link', { name: t('dashboard.openLanding') })
+    expect(link).toHaveAttribute('href', '/')
+  })
+
+  it('keeps that button for a role with no tiles at all', () => {
+    signIn([Perm.AUDIT_READ])
+    renderPage()
+    expect(screen.getByRole('link', { name: t('dashboard.openLanding') })).toBeInTheDocument()
+  })
+
   it('says so plainly when a role has nothing to show', () => {
     // Unreachable today, but the alternative is an empty page that looks broken.
     signIn([Perm.AUDIT_READ])
