@@ -1,15 +1,20 @@
-"""Stage 2: the transcript and the pinned rubric become one ``call_scores`` row.
+"""Stage 2: the transcript and the active rubric become one ``call_scores`` row.
 
 The rubric version is written with the score. When the rubric changes, which
 criteria yesterday's number was produced against stays answerable — without it
 two scores are incomparable while claiming to be comparable.
 
-Phase 1 pins the rubric in code: ``rubric_default.DEFAULT_RUBRIC`` is the
-rubric and ``RUBRIC_VERSION`` is ``"v1"``. BonviZvonki read the active row out
-of a ``rubrics`` table through ``RubricService``; that table, its service and
-its "the blocks must total exactly 100" validator are phase 2 and are not
-ported. ``extra_rules`` — the admin's free-text additions — goes with them, so
-``None`` is passed here.
+**The rubric is read from the table, once per call, and never cached here.**
+``RubricService.active()`` answers with the active ``rubrics`` row, or with
+``rubric_default.DEFAULT_RUBRIC`` when the table is empty — so a database that
+was never seeded scores exactly as it did while the rubric was a constant, under
+the same ``"v1"``. ``extra_rules`` comes from the same place, which is why it is
+stored on the rubric rather than in ``app_settings``: it is part of what
+produced the score, so it is versioned with it.
+
+Read per call rather than per worker start: an admin who publishes a fix at
+11:00 expects the next call to be scored with it, and a process-lifetime cache
+would score the rest of the day with the rubric that was active at boot.
 
 Idempotent: ``call_scores.call_id`` is UNIQUE and the row is looked for before
 anything is sent, so a re-run calls no model.
@@ -41,7 +46,7 @@ from src.modules.analysis.limits import (
     with_backoff,
 )
 from src.modules.analysis.models import CallTranscriptModel
-from src.modules.analysis.rubric_default import DEFAULT_RUBRIC, RUBRIC_VERSION
+from src.modules.analysis.rubric_service import RubricService
 from src.modules.analysis.rules import decide
 from src.modules.analysis.score_writer import existing_score, save_score
 from src.modules.analysis.scorer import CallContext, CallScorer
@@ -103,6 +108,11 @@ class ScoreStage:
                 cooldown_detail(AiRole.LLM, left), stage=Stage.SCORE
             )
 
+        # Read BEFORE the commit below, and kept as a plain value object: after
+        # the transaction closes an ORM row would expire and touching it would
+        # open another one in the middle of the provider call.
+        rubric = await RubricService(session).active()
+
         llm = await self._deps.llm_factory(session)
 
         # Same reason as in ``transcribe.py``: reading settings opens a
@@ -143,11 +153,11 @@ class ScoreStage:
 
         scorer = CallScorer(
             llm,
-            rubric_blocks=DEFAULT_RUBRIC["blocks"],
-            rubric_red_flags=DEFAULT_RUBRIC["red_flags"],
-            # Phase 2, with the editable rubric: the admin's extra rules are
-            # part of the rubric and therefore versioned with it.
-            extra_rules=None,
+            rubric_blocks=rubric.blocks,
+            rubric_red_flags=rubric.red_flags,
+            # Part of the rubric, and therefore versioned with it: a score can
+            # say which instructions produced it.
+            extra_rules=rubric.extra_rules,
             invalid_retries=self._config.invalid_retries,
             invoke=invoke,
         )
@@ -227,7 +237,7 @@ class ScoreStage:
             review=review,
             provider=getattr(llm, "provider_key", "unknown"),
             model=getattr(llm, "model", "unknown"),
-            rubric_version=RUBRIC_VERSION,
+            rubric_version=rubric.label,
             llm_calls=outcome.llm_calls,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -241,7 +251,7 @@ class ScoreStage:
             "analysis_scored",
             call_id=str(call.id),
             model=getattr(llm, "model", "?"),
-            rubric=RUBRIC_VERSION,
+            rubric=rubric.label,
             score=draft.overall,
             confidence_pct=draft.confidence_pct,
             red_flags=len(draft.red_flags),
@@ -254,7 +264,7 @@ class ScoreStage:
         return StageOutcome(
             stage=Stage.SCORE,
             result=StageResult.DONE,
-            detail=f"{draft.overall} points, rubric {RUBRIC_VERSION}",
+            detail=f"{draft.overall} points, rubric {rubric.label}",
             provider_calls=outcome.llm_calls,
             elapsed_ms=elapsed_ms,
             prompt_tokens=prompt_tokens,

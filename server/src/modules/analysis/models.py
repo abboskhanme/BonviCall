@@ -1,6 +1,6 @@
-"""Analysis ORM models (SPEC-ANALYTICS §2.2).
+"""Analysis ORM models (SPEC-ANALYTICS §2.2, and the rubric table on top of it).
 
-Four tables, and **not one column on an existing one**. BonviZvonki writes the
+Five tables, and **not one column on an existing one**. BonviZvonki writes the
 transcript onto ``calls.transcript`` and the pipeline stage onto
 ``calls.status``; here both are rows of their own, so deploying this feature
 cannot lock, rewrite or widen the busiest table in the product. The state row
@@ -15,6 +15,12 @@ of the size, so ``audio_retention`` does not touch these rows (§2.3).
 
 Money is integer **micro-USD** (1 USD = 1,000,000). No float, no ``Decimal``,
 and ``NULL``/``0`` in a cost column means *not priced* — never "free" (§11.1).
+
+``rubrics`` is the fifth table and the one an admin writes to. §2.5 pinned the
+rubric in code for phase 1 and said phase 2 would read the active row instead;
+this is that row. Nothing about the other four changes: a score still carries
+the ``rubric_version`` it was produced under, and that string still means what
+it says because a rubric is **published, never edited in place**.
 """
 
 from __future__ import annotations
@@ -371,6 +377,105 @@ class CallAnalysisStateModel(Base, UUIDMixin, TimestampMixin):
             "ix_analysis_state_failure",
             "failure_code",
             postgresql_where=sa.text("stage = 'failed'"),
+        ),
+    )
+
+
+class RubricModel(Base, UUIDMixin, TimestampMixin):
+    """One published version of the scoring rubric (SPEC-ANALYTICS §2.5).
+
+    **The rubric is versioned, and that is the whole design.** An edited rubric
+    cannot be compared with the scores it did not produce, so every save writes
+    a NEW row and the old one stays exactly as it was. ``call_scores.rubric_version``
+    holds ``"v<version>"`` and therefore keeps meaning what it says: the row
+    named there is the one a disputed number was produced against.
+
+    An empty table is a legal, working state: ``RubricService.active()`` falls
+    back to ``rubric_default.DEFAULT_RUBRIC``, so a database that was never
+    seeded still scores. Reading does not write — BonviZvonki's ``get_active()``
+    inserted the default row on first read, which made a GET a write and left
+    its router calling ``session.commit()`` after a read.
+    """
+
+    __tablename__ = "rubrics"
+
+    version: Mapped[int] = mapped_column(
+        sa.Integer,
+        nullable=False,
+        unique=True,
+        doc=(
+            "Publish order, from 1. Stamped onto every score it produced as "
+            "'v<version>' (rubric_default.version_label), which is what makes "
+            "call_scores.rubric_version resolvable back to this row."
+        ),
+    )
+    name: Mapped[str] = mapped_column(
+        sa.String(128),
+        nullable=False,
+        doc="What the admin called this version; shown in the version history.",
+    )
+    description: Mapped[str | None] = mapped_column(
+        sa.Text,
+        nullable=True,
+        doc="Why it was published. Optional, and the only place that reason survives.",
+    )
+    is_active: Mapped[bool] = mapped_column(
+        sa.Boolean,
+        nullable=False,
+        server_default=sa.text("false"),
+        doc="Exactly one row is true; new scores use it. Held by a partial unique index.",
+    )
+    blocks: Mapped[list[Any]] = mapped_column(
+        postgresql.JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+        doc=(
+            "[{key, label, max, criteria: [{id, label, points, description, optional}]}]. "
+            "The blocks total exactly 100 — RubricService refuses anything else."
+        ),
+    )
+    red_flags: Mapped[list[Any]] = mapped_column(
+        postgresql.JSONB,
+        nullable=False,
+        server_default=sa.text("'[]'::jsonb"),
+        doc=(
+            "[{type, label, penalty, zeroes_score, description}]. 'type' is the key the "
+            "model must answer with, so it is validated against RED_FLAG_KEY on save."
+        ),
+    )
+    extra_rules: Mapped[str | None] = mapped_column(
+        sa.Text,
+        nullable=True,
+        doc=(
+            "The admin's own instructions, appended to the prompt as a section of their "
+            "own. Stored HERE and not in app_settings so it is versioned with the rubric: "
+            "otherwise a score could not say which instructions produced it, and rolling "
+            "a bad edit back would not bring the text back with it."
+        ),
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        postgresql.UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        doc=(
+            "Who published it. NULL for the migration's seed and for a publisher whose "
+            "account was later deleted — the version itself must outlive the account, "
+            "because scores point at it."
+        ),
+    )
+
+    __table_args__ = (
+        # "Only one active rubric" is held by the DATABASE, adopted from
+        # BonviZvonki together with the reason it learned it: a plain index was
+        # not enough. Two parallel saves, or one hand-written UPDATE, left two
+        # `is_active = true` rows, and `scalar_one_or_none()` then raised
+        # MultipleResultsFound — which stopped ALL scoring with a 500. Partial,
+        # so historical versions may be as many as they like.
+        sa.Index(
+            "ix_rubrics_single_active",
+            "is_active",
+            unique=True,
+            postgresql_where=sa.text("is_active"),
         ),
     )
 

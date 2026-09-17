@@ -1,4 +1,10 @@
-"""The 100-point rubric, pinned in code for phase 1 (SPEC-ANALYTICS §2.5).
+"""The 100-point rubric — the seed of the ``rubrics`` table, and its fallback.
+
+Phase 1 pinned this constant as *the* rubric (SPEC-ANALYTICS §2.5). It is now
+the **default**: migration 012 seeds it as version 1, an admin publishes further
+versions through the panel, and ``RubricService.active()`` falls back to it when
+the table is empty — so a database nobody seeded still scores, with the same
+numbers it scored with yesterday.
 
 **This file is allow-listed for Uzbek text** (CONVENTIONS.md §14, SPEC-ANALYTICS
 §1.6). The criterion labels and descriptions are not messages a user reads — they
@@ -8,9 +14,9 @@ speech. Translating them would be an untested change to the product's most
 sensitive input. Comments and docstrings around them are English like everywhere
 else.
 
-Rule: the blocks total **exactly 100**. BonviZvonki enforced that in
-``RubricService._validate`` when an admin saved a rubric; phase 1 has no such
-screen, so ``tests/test_scoring.py`` asserts it instead.
+Rule: the blocks total **exactly 100**. ``rubric_service.validate_rubric``
+refuses anything else when an admin saves, and ``tests/test_scoring.py`` asserts
+the same of this constant — the screen and the seed are held to one rule.
 
 ## ``optional`` — A CRITERION DOES NOT APPLY TO EVERY CONVERSATION
 
@@ -42,12 +48,33 @@ be left and every call would score 100.
 
 from typing import Any
 
-#: Stamped on every score row. Changing ``DEFAULT_RUBRIC`` means bumping this in
-#: the same commit: a modified rubric under an unchanged version makes two
-#: scores incomparable while claiming they are comparable (§2.5). Phase 2 reads
-#: the active rubric row instead, and every phase-1 score already carries "v1",
-#: so nothing needs back-filling.
-RUBRIC_VERSION = "v1"
+#: The version number migration 012 seeds this rubric under, and the one the
+#: fallback reports when the table is empty.
+#
+# CHANGING ``DEFAULT_RUBRIC`` MEANS BUMPING THIS IN THE SAME COMMIT (§2.5). A
+# modified rubric under an unchanged version makes two scores incomparable while
+# claiming they are comparable — and now there is a second reader of the rule: a
+# database migrated today would seed the new text as "v1" while a database
+# migrated last month holds the old text under the same name. Bumping the number
+# keeps those two apart.
+DEFAULT_RUBRIC_VERSION = 1
+
+
+def version_label(version: int) -> str:
+    """``1 -> "v1"`` — the string stamped on a score.
+
+    One function, because the same string is written to
+    ``call_scores.rubric_version``, read back by the panel and compared against
+    the version history. Two spellings of it would make a score point at a
+    version nobody can find.
+    """
+    return f"v{version}"
+
+
+#: Stamped on every score produced against the default rubric. Every phase-1
+#: score already carries "v1", so seeding the default as version 1 leaves them
+#: pointing at the row that really did produce them — nothing to back-fill.
+RUBRIC_VERSION = version_label(DEFAULT_RUBRIC_VERSION)
 
 DEFAULT_RUBRIC: dict[str, Any] = {
     "name": "Bonvi savdo rubrikasi v1",

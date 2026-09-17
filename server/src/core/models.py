@@ -26,6 +26,7 @@ from src.modules.analysis.models import (  # noqa: F401
     CallAnalysisStateModel,
     CallScoreModel,
     CallTranscriptModel,
+    RubricModel,
 )
 from src.modules.audio.models import (  # noqa: F401
     AudioUploadSessionModel,

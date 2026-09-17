@@ -1,8 +1,9 @@
 """Analysis wire schemas (SPEC-ANALYTICS §6.2, §7).
 
-Three panel pages read this module and nothing else reads it: the scored-call
-list (§7.3), one call's analysis (§7.4) and the operational queue view (§7.5).
-Every field below exists because one of those three renders it.
+Four panel pages read this module and nothing else reads it: the scored-call
+list (§7.3), one call's analysis (§7.4), the operational queue view (§7.5) and
+the rubric editor (§2.5, the last section of this file). Every field below
+exists because one of those four renders it.
 
 **Neither response object is a list of rows**, which is why
 :class:`CallAnalysisResponse` and :class:`AnalysisStatusResponse` avoid the
@@ -34,6 +35,7 @@ from src.core.enums import (
     TranscriptQuality,
 )
 from src.modules.analysis.entities import ScoreSummary
+from src.modules.analysis.prompt import MAX_EXTRA_RULES
 
 # --- The score band, derived and never retyped -------------------------------
 
@@ -511,4 +513,234 @@ class AnalysisStatusResponse(BaseModel):
     month: AnalysisMonthResponse
     recent_failures: list[AnalysisFailureRow] = Field(
         description="Newest first, capped at 20 server-side. Not a paged list (§6.2)."
+    )
+
+
+# --- The rubric (§2.5) -------------------------------------------------------
+#
+# The rubric is the one part of the analysis surface an admin WRITES. Its three
+# nested models are used in both directions — the editor sends back the shape it
+# was given — which is deliberate: a separate request shape would be a second
+# place to add a field to, and the field that gets forgotten is always the one
+# the prompt reads.
+#
+# Cross-field rules (the blocks total 100, a block totals its own maximum, a
+# red-flag key is unique and well formed) are NOT here. They live in
+# ``rubric_service.validate_rubric`` because they are the service layer's job
+# (CONVENTIONS.md §2) and because their refusal carries a machine ``reason`` the
+# panel renders a sentence from.
+
+
+class RubricCriterion(BaseModel):
+    """One criterion inside a block."""
+
+    id: str = Field(
+        min_length=1,
+        max_length=16,
+        description="Short key, e.g. `A2`. The model answers per criterion under it.",
+    )
+    label: str = Field(min_length=1, max_length=200)
+    points: int = Field(
+        ge=0,
+        le=100,
+        description="This criterion's own maximum. The block's criteria must sum to its `max`.",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="What earns the points; goes into the prompt verbatim.",
+    )
+    optional: bool = Field(
+        default=False,
+        description=(
+            "Whether the model may mark this criterion `na` — not applicable to "
+            "this conversation — and have it left out of the arithmetic entirely. "
+            "**Defaults to false on purpose**: a criterion nobody thought about "
+            "must be assessed, not quietly droppable. Most Bonvi customers are "
+            "returning ones who state their order in a sentence; without this "
+            "flag the full sales script is applied to a 30-second call and the "
+            "employee scores 40 for doing everything right."
+        ),
+    )
+
+
+class RubricBlock(BaseModel):
+    """One block: a heading, a maximum, and the criteria that add up to it."""
+
+    key: str = Field(
+        min_length=1,
+        max_length=32,
+        description=(
+            "The key `call_scores.blocks` is keyed by. Changing it on a published "
+            "rubric orphans the bars of every score written under the old one."
+        ),
+    )
+    label: str = Field(min_length=1, max_length=200)
+    max: int = Field(ge=1, le=100, description="Block maximum. All blocks total exactly 100.")
+    criteria: list[RubricCriterion]
+
+
+class RubricRedFlag(BaseModel):
+    """One rule whose breach costs points, with the penalty it costs."""
+
+    type: str = Field(
+        min_length=2,
+        max_length=32,
+        description=(
+            "The key the model must answer with. `[a-z][a-z0-9_]{1,31}` — checked "
+            "again in the service, because a key the model cannot reproduce makes "
+            "every answer fail validation and stops all scoring."
+        ),
+    )
+    label: str = Field(min_length=1, max_length=200)
+    penalty: int = Field(
+        le=0,
+        ge=-100,
+        description=(
+            "Negative, always: a red flag subtracts. Zero is legal and means "
+            "'record it, but do not charge for it'."
+        ),
+    )
+    zeroes_score: bool = Field(
+        default=False,
+        description=(
+            "Whether this flag takes the whole score to 0. The heaviest sanction "
+            "in the product — swearing at a customer — and the panel never sets it "
+            "on a NEW flag: one miscategorised rule would zero an employee's month."
+        ),
+    )
+    description: str | None = Field(default=None, max_length=1000)
+
+
+class RubricResponse(BaseModel):
+    """The active rubric, or a single version of it."""
+
+    id: uuid.UUID | None = Field(
+        description="NULL when nothing has been published and this is the pinned default."
+    )
+    version: int
+    label: str = Field(
+        description=(
+            "`v3` — **exactly the string `call_scores.rubric_version` holds**, so a "
+            "score can be traced back to the criteria that produced it."
+        )
+    )
+    name: str
+    description: str | None
+    is_active: bool
+    stored: bool = Field(
+        description=(
+            "False means no row exists yet and this is `rubric_default.DEFAULT_RUBRIC`, "
+            "which is what an unseeded database still scores with. The editor says so "
+            "rather than pretending somebody published it."
+        )
+    )
+    blocks: list[RubricBlock]
+    red_flags: list[RubricRedFlag]
+    extra_rules: str | None = Field(
+        description=(
+            "The admin's own instructions, appended to the prompt as a section of "
+            "their own. Versioned with the rubric, so a score can say which "
+            "instructions produced it."
+        )
+    )
+    extra_rules_limit: int = Field(
+        description=(
+            "`prompt.MAX_EXTRA_RULES`. Sent with the rubric so the editor's counter "
+            "cannot disagree with what the server accepts — BonviZvonki wrote the "
+            "number into its page as well and had two copies of one limit."
+        )
+    )
+    created_at: datetime | None
+
+
+class RubricVersionSummary(BaseModel):
+    """One line of the version history. Nothing is ever deleted from it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    version: int
+    label: str
+    name: str
+    is_active: bool
+    created_at: datetime
+
+
+class RubricVersionListResponse(BaseModel):
+    """Every published version, newest first (SPEC §4.0's list shape)."""
+
+    items: list[RubricVersionSummary]
+    total: int
+
+
+class PublishRubricRequest(BaseModel):
+    """`PUT /analysis/rubric` — **publish the next version**, never edit this one.
+
+    There is no update endpoint and no rubric id in this body, and that is the
+    design: the version that scored yesterday's calls has to stay exactly as it
+    was, or `call_scores.rubric_version` stops meaning anything.
+    """
+
+    name: str = Field(
+        min_length=2,
+        max_length=128,
+        description=(
+            "What to call this version. Required, and the server invents nothing: "
+            "display text belongs to the panel's Uzbek catalogue (§14)."
+        ),
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Why it was published — the only place that reason survives.",
+    )
+    blocks: list[RubricBlock]
+    red_flags: list[RubricRedFlag]
+    extra_rules: str | None = Field(
+        default=None,
+        max_length=MAX_EXTRA_RULES,
+        description=(
+            "Free text, added to the prompt of EVERY call, which is why it is "
+            "capped: its length converts directly into money."
+        ),
+    )
+
+
+class PromptSection(BaseModel):
+    """One named part of the assembled system prompt.
+
+    Sent with ``editable`` because the admin edits exactly one of them and has to
+    see the rest: without the surrounding context they repeat an instruction that
+    is already there (and pay for the tokens) or contradict it.
+    """
+
+    key: str
+    editable: bool
+    text: str
+
+
+class RubricPromptResponse(BaseModel):
+    """What is actually sent to the model, assembled from the active rubric.
+
+    **Assembled by the server, never rebuilt in the panel.** Two copies of this
+    text would drift, and then the screen would show one prompt while the model
+    received another — a bug with no symptom.
+    """
+
+    rubric_version: int
+    rubric_label: str
+    sections: list[PromptSection]
+    full_text: str
+    char_count: int
+    approx_tokens: int = Field(
+        description=(
+            "A rough count paid on every call: Uzbek and Russian run at roughly "
+            "3.3 characters per token. An order of magnitude, not an invoice."
+        )
+    )
+    extra_rules_limit: int = Field(
+        description=(
+            "`prompt.MAX_EXTRA_RULES`, so the editor's counter cannot disagree "
+            "with what the server accepts."
+        )
     )
