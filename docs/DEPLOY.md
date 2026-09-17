@@ -219,6 +219,73 @@ panel.
 
 ---
 
+## Turning the call analysis on (the first time)
+
+The analysis module ships **off**: `analysis.enabled` is seeded `false`, so a
+deployment that carries this code analyses nothing and spends nothing until
+somebody does the five steps below deliberately.
+
+### 1. The key
+
+Gemini does both roles — the audio and the scoring (`docs/SPEC-ANALYTICS.md`
+§4.1). Get a key from <https://aistudio.google.com/apikey> and put it in the
+deployment's `.env`:
+
+```sh
+AI_GEMINI_API_KEY=…
+```
+
+It lives in the environment and not in `app_settings` for a reason worth
+knowing: `settings:read` is granted to **manager**, so a key in that table is a
+key every manager can read (§4.2).
+
+### 2. Cap the trial before the trial
+
+**Do this before step 4, not after.** The money cap cannot protect anything yet
+— the three price settings are seeded `0`, so every call records a cost of zero
+and the cap has nothing to add up. The cap that works is the call count:
+
+```sql
+UPDATE app_settings SET value = '20'::jsonb WHERE key = 'analysis.monthly_max_calls';
+```
+
+Twenty calls is the measurement, not the rollout. It answers the one question
+nobody can answer from a price list: what one real Uzbek sales call costs, end
+to end, at this audio length and this prompt.
+
+### 3. Turn it on
+
+```sql
+UPDATE app_settings SET value = 'true'::jsonb WHERE key = 'analysis.enabled';
+```
+
+### 4. Restart the worker — it is the part that does the work
+
+```sh
+docker compose -f docker-compose.prod.yml up -d backend worker
+```
+
+The four jobs (`analysis_dispatch`, `analysis_run`, `analysis_stale_reset`,
+`analysis_retry_transient`) are registered at process start. A worker that was
+already running when this code arrived will not know about them, and nothing
+will be analysed while everything looks correct — the failure this project has
+already met four times (`docs/STATUS.md`).
+
+### 5. Watch it, then decide
+
+`TAHLIL → Tahlil navbati` in the panel is the page for this: what is queued,
+what failed and why, which provider is cooling down, and the month's spend
+against the caps. When twenty calls have been scored, read the cost off that
+page, enter the real prices into the three `analysis.price_*` settings, and only
+then raise `analysis.monthly_max_calls` to the fleet's real volume.
+
+**The audio leaves this server at step 3 and not before.** It goes to Google,
+for transcription only; the scoring step sends text. That is a decision the
+client made on 2026-09-17 and it is the reason this section exists rather than
+a `docker compose up` line.
+
+---
+
 ## What is still missing
 
 Honest list, so nobody believes this is finished.
