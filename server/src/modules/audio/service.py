@@ -23,7 +23,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import IO
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import clock
@@ -590,6 +590,29 @@ class AudioService:
         return True
 
     # --- The analysis seam (SPEC-ANALYTICS §3) -----------------------------
+
+    @staticmethod
+    def live_audio_call_ids() -> Select:
+        """``SELECT call_id FROM call_audio WHERE deleted_at IS NULL``.
+
+        A **subquery**, not an answer, so the analysis dispatch gate can put it
+        inside its own set-based statement rather than asking per call
+        (SPEC-ANALYTICS §2.6).
+
+        It exists because ``calls.has_audio`` is not the whole truth:
+        :meth:`apply_retention` deletes the blob, sets ``deleted_at`` and
+        deliberately leaves ``has_audio`` true — the row is the record that
+        there *was* a recording. A gate written on ``has_audio`` alone therefore
+        queues calls whose bytes are gone, and every one of them travels through
+        a claim and a provider client to be told what this column already knew.
+
+        Here rather than in ``modules/analysis`` because **what counts as a
+        live recording is this module's rule** (CONVENTIONS.md §2): analysis has
+        no foreign key into ``call_audio`` and must not learn its shape. A
+        column projection, never ``select(CallAudioModel)``, so no ORM entity
+        leaves this module.
+        """
+        return select(CallAudioModel.call_id).where(CallAudioModel.deleted_at.is_(None))
 
     async def analysis_source(
         self,

@@ -117,6 +117,30 @@ class ErrorCode:
     # --- Settings (SPEC §3.11) --------------------------------------------
     RETENTION_CONFIRMATION_REQUIRED = "retention_confirmation_required"
 
+    # --- Call analysis (SPEC-ANALYTICS §6.3) -------------------------------
+    #
+    # Four codes, all 409, all answers to "no, not this call, not now". The
+    # nineteen ``AnalysisFailure`` values are deliberately NOT here: they are
+    # written to ``call_analysis_state.failure_code`` and read back through
+    # ``GET /analysis/calls/{id}``, and they never leave through an HTTP
+    # status. Mixing the two vocabularies would put nineteen codes into the
+    # wire contract to describe things no request ever caused.
+
+    #: The feature is off for this deployment (``analysis.enabled``). One
+    #: settings row turns it on, and the same row is the rollback.
+    ANALYSIS_DISABLED = "analysis_disabled"
+    #: This month's spend cap has been reached — either the money one or the
+    #: call one. Which of the two is in the response detail, because they are
+    #: raised by different people for different reasons.
+    ANALYSIS_COST_CAP_REACHED = "analysis_cost_cap_reached"
+    #: The call has no recording, is too short, or is not an external answered
+    #: call. The detail names the rule that refused it.
+    CALL_NOT_ANALYSABLE = "call_not_analysable"
+    #: No API key, an unknown provider, or a provider that does not do this
+    #: role. A configuration answer: the same request will fail identically
+    #: until somebody changes the environment or the settings row.
+    AI_NOT_CONFIGURED = "ai_not_configured"
+
     # --- App versions (N33, N34) ------------------------------------------
     #: Raising the minimum supported version strands every handset below it,
     #: and these are personally owned phones: a stranded one stops reporting

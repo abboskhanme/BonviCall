@@ -5,13 +5,25 @@ which is what lets a validator test assert on the numbers rather than on a
 recorded blob. ``overall_override`` and ``invented_flag`` exist to break it
 deliberately.
 
-Task 7 adds the fake ASR and LLM clients here (SPEC-ANALYTICS §9.1); this file
-holds only what the pure scoring tests need, and imports nothing from ``src``.
+:class:`StubASR` and :class:`StubLLM` are what make every pipeline test run
+without a network. They are attached through ``PipelineDeps``, so **there is no
+"test mode" branch in the production code** — nothing here can be switched on by
+accident on a live system.
+
+``StubASR.calls`` and ``StubLLM.calls`` are the counters that PROVE
+idempotency: on a second run they must not move.
+
+Nothing at module level imports from ``src``: the pure scoring tests import this
+file, and keeping the top of it importless is what lets them run with no
+database and no settings. The two places that need a project exception type
+import it inside the function.
 """
 
 from __future__ import annotations
 
 import random
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Any
 
 # -- A sample transcript (mixed Uzbek/Russian, as the calls really are) -----
@@ -141,3 +153,150 @@ def build_payload(
         # but a provider may still send it — the validator must ignore it.
         "overall_score": overall if overall_override is None else overall_override,
     }
+
+
+# -- Fake providers ---------------------------------------------------------
+
+
+@dataclass
+class StubASR:
+    """Reads the stream to the end, like a real client, and keeps nothing.
+
+    Reading it matters: it is what proves the pipeline handed over a stream
+    that actually yields the recording's bytes, rather than a handle nobody
+    opened.
+    """
+
+    provider_key: str = "stub"
+    model: str = "stub-scribe-v1"
+    text: str = SAMPLE_TRANSCRIPT
+    language: str | None = "mixed"
+    duration_ms: int | None = 90_000
+    #: Every successful transcribe. Must NOT move on a re-run.
+    calls: int = 0
+    bytes_seen: int = 0
+    filenames: list[str] = field(default_factory=list)
+    languages: list[str | None] = field(default_factory=list)
+    #: Answer 429 this many times, then succeed.
+    fail_with_429: int = 0
+    #: A daily quota, which is never retried and opens a long cooldown.
+    daily_quota: bool = False
+    error: Exception | None = None
+    closed: int = 0
+
+    async def transcribe(
+        self,
+        audio: AsyncIterator[bytes],
+        *,
+        filename: str,
+        language: str | None = None,
+    ) -> Any:
+        from src.modules.analysis.providers.types import Transcript
+
+        seen = 0
+        async for chunk in audio:
+            seen += len(chunk)
+        self.bytes_seen = seen
+        self.filenames.append(filename)
+        self.languages.append(language)
+
+        if self.fail_with_429 > 0:
+            self.fail_with_429 -= 1
+            from src.modules.analysis.errors import ProviderRateLimitError
+
+            raise ProviderRateLimitError(
+                "Stub provider hit its request limit (429)",
+                retry_after_sec=0.0,
+                daily_quota=self.daily_quota,
+            )
+        if self.error is not None:
+            raise self.error
+
+        self.calls += 1
+        return Transcript(
+            text=self.text,
+            provider=self.provider_key,
+            model=self.model,
+            language=self.language,
+            duration_ms=self.duration_ms,
+        )
+
+    async def ping(self) -> str:
+        return "ok"
+
+    async def aclose(self) -> None:
+        self.closed += 1
+
+
+@dataclass
+class StubLLM:
+    """Builds an answer that really matches the rubric it was given."""
+
+    model: str = "stub-haiku"
+    provider_key: str = "stub"
+    #: Every successful completion, retries included.
+    calls: int = 0
+    #: Ready-made answers; when set they replace the generated one.
+    responses: list[str] = field(default_factory=list)
+    prompts: list[str] = field(default_factory=list)
+    systems: list[str] = field(default_factory=list)
+    fail_with_429: int = 0
+    daily_quota: bool = False
+    error: Exception | None = None
+    ratio: float = 0.8
+    red_flags: tuple[str, ...] = ()
+    confidence: float = 0.92
+    quality: str = "high"
+    seed: int = 0
+    rubric_blocks: list[dict[str, Any]] = field(default_factory=list)
+    rubric_red_flags: list[dict[str, Any]] = field(default_factory=list)
+    closed: int = 0
+
+    async def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any] | None = None,
+        max_tokens: int = 4096,
+    ) -> str:
+        import json
+
+        if self.fail_with_429 > 0:
+            self.fail_with_429 -= 1
+            from src.modules.analysis.errors import ProviderRateLimitError
+
+            raise ProviderRateLimitError(
+                "Stub provider hit its request limit (429)",
+                retry_after_sec=0.0,
+                daily_quota=self.daily_quota,
+            )
+        if self.error is not None:
+            raise self.error
+
+        self.calls += 1
+        self.systems.append(system)
+        self.prompts.append(user)
+        if self.responses:
+            index = min(self.calls - 1, len(self.responses) - 1)
+            return self.responses[index]
+        return json.dumps(
+            build_payload(
+                self.rubric_blocks,
+                self.rubric_red_flags,
+                ratio=self.ratio,
+                red_flags=self.red_flags,
+                confidence=self.confidence,
+                quality=self.quality,
+                # A different score per call, so fifty scored calls do not all
+                # come out as the same 76.
+                seed=self.seed + self.calls,
+            ),
+            ensure_ascii=False,
+        )
+
+    async def ping(self) -> str:
+        return "OK"
+
+    async def aclose(self) -> None:
+        self.closed += 1

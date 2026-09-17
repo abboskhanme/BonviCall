@@ -129,6 +129,27 @@ MESSAGES: dict[str, str] = {
         "Bu fayl qabul qilinmadi. U APK emas yoki boshqa kalit bilan "
         "imzolangan — bunday ilovani telefonga yangilab o'rnatib bo'lmaydi."
     ),
+    # --- Call analysis (SPEC-ANALYTICS §6.3) ------------------------------
+    #
+    # Each one says what to do next, not just what went wrong: these appear
+    # under a button an admin has just pressed, and "409" on its own sends
+    # somebody to ask a developer.
+    ErrorCode.ANALYSIS_DISABLED: (
+        "Qo'ng'iroqlarni tahlil qilish o'chirilgan. Uni Sozlamalardan "
+        "yoqish mumkin."
+    ),
+    ErrorCode.ANALYSIS_COST_CAP_REACHED: (
+        "Bu oy uchun tahlil chegarasi tugadi. Sozlamalardagi oylik chegarani "
+        "ko'tarmaguningizcha yangi qo'ng'iroqlar tahlil qilinmaydi."
+    ),
+    ErrorCode.CALL_NOT_ANALYSABLE: (
+        "Bu qo'ng'iroq tahlil qilinmaydi: yozuvi yo'q, juda qisqa yoki "
+        "mijoz bilan bo'lgan suhbat emas."
+    ),
+    ErrorCode.AI_NOT_CONFIGURED: (
+        "Tahlil provayderi sozlanmagan: kalit kiritilmagan yoki tanlangan "
+        "model mavjud emas. Administrator serverda sozlashi kerak."
+    ),
     # --- Device protocol (English on purpose, see the module docstring) ----
     ErrorCode.HEADER_MISSING: "A required request header is missing.",
     ErrorCode.CHUNK_OFFSET_MISMATCH: "Chunk offset does not match the session state.",
