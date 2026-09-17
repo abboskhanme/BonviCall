@@ -167,7 +167,10 @@ AnalysisService ──► CallService.get(principal, id) (scope is decided there
 
 > **The provider list in the brief is stale, and the code is the authority.**
 > The registry today holds **three** providers — `openai`, `gemini`,
-> `anthropic`. `groq` and `elevenlabs` were removed with a 20-line comment
+> `anthropic` — and phase 1 ships **two** of them: the client has ruled OpenAI
+> out (§4.1), so `providers/openai.py` and its registry row do not come across.
+> `openai_compat.py` does, because it is the shared protocol adapter rather
+> than a vendor. `groq` and `elevenlabs` were removed with a 20-line comment
 > recording why (Groq/Whisper produced Tibetan script and English "translations"
 > for Uzbek speech across five real calls; ElevenLabs was dropped by the client
 > and never tested). Both SDKs are still pinned in BonviZvonki's
@@ -578,16 +581,30 @@ async def analysis_source(self, call_id: uuid.UUID) -> AnalysisSource: ...
 `registry.py` holds one `AIProvider` entry per vendor; adding a vendor is adding
 an entry. `client_kind` selects the protocol, so any OpenAI-compatible vendor
 (DeepSeek, Together, Fireworks, xAI, Mistral) needs a registry row and a
-`base_url` and no code at all. Phase 1 ships the three that exist:
+`base_url` and no code at all.
+
+**Client decision, 2026-09-17: speech-to-text runs on Gemini; OpenAI is not
+wanted. Scoring the transcript may use Claude, and the provider stays a setting,
+because BonviZvonki already made it one.**
+
+Phase 1 therefore ships two providers:
 
 | Key | Roles | Default model | Why |
 |---|---|---|---|
-| `gemini` | ASR, LLM | `gemini-3.1-flash-lite` | **The only ASR tested on real Uzbek calls that works.** It takes audio directly, separates speakers, and emits the timestamps the prompt asks for. Its free tier allows 500 requests/day against the flash family's 20. |
-| `anthropic` | LLM | `claude-haiku-4-5` | The intended scorer. Text only. |
-| `openai` | ASR, LLM | `gpt-4o-transcribe` / `gpt-4.1-mini` | Present so a switch is a settings change. Uzbek ASR quality is mediocre — the registry comment says so. |
+| `gemini` | ASR (+ LLM capable) | `gemini-3.1-flash-lite` | **The only ASR tested on real Uzbek calls that works.** It takes audio directly, separates speakers, and emits the timestamps the prompt asks for. Its free tier allows 500 requests/day against the flash family's 20. |
+| `anthropic` | LLM | `claude-haiku-4-5` | The scorer. Text only — no audio ever reaches it. |
+
+`openai` is **not ported** in phase 1 (§8): it is the one provider the client
+has ruled out, and carrying an unused SDK means a dependency, a key, a code
+path and a set of tests that nothing exercises. `openai_compat.py` still comes
+across, because it is the protocol adapter every OpenAI-compatible vendor needs
+— adding DeepSeek, Together or xAI later is then a registry row and a
+`base_url`, with no code. What phase 1 does not ship is the `openai` **row**.
 
 Defaults resolve to `gemini` for ASR and `anthropic` for LLM
-(`default_provider_key`). Both are overridable per role in `app_settings`.
+(`default_provider_key`). Both stay overridable per role in `app_settings`, so
+moving scoring from Claude to Gemini — or to a vendor added later — is a
+settings change and not a release.
 
 ### 4.2 Keys live in the environment, not in `app_settings`
 
@@ -608,7 +625,9 @@ lines to `.env.example` in the same commit (that file's own rule):
 
 ```python
 ai_gemini_api_key:    SecretStr = SecretStr("")   # AI_GEMINI_API_KEY
-ai_openai_api_key:    SecretStr = SecretStr("")   # AI_OPENAI_API_KEY
+# No `ai_openai_api_key`: the client has ruled OpenAI out (§4.1). A vendor
+    # added later brings its own line here — and a key with no provider row is
+    # a secret in a `.env` for no reason.
 ai_anthropic_api_key: SecretStr = SecretStr("")   # AI_ANTHROPIC_API_KEY
 ```
 
@@ -638,8 +657,10 @@ Add to `server/requirements.txt`:
 # not start (analysis/providers/builders.py).
 google-genai==2.18.1
 anthropic==0.122.0
-openai==3.1.0
 ```
+
+`openai` is deliberately absent — see §4.1. The `openai_compat` adapter is
+vendor-agnostic HTTP over `httpx` and needs no SDK.
 
 **Client decision, 2026-09-17: pin the newest STABLE release of each of these,
 not BonviZvonki's versions.** BonviZvonki's pins are a starting point, not a
