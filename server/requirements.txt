@@ -33,6 +33,17 @@ structlog==24.4.0
 # this is the process that deletes audio irreversibly.
 apscheduler==3.10.4
 
+# The SAP `.xlsx` reader (modules/sales). Newest stable at pin time.
+#
+# NOT a free choice between spreadsheet libraries: the sales export
+# arrives in two generations whose money cells are told apart ONLY by
+# `cell.number_format` (an old-export `#,##0` integer is a thousand times
+# too large — 146,000 $ stored as 146 $). openpyxl is the only reader that
+# exposes the format; python-calamine and xlsx2csv discard it, and the
+# defect would be silent. `pandas` would bring a numeric stack this server
+# has no other use for.
+openpyxl==3.1.5
+
 # AI providers — the official vendor SDK, imported lazily INSIDE the client
 # (analysis/providers/gemini.py) so that a missing package is a clear error at
 # call time rather than a server that will not start.
