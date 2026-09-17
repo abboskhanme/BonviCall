@@ -92,7 +92,7 @@ server/src/modules/analysis/
 │   ├── builders.py     PORT  client_kind → client class
 │   ├── gemini.py       PORT
 │   ├── openai_compat.py PORT
-│   └── anthropic.py    PORT
+│   └── (anthropic.py — phase 2, with Claude)
 └── tests/
     ├── test_analysis_api.py       RBAC 401/403/404 for three endpoints
     ├── test_analysis_rules.py     every function in rules.py
@@ -162,15 +162,15 @@ AnalysisService ──► CallService.get(principal, id) (scope is decided there
 | `ai/infrastructure/providers/base.py` | 123 (70) | `providers/base.py` | **copy + rewire** (≈10) | `collect_audio()`'s `MAX_AUDIO_MB = 200` guard stays but is now a second line of defence: the size is known from `call_audio.bytes` before a byte is read, so the pipeline refuses oversized audio without allocating (§3). `silence_wav()` and `guess_mime()` copy unchanged. |
 | `ai/infrastructure/providers/gemini_provider.py` | 207 (146) | `providers/gemini.py` | **copy as-is** (imports only, ≈6) | The `_TRANSCRIBE_PROMPT` constant stays **in Uzbek** — see §1.6. `_SKIP`/`_RETIRED` model filters stay. |
 | `ai/infrastructure/providers/openai_compat.py` | 199 (153) | `providers/openai_compat.py` | **copy as-is** (≈6) | — |
-| `ai/infrastructure/providers/anthropic_provider.py` | 102 (71) | `providers/anthropic.py` | **copy as-is** (≈4) | — |
+| `ai/infrastructure/providers/anthropic_provider.py` | 102 (71) | — | **not in phase 1** | Returns with Claude: one pinned SDK, one key, one registry row (§4.1). |
 | `ai/tests/*` | 738 | see §9 | partial | `test_provider_requests.py` and `test_registry_and_factory.py` port; `test_settings_endpoint.py` does not. |
 
 > **The provider list in the brief is stale, and the code is the authority.**
 > The registry today holds **three** providers — `openai`, `gemini`,
-> `anthropic` — and phase 1 ships **two** of them: the client has ruled OpenAI
-> out (§4.1), so `providers/openai.py` and its registry row do not come across.
-> `openai_compat.py` does, because it is the shared protocol adapter rather
-> than a vendor. `groq` and `elevenlabs` were removed with a 20-line comment
+> `anthropic` — and phase 1 ships **one** of them: Gemini does both roles
+> (§4.1). `providers/openai.py`, `providers/anthropic.py` and their registry
+> rows do not come across in phase 1; `openai_compat.py` does, because it is
+> the shared protocol adapter rather than a vendor. `groq` and `elevenlabs` were removed with a 20-line comment
 > recording why (Groq/Whisper produced Tibetan script and English "translations"
 > for Uzbek speech across five real calls; ElevenLabs was dropped by the client
 > and never tested). Both SDKs are still pinned in BonviZvonki's
@@ -583,28 +583,37 @@ an entry. `client_kind` selects the protocol, so any OpenAI-compatible vendor
 (DeepSeek, Together, Fireworks, xAI, Mistral) needs a registry row and a
 `base_url` and no code at all.
 
-**Client decision, 2026-09-17: speech-to-text runs on Gemini; OpenAI is not
-wanted. Scoring the transcript may use Claude, and the provider stays a setting,
-because BonviZvonki already made it one.**
+**Client decision, 2026-09-17: BOTH roles run on Gemini for now. OpenAI is
+ruled out. Claude is a later step, not phase 1.**
 
-Phase 1 therefore ships two providers:
+Phase 1 therefore ships exactly one provider:
 
 | Key | Roles | Default model | Why |
 |---|---|---|---|
-| `gemini` | ASR (+ LLM capable) | `gemini-3.1-flash-lite` | **The only ASR tested on real Uzbek calls that works.** It takes audio directly, separates speakers, and emits the timestamps the prompt asks for. Its free tier allows 500 requests/day against the flash family's 20. |
-| `anthropic` | LLM | `claude-haiku-4-5` | The scorer. Text only — no audio ever reaches it. |
+| `gemini` | ASR **and** LLM | `gemini-3.1-flash-lite` | **The only ASR tested on real Uzbek calls that works.** It takes audio directly, separates speakers, and emits the timestamps the prompt asks for. Its free tier allows 500 requests/day against the flash family's 20. The same vendor scores the transcript, so phase 1 carries one SDK, one key and one bill. |
 
-`openai` is **not ported** in phase 1 (§8): it is the one provider the client
-has ruled out, and carrying an unused SDK means a dependency, a key, a code
-path and a set of tests that nothing exercises. `openai_compat.py` still comes
-across, because it is the protocol adapter every OpenAI-compatible vendor needs
-— adding DeepSeek, Together or xAI later is then a registry row and a
-`base_url`, with no code. What phase 1 does not ship is the `openai` **row**.
+What that buys, beyond less code: the measurement task (§10 task 12) reports
+**one** cost curve rather than two, so the first real number is attributable.
+A second vendor added while nothing has been measured would make "what does a
+call cost" unanswerable at exactly the moment it is asked.
 
-Defaults resolve to `gemini` for ASR and `anthropic` for LLM
-(`default_provider_key`). Both stay overridable per role in `app_settings`, so
-moving scoring from Claude to Gemini — or to a vendor added later — is a
-settings change and not a release.
+Neither `openai` nor `anthropic` is ported in phase 1 (§8). The reasoning is
+the same for both: an unused SDK is a dependency, a key, a code path and a set
+of tests that nothing exercises — and this repo has a test whose whole job is
+to fail when a finished component has no caller.
+
+**Claude comes back as a settings change, not a rewrite.** The registry is a
+table of vendors; `anthropic_provider.py` is 102 lines and `client_kind`
+already selects the protocol. Switching scoring to Claude later is: one pinned
+SDK, one key in the environment, one registry row, one settings value — no
+change to the pipeline, the prompt, the scorer or the schema, because the
+provider is resolved per role at call time. `openai_compat.py` still comes
+across in phase 1, because it is the shared protocol adapter rather than a
+vendor: an OpenAI-compatible vendor added later is a registry row and a
+`base_url`, with no code.
+
+Defaults resolve to `gemini` for both roles (`default_provider_key`), and both
+stay overridable per role in `app_settings`.
 
 ### 4.2 Keys live in the environment, not in `app_settings`
 
@@ -628,7 +637,7 @@ ai_gemini_api_key:    SecretStr = SecretStr("")   # AI_GEMINI_API_KEY
 # No `ai_openai_api_key`: the client has ruled OpenAI out (§4.1). A vendor
     # added later brings its own line here — and a key with no provider row is
     # a secret in a `.env` for no reason.
-ai_anthropic_api_key: SecretStr = SecretStr("")   # AI_ANTHROPIC_API_KEY
+# `ai_anthropic_api_key` arrives with Claude in phase 2 (§4.1).
 ```
 
 `AIProvider.env_var` is replaced by `settings_attr: str` — the **name of the
@@ -640,7 +649,7 @@ configuration surface is declared, and a key read around it would not appear in
 `env_file`. A blank key raises the ported `missing_key()`, which the service
 turns into `409 ai_not_configured`. `legacy_key_settings` is deleted.
 
-**One trap worth naming:** the `openai` and `anthropic` SDKs fall back to their
+**One trap worth naming, for the SDKs phase 2 adds:** the `openai` and `anthropic` SDKs fall back to their
 own `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` environment variables when no key is
 passed. `ClientConfig.api_key` is always passed explicitly, so that fallback is
 never reached — but do not "simplify" by dropping the argument, or an unset
@@ -656,11 +665,12 @@ Add to `server/requirements.txt`:
 # missing package is a clear error at call time rather than a server that will
 # not start (analysis/providers/builders.py).
 google-genai==2.18.1
-anthropic==0.122.0
 ```
 
-`openai` is deliberately absent — see §4.1. The `openai_compat` adapter is
-vendor-agnostic HTTP over `httpx` and needs no SDK.
+**One dependency, because phase 1 has one provider (§4.1).** `anthropic` and
+`openai` are deliberately absent; each returns with its own pinned SDK on the
+day its registry row does. The `openai_compat` adapter needs no SDK at all —
+it is vendor-agnostic HTTP over `httpx`, which is already a dependency.
 
 **Client decision, 2026-09-17: pin the newest STABLE release of each of these,
 not BonviZvonki's versions.** BonviZvonki's pins are a starting point, not a

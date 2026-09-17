@@ -3,12 +3,18 @@ uvicorn[standard]==0.34.0
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 alembic==1.14.0
-# 2.13.5, up from 2.10.4, and bumped on its own rather than alongside the
-# feature that forces it: the call-analysis SDK `google-genai` requires
-# pydantic>=2.12.5 (docs/SPEC-ANALYTICS.md §4.3). Pydantic generates this API's
-# OpenAPI document, so the proof that the bump is a no-op is `make contract`
-# leaving contract/ byte-identical — checked when this pin moved, and the thing
-# to check again the next time it does.
+# 2.13.5, up from 2.10.4, bumped alone and ahead of the feature that forces it:
+# the call-analysis SDK `google-genai` requires pydantic>=2.12.5
+# (docs/SPEC-ANALYTICS.md §4.3).
+#
+# Pydantic generates this API's OpenAPI document, and this bump CHANGES it.
+# 2.11+ emits `additionalProperties: true` on bare-dict fields and 2.12+ adds a
+# `pattern` to Decimal-as-string fields: seven added lines in
+# `contract/openapi-panel-v1.json`, none in the device document the phones'
+# DTOs are generated from. Annotations only — no field, type or name moves — so
+# `make contract` must be re-run and its diff committed alongside this pin.
+# Pinning 2.12.5 instead buys nothing: it produces the same seven lines, so no
+# version both satisfies the SDK and leaves the contract untouched.
 pydantic==2.13.5
 # Backs pydantic's EmailStr: the login form validates the address at the edge
 # rather than letting a typo reach a CITEXT unique index as a 500.
