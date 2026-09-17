@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
+from typing import IO
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +32,8 @@ from src.core.config import get_settings
 from src.core.deps import Principal
 from src.core.enums import (
     ActorType,
+    AnalysisFailure,
+    AudioContainer,
     AudioMissingReason,
     AuditAction,
     CallDisposition,
@@ -118,6 +122,63 @@ class PlaybackSource:
     stat: ObjectStat
     content_type: str
     filename: str
+
+
+#: ``call_audio.container`` → the media type and the file extension the
+#: analysis pipeline hands a provider. Declared as a pair because the vendor
+#: SDKs infer the type from the **filename**: an ``audio/mp4`` body called
+#: ``.ogg`` comes back as a complaint about the codec, which is the least
+#: useful place for this to surface. The container is an enum, so nothing here
+#: has to guess from an HTTP header — the map BonviZvonki needed for that is
+#: one of the pieces this port deletes (SPEC-ANALYTICS §3.2).
+ANALYSIS_MEDIA_TYPES: dict[AudioContainer, tuple[str, str]] = {
+    AudioContainer.OGG: ("audio/ogg", "ogg"),
+    AudioContainer.MP4: ("audio/mp4", "m4a"),
+}
+
+
+@dataclass(frozen=True)
+class AnalysisSource:
+    """One recording, ready for an ASR provider — and no storage key in it.
+
+    ``open`` is bound by :class:`AudioService` over the storage seam, so the
+    caller reads the bytes while holding neither a key nor a path: **no module
+    outside this one opens an audio file** (SPEC §6, CONVENTIONS.md §2). It is
+    the same idiom as :meth:`AudioService.archive_for`, which binds
+    ``open_bytes`` per entry.
+
+    Call ``open()`` once per attempt rather than once per call: a retry after a
+    provider timeout wants a fresh handle, not a stream somebody already read
+    to the end. Opening a local file again costs nothing, which is the whole
+    difference between this and a source that had to be downloaded.
+
+    ``bytes`` and ``duration_ms`` are also the two facts the pipeline records
+    on the transcript row — ASR is billed per second of audio, and a cost
+    nobody measured is a cost nobody can cap (SPEC-ANALYTICS §11.1).
+    """
+
+    call_id: uuid.UUID
+    bytes: int
+    duration_ms: int | None
+    content_type: str
+    filename: str
+    open: Callable[[], IO[bytes]]
+
+
+class AudioNotAnalysable(Exception):
+    """The file is there and readable, but sending it would be waste.
+
+    Carries a :class:`~src.core.enums.AnalysisFailure` and not an
+    ``ErrorCode``: these answers never leave through an HTTP status. They are
+    written to ``call_analysis_state.failure_code`` and read back through the
+    panel (SPEC-ANALYTICS §6.3), so the caller stores ``.failure`` verbatim and
+    there is no second translation table to keep in step with this one.
+    """
+
+    def __init__(self, failure: AnalysisFailure, detail: str) -> None:
+        super().__init__(f"{failure.value}: {detail}")
+        self.failure = failure
+        self.detail = detail
 
 
 class AudioService:
@@ -527,6 +588,100 @@ class AudioService:
         )
         await self.session.commit()
         return True
+
+    # --- The analysis seam (SPEC-ANALYTICS §3) -----------------------------
+
+    async def analysis_source(
+        self,
+        call_id: uuid.UUID,
+        *,
+        min_duration_ms: int | None = None,
+        max_bytes: int | None = None,
+    ) -> AnalysisSource:
+        """Locate one recording for the analysis pipeline, or refuse it.
+
+        **BonviCall owns this file**, so this is a local read. The apparatus
+        BonviZvonki needed because it never owned the bytes — an HTTP stream
+        opened per attempt, a counting passthrough so nothing was ever
+        buffered, a re-download on every retry — has no counterpart here and is
+        not ported (SPEC-ANALYTICS §3.2).
+
+        **No ``Principal``.** The caller is a worker job, not a request, and
+        inventing a principal for it would be a lie. Row-level scope is decided
+        where a person asks (:meth:`playback_source`); nothing here is answered
+        to a browser.
+
+        Four refusals, in the order in which they save money:
+
+        * no ``call_audio`` row at all → ``404 audio_not_found``
+        * ``deleted_at`` set, i.e. retention took it → ``410 audio_expired``
+        * the row is there and the bytes are not → ``404 audio_not_found``
+        * over ``max_bytes``, or under ``min_duration_ms`` →
+          :class:`AudioNotAnalysable`, before a byte is read
+
+        The first two are the same two answers :meth:`_source_for` already
+        gives the panel, so the two readers of ``call_audio`` cannot drift
+        apart. The third is why this stats the file rather than trusting the
+        row: a blob that is gone without ``deleted_at`` — a database restored
+        in front of an unrestored disk, or a hand-deleted file — would
+        otherwise be discovered halfway through a provider call, as a paid-for
+        failure wearing a confusing message.
+
+        ``min_duration_ms`` is measured against the **file**, not the call log.
+        The two disagree exactly when the recorder truncated the call
+        (``calls.audio_duration_mismatch``, UC-14), and that is the case where
+        paying to transcribe is most obviously wasted. An unknown duration is
+        never short: a null is an absent measurement, not a small one.
+
+        Both limits belong to the caller. This module holds no analysis policy
+        and reads no ``analysis.*`` setting; ``None`` means "do not judge".
+        """
+        audio = await self.session.scalar(
+            select(CallAudioModel).where(CallAudioModel.call_id == call_id)
+        )
+        if audio is None:
+            raise NotFoundError(ErrorCode.AUDIO_NOT_FOUND)
+        if audio.deleted_at is not None:
+            raise GoneError(ErrorCode.AUDIO_EXPIRED)
+
+        # Raises 404 ``audio_not_found`` when the key resolves to nothing —
+        # the same answer playback gives, reached the same way.
+        stat = self.storage.stat(audio.storage_key)
+        if max_bytes is not None and stat.bytes > max_bytes:
+            raise AudioNotAnalysable(
+                AnalysisFailure.AUDIO_TOO_LARGE,
+                f"{stat.bytes} bytes exceeds the {max_bytes}-byte ceiling",
+            )
+        if (
+            min_duration_ms is not None
+            and audio.duration_ms is not None
+            and audio.duration_ms < min_duration_ms
+        ):
+            raise AudioNotAnalysable(
+                AnalysisFailure.CALL_TOO_SHORT,
+                f"{audio.duration_ms} ms of audio, floor is {min_duration_ms} ms",
+            )
+
+        content_type, extension = ANALYSIS_MEDIA_TYPES[audio.container]
+        key = audio.storage_key
+        return AnalysisSource(
+            call_id=call_id,
+            # The size on disk, not ``call_audio.bytes``: this is the number
+            # ``open()`` will actually yield, and therefore the number the
+            # vendor bills and the transcript row should record.
+            bytes=stat.bytes,
+            duration_ms=audio.duration_ms,
+            content_type=content_type,
+            # Deliberately not ``recording_filename()``, which names the agent
+            # for the person saving it to a desktop. This name is read by a
+            # third party in another country, and the call id is all it needs
+            # (SPEC-ANALYTICS §11.5).
+            filename=f"call-{call_id}.{extension}",
+            # ``key=key`` keeps the storage key inside this closure and inside
+            # this module: what crosses the boundary is a callable, never a
+            # path. Same binding trick, and same reason, as ``archive_for``.
+            open=lambda key=key: self.storage.open_range(key, 0, None),
+        )
 
     # --- The archive of one page (UC-22's sibling) -------------------------
 

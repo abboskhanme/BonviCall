@@ -222,7 +222,16 @@ The **panel module** and the **Android package layout** are defined in
 Release-1 module set, fixed now from `TASKS.md` Phase 3 (no module is invented
 later without an entry here): `auth`, `users`, `agents`, `numbers`, `enrolment`,
 `installations`, `devices`, `calls`, `audio`, `alerts`, `gaps`, `commands`,
-`exports`, `audit`, `settings`, `catalog`.
+`exports`, `audit`, `settings`, `catalog`, `analysis`.
+
+`analysis` is the one entry added after release 1 (`SPEC-ANALYTICS.md` §1.1). It
+carries files beyond the canonical three — `rules.py`, `prompt.py`,
+`validator.py`, `rubric_default.py`, `scorer.py`, `score_writer.py`,
+`pipeline.py`, `jobs.py` and a `providers/` subpackage — for the reason `audio`
+already does (`archive.py`, `jobs.py`, `reports.py`): the alternative was a
+second module with no `models.py`, which §2.1 would force into `core/reads.py`
+and `test_layering.py` would then forbid from containing the substring
+`update(`.
 
 ---
 
@@ -650,8 +659,34 @@ repos are open next to this one and copying a file brings its comment language
 with it. Translate the comment when you adopt the pattern.
 
 Checkable: Uzbek text inside `.py`, `.kt`, `.ts` or `.tsx` is legal in exactly
-three files — `core/messages_uz.py`, `uz.json`, `strings.xml`. Anywhere else it
-is a violation.
+six files — `core/messages_uz.py`, `uz.json`, `strings.xml`, and the three
+model-prompt files named below. Anywhere else it is a violation.
+
+**The prompt exception, added with the analysis module (`SPEC-ANALYTICS.md`
+§1.6 and §1.2):**
+
+| File | What stays Uzbek |
+|---|---|
+| `server/src/modules/analysis/prompt.py` | the scoring prompt, every section |
+| `server/src/modules/analysis/rubric_default.py` | the rubric's labels and descriptions |
+| `server/src/modules/analysis/providers/gemini.py` | `_TRANSCRIBE_PROMPT` |
+
+A model prompt is neither a comment nor a message a user reads — it is domain
+data whose language is measured by the quality of the output it produces on
+Uzbek and code-switched Uzbek/Russian speech. Translating it would be an
+untested change to the product's most sensitive input, and the same holds for
+the rubric's criterion labels, which are what the model matches against.
+
+The exception covers the **strings** in those files and nothing else: their
+comments and docstrings are English like everywhere else, and no fourth file
+joins the list without the same argument.
+
+One corollary, so it is not argued case by case: **test data that stands in for
+what a provider sends or receives stays in the source language** — the sample
+transcript in `analysis/tests/stubs.py`, the stub model answer beside it, and an
+assertion quoting a prompt substring. It is a fixture, like
+`contract/phone-vectors.json`, and translating it would test a language the
+product never sees. Test names, docstrings and comments are still English.
 
 ---
 

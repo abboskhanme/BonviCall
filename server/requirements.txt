@@ -33,6 +33,22 @@ structlog==24.4.0
 # this is the process that deletes audio irreversibly.
 apscheduler==3.10.4
 
+# AI providers — the official vendor SDK, imported lazily INSIDE the client
+# (analysis/providers/gemini.py) so that a missing package is a clear error at
+# call time rather than a server that will not start.
+#
+# ONE dependency, because phase 1 ships one provider: Gemini does both ASR and
+# LLM (docs/SPEC-ANALYTICS.md §4.1). `anthropic` and `openai` are deliberately
+# absent — each arrives with its own pinned SDK on the day its registry row
+# does. `providers/openai_compat.py` is here without a pin on purpose: it is
+# the shared protocol adapter, nothing in phase 1 has a registry row that uses
+# it, and its import sits inside the call.
+#
+# This requires pydantic>=2.12.5, which is why the bump above went first and
+# alone. Newest stable at pin time, resolved in the container rather than
+# copied from BonviZvonki (§4.3).
+google-genai==2.24.0
+
 pytest==8.3.4
 pytest-asyncio==0.25.0
 ruff==0.8.6
