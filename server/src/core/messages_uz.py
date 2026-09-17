@@ -315,6 +315,16 @@ ALERT_TEXT: dict[str, tuple[str, str]] = {
         "Eski ilova versiyalari rad etilmoqda",
         "Eski ilovali telefonlar rad etilmoqda. Ularga yangi versiyani o'rnating.",
     ),
+    "analysis_job_failed": (
+        "Qo'ng'iroq tahlili to'xtab qoldi",
+        "Tahlil vazifasi ketma-ket uch marta xato berdi — yangi qo'ng'iroqlar "
+        "tahlil qilinmayapti. Server jurnalini tekshiring.",
+    ),
+    "analysis_cost_cap_reached": (
+        "Tahlilning oylik chegarasiga yetildi",
+        "Shu oy uchun belgilangan tahlil chegarasi tugadi, shuning uchun tahlil "
+        "to'xtatildi. Sozlamalardan chegarani oshiring yoki keyingi oyni kuting.",
+    ),
 }
 
 #: The install landing page (UC-02, SPEC §8.1). One column, no JavaScript, and
@@ -386,7 +396,7 @@ def message_for(code: str) -> str:
 #: false in wording is how people learn to distrust alert text.
 #:
 #: Only the six kinds a capability report can produce need an entry. The other
-#: 21 are either present-tense ("aloqada emas") or describe an event that
+#: 23 are either present-tense ("aloqada emas") or describe an event that
 #: cannot happen without a prior state (``auth_expired`` had a session,
 #: ``capture_rate_regression`` is computed against a baseline), so their
 #: wording is honest on a first sighting already.

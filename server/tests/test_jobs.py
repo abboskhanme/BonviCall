@@ -18,7 +18,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import pytest_asyncio
 import sqlalchemy as sa
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
+from src.core.clock import TASHKENT
 from src.core.enums import (
     AlertKind,
     AudioMissingReason,
@@ -28,7 +31,13 @@ from src.core.enums import (
 from src.core.jobs import FAILURES_BEFORE_ALERT, JobRunner, lock_key
 from src.modules.alerts.models import AlertModel
 from src.modules.audio.models import AudioUploadSessionModel, CallAudioModel
-from src.worker import ALL_JOBS, ON_DEMAND, SCHEDULE, build_scheduler
+from src.worker import (
+    ALL_JOBS,
+    ON_DEMAND,
+    SCHEDULE,
+    build_scheduler,
+    failure_alert_kind,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -85,11 +94,62 @@ async def test_every_job_spec_names_is_registered() -> None:
         "model_capture_stats",
         "audio_retention",
         "storage_usage",
+        # SPEC-ANALYTICS §5's four.
+        "analysis_dispatch",
+        "analysis_run",
+        "analysis_retry_transient",
+        "analysis_stale_reset",
     }
     assert expected <= set(SCHEDULE)
     # The two the SPEC marks "on demand" are runnable but not on a clock.
     assert "reclassify_calls" in ALL_JOBS
     assert "reclassify_calls" in ON_DEMAND
+
+
+#: SPEC-ANALYTICS §5's table, as the intervals it gives. Written out here
+#: rather than read off ``SCHEDULE`` — a test that derives its expectation from
+#: the thing under test asserts nothing.
+ANALYSIS_INTERVALS = {
+    "analysis_dispatch": timedelta(minutes=5),
+    "analysis_run": timedelta(minutes=2),
+    "analysis_stale_reset": timedelta(hours=1),
+}
+
+
+async def test_the_analysis_jobs_run_at_the_cadence_the_spec_gives() -> None:
+    """The cadence is the whole coupling between the module and this file.
+
+    ``analysis_run`` is the only job in the whole table that spends money and
+    the most frequent of the four, which reads backwards until you see what
+    bounds it: the feature flag and the two monthly caps, not the interval.
+    Slowing the tick instead would look like a cost control and would only
+    build a backlog.
+    """
+    for name, interval in ANALYSIS_INTERVALS.items():
+        _, trigger = SCHEDULE[name]
+        assert isinstance(trigger, IntervalTrigger), name
+        assert trigger.interval == interval, name
+
+
+async def test_the_nightly_retry_runs_between_the_stats_and_the_deletion() -> None:
+    """01:45 is a position, not a preference (SPEC-ANALYTICS §5).
+
+    ``model_capture_stats`` runs at 01:00 and ``audio_retention`` at 02:00. The
+    retry sits between them so that a slow pass over a week of failures cannot
+    delay the one job in this table that deletes data irreversibly.
+    """
+
+    def at(name: str) -> tuple[str, str, object]:
+        _, trigger = SCHEDULE[name]
+        assert isinstance(trigger, CronTrigger), name
+        fields = {field.name: str(field) for field in trigger.fields}
+        return fields["hour"], fields["minute"], trigger.timezone
+
+    assert at("analysis_retry_transient") == ("1", "45", TASHKENT), (
+        "Tashkent, not UTC: the business calendar is the one the reader lives in"
+    )
+    assert at("model_capture_stats")[:2] == ("1", "0")
+    assert at("audio_retention")[:2] == ("2", "0")
 
 
 async def test_the_scheduler_builds_with_one_instance_per_job() -> None:
@@ -199,6 +259,63 @@ async def test_three_consecutive_failures_raise_an_alert(db) -> None:
         .where(AlertModel.kind == AlertKind.RETENTION_JOB_FAILED)
     )
     assert raised == 1
+
+
+async def test_a_failing_analysis_job_names_the_analysis_subsystem(db) -> None:
+    """Not ``retention_job_failed`` (SPEC-ANALYTICS §5).
+
+    Every job but ``backup_verify`` used to fall through to that value, so a
+    stalled AI pipeline raised an alert whose Uzbek text says old recordings
+    are not being deleted. An admin reading it at 22:00 would go and look at
+    retention, find it healthy, and conclude the alert meant nothing.
+    """
+
+    async def failing(session) -> int:
+        raise RuntimeError("provider is down")
+
+    from src.worker import alert_on_repeated_failure
+
+    runner = JobRunner(on_repeated_failure=alert_on_repeated_failure)
+    for _ in range(FAILURES_BEFORE_ALERT):
+        await runner.run("analysis_run", failing)
+
+    kinds = (await db.scalars(sa.select(AlertModel.kind))).all()
+    assert kinds == [AlertKind.ANALYSIS_JOB_FAILED]
+    alert = await db.scalar(sa.select(AlertModel))
+    assert alert.detail["job"] == "analysis_run"
+    assert alert.detail["consecutive_failures"] == FAILURES_BEFORE_ALERT
+    assert "tahlil" in alert.body_uz.lower(), "an Uzbek sentence about analysis"
+
+
+async def test_two_failures_are_not_yet_an_alert(db) -> None:
+    """Three strikes, and the third is the one that speaks.
+
+    Pinned because the prefix match is new, and ``analysis_run`` ticks every
+    two minutes: alerting on every failure would bury every other kind in the
+    inbox within the hour.
+    """
+
+    async def failing(session) -> int:
+        raise RuntimeError("transient")
+
+    from src.worker import alert_on_repeated_failure
+
+    runner = JobRunner(on_repeated_failure=alert_on_repeated_failure)
+    for _ in range(FAILURES_BEFORE_ALERT - 1):
+        await runner.run("analysis_dispatch", failing)
+
+    assert await db.scalar(sa.select(sa.func.count()).select_from(AlertModel)) == 0
+
+
+async def test_the_failure_alert_kind_is_chosen_by_subsystem() -> None:
+    """The prefix, not a list of the four names: a fifth analysis job must not
+    have to remember to come and register itself here."""
+    assert failure_alert_kind("backup_verify") is AlertKind.BACKUP_FAILED
+    assert failure_alert_kind("audio_retention") is AlertKind.RETENTION_JOB_FAILED
+    assert failure_alert_kind("silence_detection") is AlertKind.RETENTION_JOB_FAILED
+    for name in sorted(SCHEDULE):
+        if name.startswith("analysis_"):
+            assert failure_alert_kind(name) is AlertKind.ANALYSIS_JOB_FAILED, name
 
 
 async def test_a_success_resets_the_failure_count(db) -> None:
@@ -500,3 +617,55 @@ async def test_callback_events_are_deleted_not_kept(db, service_token) -> None:
     assert await callback_event_retention(db) == 1
     assert await callback_event_retention(db) == 0
     assert await db.scalar(sa.select(sa.func.count()).select_from(CallbackEventModel)) == 0
+
+
+# --- Analysis: four jobs that must do nothing until somebody says so --------
+
+
+async def test_the_analysis_jobs_do_nothing_with_the_flag_off(
+    db, call_factory, audio_factory
+) -> None:
+    """What deploying SPEC-ANALYTICS phase 1 changes on a running system.
+
+    ``analysis.enabled`` is seeded ``false`` by migration 010, so four job
+    names exist and not one byte of audio leaves the host. This is also the
+    ``make job n=analysis_dispatch`` check: run by hand, it returns 0.
+
+    ``analysis_stale_reset`` is deliberately *not* here — it closes rows a
+    killed worker left half-finished and spends nothing, so it runs whatever
+    the flag says.
+    """
+    from src.modules.analysis.jobs import (
+        analysis_dispatch,
+        analysis_retry_transient,
+        analysis_run,
+        analysis_stale_reset,
+    )
+
+    call = await call_factory(has_audio=True, audio_missing_reason=None, duration_sec=180)
+    await audio_factory(call=call)
+
+    for job in (analysis_dispatch, analysis_run, analysis_retry_transient):
+        assert await job(db) == 0, job.__name__
+    # Nothing was queued, so the sweeper has nothing to close either.
+    assert await analysis_stale_reset(db) == 0
+
+
+async def test_the_analysis_jobs_are_safe_to_run_twice(db) -> None:
+    """The case the advisory lock does not cover: a worker restarting.
+
+    With an empty queue every one of them is a no-op both times, which is the
+    weakest form of the property — the real idempotency assertions (one
+    transcript row, no second provider call) live in
+    ``modules/analysis/tests/test_pipeline.py``, where the providers are
+    stubbed. What this pins is that running them from the *scheduler's* entry
+    points, twice, raises nothing.
+    """
+    from src.modules.analysis import jobs as analysis_jobs
+
+    for name in sorted(SCHEDULE):
+        if not name.startswith("analysis_"):
+            continue
+        job = getattr(analysis_jobs, name)
+        assert await job(db) == 0
+        assert await job(db) == 0

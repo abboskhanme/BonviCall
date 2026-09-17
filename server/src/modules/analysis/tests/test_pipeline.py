@@ -28,15 +28,18 @@ import sqlalchemy as sa
 from src.core import clock
 from src.core.enums import (
     AiRole,
+    AlertKind,
+    AlertSeverity,
     AnalysisFailure,
     AnalysisStage,
     CallDisposition,
     CallType,
 )
+from src.modules.alerts.models import AlertModel
 from src.modules.analysis.config import AnalysisConfig
 from src.modules.analysis.entities import Stage
 from src.modules.analysis.errors import ProviderAuthError, ProviderUnavailableError
-from src.modules.analysis.limits import ProviderCooldown
+from src.modules.analysis.limits import CAP_CALLS, ProviderCooldown
 from src.modules.analysis.models import (
     AiProviderCooldownModel,
     CallAnalysisStateModel,
@@ -959,6 +962,104 @@ async def test_the_monthly_cost_cap_sums_what_was_really_spent(
 
     assert processed == 0
     assert asr.calls == 0
+
+
+async def test_a_reached_cap_raises_an_alert_that_names_which_one(
+    db, deps, call_factory, audio_factory, analysis_state_factory
+) -> None:
+    """§4.5. Without it, "the cap is working" and "the pipeline is broken" look
+    identical from outside: no new scores appear and nobody watches a worker
+    log. §10 task 12's controlled trial is designed to end on this alert.
+
+    The scope is the cap's name, because the two are cleared by different
+    people: one raises the call cap having decided to spend more, the other
+    raises the cost cap having read the invoice.
+    """
+    await analysable_call(call_factory, audio_factory)
+    await dispatch(db, make_config())
+    done = await call_factory()
+    await analysis_state_factory(
+        call=done, stage=AnalysisStage.COMPLETED, last_run_at=clock.now()
+    )
+
+    assert await run_queue(db, config=make_config(monthly_max_calls=1), deps=deps) == 0
+
+    alert = (
+        await db.execute(
+            sa.select(AlertModel).where(
+                AlertModel.kind == AlertKind.ANALYSIS_COST_CAP_REACHED
+            )
+        )
+    ).scalar_one()
+    assert alert.dedupe_key == f"analysis_cost_cap_reached:{CAP_CALLS}"
+    assert alert.severity is AlertSeverity.WARNING, (
+        "nothing is broken and no data is at risk — the feature stopped itself"
+    )
+    assert alert.detail["cap"] == CAP_CALLS
+    assert alert.detail["calls"] == 1
+
+
+async def test_the_cap_alert_is_raised_once_however_often_the_job_runs(
+    db, deps, call_factory, audio_factory, analysis_state_factory
+) -> None:
+    """``analysis_run`` reaches this check every two minutes. 720 rows a day
+    saying the same thing is how an inbox stops being read."""
+    await analysable_call(call_factory, audio_factory)
+    await dispatch(db, make_config())
+    done = await call_factory()
+    await analysis_state_factory(
+        call=done, stage=AnalysisStage.COMPLETED, last_run_at=clock.now()
+    )
+
+    capped = make_config(monthly_max_calls=1)
+    for _ in range(3):
+        assert await run_queue(db, config=capped, deps=deps) == 0
+
+    rows = (
+        (
+            await db.execute(
+                sa.select(AlertModel).where(
+                    AlertModel.kind == AlertKind.ANALYSIS_COST_CAP_REACHED
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(rows) == 1
+    assert rows[0].occurrence_count == 3, "the repeats bump the open row"
+
+
+async def test_the_cap_alert_clears_itself_when_the_cap_stops_biting(
+    db, deps, asr, llm, call_factory, audio_factory, analysis_state_factory
+) -> None:
+    """The Tashkent month turning over clears both caps by itself.
+
+    September's alert still sitting at the top of the page in October is the
+    same failure as never raising it: an inbox full of things that are no
+    longer true. The house idiom — ``enrolment.receiver_health`` raises or
+    resolves on every pass.
+    """
+    await analysable_call(call_factory, audio_factory)
+    await dispatch(db, make_config())
+    done = await call_factory()
+    await analysis_state_factory(
+        call=done, stage=AnalysisStage.COMPLETED, last_run_at=clock.now()
+    )
+
+    assert await run_queue(db, config=make_config(monthly_max_calls=1), deps=deps) == 0
+    # The admin raises the cap — or the month turns over, which is the same
+    # arithmetic from this function's point of view.
+    await run_queue(db, config=make_config(monthly_max_calls=500), deps=deps)
+
+    alert = (
+        await db.execute(
+            sa.select(AlertModel).where(
+                AlertModel.kind == AlertKind.ANALYSIS_COST_CAP_REACHED
+            )
+        )
+    ).scalar_one()
+    assert alert.resolved_at is not None
 
 
 async def test_a_cap_of_zero_means_stop(

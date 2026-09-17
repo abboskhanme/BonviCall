@@ -337,8 +337,16 @@ class AlertKind(StrEnum):
 
     SPEC §3.1 says "24 values"; §10.3's table groups the three
     ``permission_lost_*`` causes on one line and pairs
-    ``retention_job_failed``/``backup_failed`` on another. Expanded, the closed
-    set is the 27 below — the count in §3.1 is a count of table rows.
+    ``retention_job_failed``/``backup_failed`` on another. Expanded, release 1's
+    closed set was the first 27 below — the count in §3.1 is a count of table
+    rows.
+
+    The last two arrive with the analysis module (SPEC-ANALYTICS §2.1, §5,
+    migration 011) and each exists because the nearest existing value would
+    point an admin at the wrong subsystem: a stalled AI pipeline raising
+    ``retention_job_failed`` sends somebody to look at deletion, and a monthly
+    cap stopping the queue is not a failure at all — it is the safety rail
+    working, and it needs a name that says so.
     """
 
     CAPTURE_DISABLED = "capture_disabled"
@@ -368,6 +376,8 @@ class AlertKind(StrEnum):
     BACKUP_FAILED = "backup_failed"
     STORAGE_CAPACITY_LOW = "storage_capacity_low"
     MIN_VERSION_REFUSALS = "min_version_refusals"
+    ANALYSIS_JOB_FAILED = "analysis_job_failed"
+    ANALYSIS_COST_CAP_REACHED = "analysis_cost_cap_reached"
 
 
 class AlertSeverity(StrEnum):

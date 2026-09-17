@@ -37,6 +37,12 @@ from src.core.jobs import JobCallable, JobRunner
 from src.core.logging import configure_logging, get_logger
 from src.modules.alerts.jobs import close_superseded_alerts
 from src.modules.alerts.service import AlertService
+from src.modules.analysis.jobs import (
+    analysis_dispatch,
+    analysis_retry_transient,
+    analysis_run,
+    analysis_stale_reset,
+)
 from src.modules.audio.jobs import (
     audio_retention,
     pending_audio_sweeper,
@@ -68,6 +74,8 @@ log = get_logger(__name__)
 #:   a redeploy to take effect.
 #: * the nightly jobs are staggered rather than all at 02:00, so a slow
 #:   retention pass does not delay the storage figure that measures it.
+#: * the four ``analysis_*`` cadences are SPEC-ANALYTICS §5's, and they are
+#:   grouped below rather than appended, so the AI pipeline reads as one thing.
 SCHEDULE: dict[str, tuple[JobCallable, object]] = {
     "command_timeout": (command_timeout, IntervalTrigger(seconds=10)),
     # Hourly, not nightly: an admin looking at the inbox an hour after a phone
@@ -86,9 +94,27 @@ SCHEDULE: dict[str, tuple[JobCallable, object]] = {
     "upload_session_sweeper": (upload_session_sweeper, IntervalTrigger(minutes=15)),
     "pending_audio_sweeper": (pending_audio_sweeper, IntervalTrigger(hours=1)),
     "call_log_delta_close": (call_log_delta_close, IntervalTrigger(hours=1)),
+    # Analysis (SPEC-ANALYTICS §5). Dispatch is pure SQL and contacts no
+    # provider. ``analysis_run`` is the only job in this whole table that
+    # spends money, and the two-minute tick is not what bounds it — the feature
+    # flag and both monthly caps stop it before a row is claimed, so slowing
+    # the interval would look like a cost control and only build a backlog.
+    # ``analysis_stale_reset`` runs whatever the flag says: a row left
+    # ``transcribing`` by a worker that died just before somebody turned the
+    # feature off would otherwise sit there for ever, and closing it is free.
+    "analysis_dispatch": (analysis_dispatch, IntervalTrigger(minutes=5)),
+    "analysis_run": (analysis_run, IntervalTrigger(minutes=2)),
+    "analysis_stale_reset": (analysis_stale_reset, IntervalTrigger(hours=1)),
     "model_capture_stats": (
         model_capture_stats,
         CronTrigger(hour=1, minute=0, timezone=TASHKENT),
+    ),
+    # 01:45, between ``model_capture_stats`` (01:00) and ``audio_retention``
+    # (02:00) on purpose: a slow retry must never delay the job that deletes
+    # data.
+    "analysis_retry_transient": (
+        analysis_retry_transient,
+        CronTrigger(hour=1, minute=45, timezone=TASHKENT),
     ),
     "audio_retention": (
         audio_retention,
@@ -117,6 +143,28 @@ ALL_JOBS: dict[str, JobCallable] = {
 } | {"reclassify_calls": reclassify_calls}
 
 
+def failure_alert_kind(name: str) -> AlertKind:
+    """Which cause a repeatedly failing job is reported under.
+
+    ``retention_job_failed`` is the fall-through, and for a while it was the
+    only value — which quietly made it mean "some scheduled job is broken". The
+    two exceptions are the subsystems somebody would go and *look* at, and they
+    are looked at in different places: a failed backup is a storage question, a
+    stalled ``analysis_*`` job is the AI pipeline (SPEC-ANALYTICS §5). An alert
+    that names the wrong subsystem is worse than no alert, because it is acted
+    on — at 22:00, by somebody reading Uzbek text that says old recordings are
+    not being deleted.
+
+    Matched on the ``analysis_`` prefix rather than on a list of the four job
+    names: a fifth analysis job must not have to remember to come here.
+    """
+    if name == "backup_verify":
+        return AlertKind.BACKUP_FAILED
+    if name.startswith("analysis_"):
+        return AlertKind.ANALYSIS_JOB_FAILED
+    return AlertKind.RETENTION_JOB_FAILED
+
+
 async def alert_on_repeated_failure(name: str, failures: int, exc: Exception) -> None:
     """Three strikes and an admin is told (SPEC §10.4).
 
@@ -127,9 +175,7 @@ async def alert_on_repeated_failure(name: str, failures: int, exc: Exception) ->
     Its own session: the job's has already failed, and quite possibly its
     database connection with it.
     """
-    kind = (
-        AlertKind.BACKUP_FAILED if name == "backup_verify" else AlertKind.RETENTION_JOB_FAILED
-    )
+    kind = failure_alert_kind(name)
     async with database.get_sessionmaker()() as session:
         await AlertService(session).raise_alert(
             kind=kind,

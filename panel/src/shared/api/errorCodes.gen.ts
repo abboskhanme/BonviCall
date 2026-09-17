@@ -11,6 +11,9 @@
 /** Every error code the server can emit (server/src/core/errors.py::ErrorCode). */
 export const ERROR_CODES = [
   'agent_has_open_assignment',
+  'ai_not_configured',
+  'analysis_cost_cap_reached',
+  'analysis_disabled',
   'apk_rejected',
   'app_error',
   'app_version_unsupported',
@@ -20,6 +23,7 @@ export const ERROR_CODES = [
   'audio_not_found',
   'bad_request',
   'call_identity_conflict',
+  'call_not_analysable',
   'call_not_found',
   'callback_receiver_down',
   'cannot_modify_self',

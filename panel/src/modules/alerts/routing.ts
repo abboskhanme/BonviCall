@@ -73,6 +73,11 @@ export const ALERT_TARGET: Record<AlertKind, AlertTarget> = {
   backup_failed: 'none',
   storage_capacity_low: 'none',
   min_version_refusals: 'none',
+  // Both are about the server's own analysis pipeline. There is no handset to
+  // open and no agent to talk to: the job log and the analysis settings are
+  // where either one is dealt with.
+  analysis_job_failed: 'none',
+  analysis_cost_cap_reached: 'none',
 }
 
 /**

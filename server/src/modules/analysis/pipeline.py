@@ -51,6 +51,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core import clock, database
 from src.core.enums import (
+    AlertKind,
+    AlertSeverity,
     AnalysisFailure,
     AnalysisStage,
     CallDisposition,
@@ -58,6 +60,7 @@ from src.core.enums import (
 )
 from src.core.errors import ErrorCode, NotFoundError
 from src.core.logging import get_logger
+from src.modules.alerts.service import AlertService
 from src.modules.analysis.config import PROGRESS_EVERY, AnalysisConfig, load_config
 from src.modules.analysis.entities import (
     TRANSIENT_FAILURES,
@@ -71,7 +74,13 @@ from src.modules.analysis.entities import (
 )
 from src.modules.analysis.errors import ProviderError, redact
 from src.modules.analysis.factory import get_asr_client, get_llm_client
-from src.modules.analysis.limits import asr_cost_micro_usd, cap_state
+from src.modules.analysis.limits import (
+    CAP_CALLS,
+    CAP_COST,
+    CapState,
+    asr_cost_micro_usd,
+    cap_state,
+)
 from src.modules.analysis.models import (
     CallAnalysisStateModel,
     CallTranscriptModel,
@@ -744,6 +753,59 @@ async def claim(session: AsyncSession, limit: int) -> list[uuid.UUID]:
     return call_ids
 
 
+async def _report_caps(session: AsyncSession, caps: CapState) -> None:
+    """Raise — or clear — the alert that says a monthly cap stopped the queue.
+
+    WHY AN ALERT AND NOT ONLY A LOG LINE. From outside, "the cap is doing its
+    job" and "the pipeline is broken" look identical: no new scores appear.
+    Nobody watches a worker log, so without this the difference is invisible
+    until somebody asks why yesterday's calls have no scores. §10 task 12's
+    controlled trial is designed to *end* on this alert.
+
+    **Scoped by cap name**, so the call cap and the cost cap are separate rows.
+    They are reached by different facts and cleared by different people: one
+    raises the call cap having decided to spend more, the other raises the cost
+    cap having read the invoice. One row saying "a cap was reached" would make
+    an admin go and find out which.
+
+    **Resolved when it passes**, the house idiom (``enrolment.receiver_health``).
+    The Tashkent month turning over clears both caps by itself, and September's
+    alert sitting at the top of the page in October is how an inbox stops being
+    read.
+
+    ``analysis_dispatch`` deliberately does not raise it: it stops queueing on
+    the same caps but spends nothing, and ``analysis_run`` reaches the same
+    check more often. One writer is one story in the alert history. Nor does
+    ``AnalysisService`` when a person queues one call by hand — they pressed a
+    button and got a 409 back, which is the answer; an alert as well would be
+    the system telling them what they just read.
+
+    Commits, because the caller's next act is ``claim()``, which opens a
+    transaction of its own — the same shape as ``enrolment.receiver_health``.
+    """
+    alerts = AlertService(session)
+    for cap in (CAP_CALLS, CAP_COST):
+        if caps.reached == cap:
+            await alerts.raise_alert(
+                kind=AlertKind.ANALYSIS_COST_CAP_REACHED,
+                # Not CRITICAL: nothing is broken and no data is at risk. The
+                # feature has stopped itself on purpose, and an admin decides
+                # whether that should continue.
+                severity=AlertSeverity.WARNING,
+                scope=cap,
+                detail={
+                    "cap": cap,
+                    "reason": caps.reason,
+                    "calls": caps.usage.calls,
+                    "cost_micro_usd": caps.usage.cost_micro_usd,
+                    "month_from": caps.usage.month_from.isoformat(),
+                },
+            )
+        else:
+            await alerts.resolve(AlertKind.ANALYSIS_COST_CAP_REACHED, cap)
+    await session.commit()
+
+
 async def run_queue(
     session: AsyncSession,
     *,
@@ -761,15 +823,11 @@ async def run_queue(
         return 0
 
     caps = await cap_state(session, config)
+    await _report_caps(session, caps)
     if caps.blocked:
-        # Logged at warning with the cap that tripped, because the two need
-        # different actions: a call cap is raised by a person who has decided
-        # to spend more, a cost cap by one who has checked the invoice.
-        #
-        # NOTE: §4.5 also asks for an ``analysis_cost_cap_reached`` alert here.
-        # ``AlertKind`` has no such member yet — see the task report — and
-        # raising a neighbouring kind would send somebody to the wrong
-        # subsystem, so this stays a log line until the enum value lands.
+        # Logged at warning as well as alerted, because the two need different
+        # actions: a call cap is raised by a person who has decided to spend
+        # more, a cost cap by one who has checked the invoice.
         log.warning(
             "analysis_cost_cap_reached",
             cap=caps.reached,

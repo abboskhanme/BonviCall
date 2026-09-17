@@ -134,6 +134,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Analysed Calls
+         * @description A cursor page, newest conversation first (§7.3).
+         *
+         *     Keyset and not offset, through the same ``cursor`` idiom as the calls list:
+         *     no row that existed when paging started is skipped or returned twice, which
+         *     an OFFSET cannot give while the pipeline keeps finishing calls underneath.
+         *
+         *     The sort is fixed at ``started_at DESC``. There is one ordering a reader of
+         *     this page wants — the newest conversation — and a sort control that can
+         *     disagree with the cursor is a way to lose rows for no gain.
+         */
+        get: operations["list_analysed_calls_api_v1_analysis_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/calls/{call_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Call Analysis
+         * @description One call's state, transcript and score, plus the call's own facts.
+         *
+         *     A call the pipeline has never touched answers 200 with all three null —
+         *     **not 404** — because the page must tell "not analysed" from "no such
+         *     call". A call belonging to another agent is the 404.
+         */
+        get: operations["get_call_analysis_api_v1_analysis_calls__call_id__get"];
+        put?: never;
+        /**
+         * Queue Call Analysis
+         * @description Queue one call; the worker picks it up within two minutes.
+         *
+         *     **Never runs a provider call inside the request.** An LLM round trip behind
+         *     an HTTP request is how a panel times out and a user presses the button
+         *     again — and each press would be a second bill.
+         *
+         *     Returns 200 with the state row whether it was created or already there, so
+         *     a re-press is indistinguishable from the first press. The four ways this
+         *     answers 409 — the feature is off, the call is not analysable, the month's
+         *     cap is reached, no provider is configured — are decided in the service.
+         */
+        post: operations["queue_call_analysis_api_v1_analysis_calls__call_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analysis Status
+         * @description What is waiting, what broke, and what the month has cost (§7.5).
+         *
+         *     Declared **above** ``/calls/{call_id}``: the two do not collide, but the
+         *     literal route staying above the parameterised one is the habit that keeps
+         *     them from colliding the day a path is renamed.
+         *
+         *     Not paged. ``recent_failures`` is capped at twenty server-side, and none of
+         *     the four fields below it is a list of rows to walk (§6.2).
+         */
+        get: operations["analysis_status_api_v1_analysis_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/download/{version_code}": {
         parameters: {
             query?: never;
@@ -1286,11 +1378,19 @@ export interface components {
          *
          *     SPEC §3.1 says "24 values"; §10.3's table groups the three
          *     ``permission_lost_*`` causes on one line and pairs
-         *     ``retention_job_failed``/``backup_failed`` on another. Expanded, the closed
-         *     set is the 27 below — the count in §3.1 is a count of table rows.
+         *     ``retention_job_failed``/``backup_failed`` on another. Expanded, release 1's
+         *     closed set was the first 27 below — the count in §3.1 is a count of table
+         *     rows.
+         *
+         *     The last two arrive with the analysis module (SPEC-ANALYTICS §2.1, §5,
+         *     migration 011) and each exists because the nearest existing value would
+         *     point an admin at the wrong subsystem: a stalled AI pipeline raising
+         *     ``retention_job_failed`` sends somebody to look at deletion, and a monthly
+         *     cap stopping the queue is not a failure at all — it is the safety rail
+         *     working, and it needs a name that says so.
          * @enum {string}
          */
-        AlertKind: "capture_disabled" | "permission_lost_microphone" | "permission_lost_phone_state" | "permission_lost_call_log" | "battery_optimisation_reenabled" | "app_force_stopped" | "install_disappeared" | "recording_route_lost" | "service_not_running" | "device_offline" | "device_silent" | "fleet_silent" | "capture_rate_regression" | "queue_full" | "storage_low" | "poisoned_record" | "auth_expired" | "credential_replay" | "installation_rebound" | "callback_receiver_down" | "enrolment_stalled" | "attribution_out_of_range" | "attribution_discarded_spike" | "retention_job_failed" | "backup_failed" | "storage_capacity_low" | "min_version_refusals";
+        AlertKind: "capture_disabled" | "permission_lost_microphone" | "permission_lost_phone_state" | "permission_lost_call_log" | "battery_optimisation_reenabled" | "app_force_stopped" | "install_disappeared" | "recording_route_lost" | "service_not_running" | "device_offline" | "device_silent" | "fleet_silent" | "capture_rate_regression" | "queue_full" | "storage_low" | "poisoned_record" | "auth_expired" | "credential_replay" | "installation_rebound" | "callback_receiver_down" | "enrolment_stalled" | "attribution_out_of_range" | "attribution_discarded_spike" | "retention_job_failed" | "backup_failed" | "storage_capacity_low" | "min_version_refusals" | "analysis_job_failed" | "analysis_cost_cap_reached";
         /** AlertListResponse */
         AlertListResponse: {
             items: components["schemas"]["AlertResponse"][];
@@ -1335,6 +1435,212 @@ export interface components {
          * @enum {string}
          */
         AlertSeverity: "info" | "warning" | "critical";
+        /**
+         * AnalysisCallHeader
+         * @description Which conversation this is (§7.4).
+         *
+         *     Carried in the analysis response on purpose: the detail page must say
+         *     *whose call, when, with whom and how long* without sending the reader to
+         *     the calls section to find out. The analysis section is a section of its own
+         *     (§7), so a link there is a navigation away from the page, not a tooltip.
+         *
+         *     ``agent_name`` is resolved server-side for the same reason
+         *     ``CallResponse`` resolves it — a name lookup per row in the browser is the
+         *     N+1 problem with a different owner.
+         */
+        AnalysisCallHeader: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            /** Format: uuid */
+            call_id: string;
+            /** @description Why a call was or was not scored: only `external` is scored, and `unknown` means the line directory cannot tell yet (§2.6). */
+            call_type: components["schemas"]["CallType"];
+            direction: components["schemas"]["CallDirection"];
+            disposition: components["schemas"]["CallDisposition"];
+            duration_sec: number;
+            /** @description As the device saw it. NULL when the caller withheld it. */
+            remote_number: string | null;
+            /**
+             * Format: date-time
+             * @description When the conversation happened. The list sorts on this (§7.3).
+             */
+            started_at: string;
+        };
+        /**
+         * AnalysisFailure
+         * @description Why a call stopped. Closed, and ``NOT NULL`` whenever the stage is
+         *     ``skipped`` or ``failed`` (a CHECK on ``call_analysis_state``).
+         *
+         *     ``stage`` says whether the row is terminal; this says why. The three groups
+         *     below are not decoration — only the transient ones are re-queued by
+         *     ``analysis_retry_transient``, and getting that membership wrong is how 885
+         *     rate-limited calls stayed permanently failed in BonviZvonki after the quota
+         *     they were waiting on had reset.
+         * @enum {string}
+         */
+        AnalysisFailure: "no_audio" | "audio_expired" | "call_too_short" | "call_type_unknown" | "call_type_internal" | "provider_rate_limit" | "provider_cooldown" | "provider_unavailable" | "provider_network" | "interrupted" | "timeout" | "transcript_empty" | "score_invalid" | "ai_not_configured" | "provider_auth" | "provider_model" | "sdk_missing" | "audio_too_large" | "internal";
+        /**
+         * AnalysisFailureRow
+         * @description One recent failure, with enough to act on it (§7.5).
+         */
+        AnalysisFailureRow: {
+            attempts: number;
+            /** Format: uuid */
+            call_id: string;
+            code: components["schemas"]["AnalysisFailure"];
+            detail: string | null;
+            last_run_at: string | null;
+            /** @description Which half was running: transcribe | score. */
+            stage: string | null;
+            /** Format: date-time */
+            started_at: string;
+        };
+        /**
+         * AnalysisListItem
+         * @description One row of the scored-call list (§7.3).
+         *
+         *     The columns §7.3 names and nothing more. No transcript text: a list of
+         *     fifty conversations is not a place to ship fifty transcripts, and the
+         *     detail page is one click away.
+         */
+        AnalysisListItem: {
+            call: components["schemas"]["AnalysisCallHeader"];
+            failure_code: components["schemas"]["AnalysisFailure"] | null;
+            needs_review: boolean;
+            /** @description NULL until the call is scored — a queued row still has a place in the list. */
+            overall_score: number | null;
+            /** @description Sorted and de-duplicated, for the chips. The quotes stay on the detail page: a customer's words do not belong in a list payload. */
+            red_flag_types: string[];
+            scored_at: string | null;
+            stage: components["schemas"]["AnalysisStage"];
+        };
+        /**
+         * AnalysisListResponse
+         * @description A cursor page of analysed calls, newest conversation first (§7.3).
+         */
+        AnalysisListResponse: {
+            has_more: boolean;
+            items: components["schemas"]["AnalysisListItem"][];
+            next_cursor: string | null;
+            /** @description Counted only when asked, exactly as /calls does it. */
+            total?: number | null;
+        };
+        /**
+         * AnalysisMonthResponse
+         * @description This Tashkent calendar month's spend against the caps (§4.5, §11.1).
+         *
+         *     Tashkent and not UTC because the person reading the bill lives there: a
+         *     month turning over at 05:00 local would put the first five hours of every
+         *     month into the previous one's cap.
+         */
+        AnalysisMonthResponse: {
+            /** @description Measured ASR input — the billing unit. */
+            audio_minutes: number;
+            /** @description State rows that reached `completed` this month. */
+            calls: number;
+            /** @description The cap that actually protects the account until a price is entered, because an unpriced month can never reach the money one. */
+            cap_calls: number;
+            cap_micro_usd: number;
+            completion_tokens: number;
+            cost_micro_usd: number;
+            /**
+             * Format: date
+             * @description First day of the current Asia/Tashkent month. Named like every other window in this API; §6.2 sketched it as `from`, which is not a Python identifier.
+             */
+            date_from: string;
+            /** @description Whether any vendor price has been entered. **False is what stops the panel rendering $0.00 and implying the feature is free** — a cost of zero because nobody typed a price is not a free feature. */
+            priced: boolean;
+            prompt_tokens: number;
+        };
+        /**
+         * AnalysisStage
+         * @description Where one call stands in the analysis pipeline (SPEC-ANALYTICS §2.4).
+         *
+         *     The state row *is* the status: there is no ``calls.status`` column and
+         *     nothing on ``calls`` is written by the analysis module.
+         *
+         *     BonviZvonki's ``locked`` is deliberately absent. Locking is the claim query
+         *     (``FOR UPDATE SKIP LOCKED``) plus the worker's advisory lock, and neither
+         *     survives a crash — a persisted ``locked`` would, leaving a row that no
+         *     dispatch picks up and no operator can explain.
+         * @enum {string}
+         */
+        AnalysisStage: "queued" | "transcribing" | "scoring" | "completed" | "skipped" | "failed";
+        /**
+         * AnalysisStageCounts
+         * @description Calls per stage. One field per ``AnalysisStage`` member, always present.
+         *
+         *     A fixed object rather than a map, so a stage with nothing in it is a
+         *     visible zero instead of an absent key the panel has to default. The six
+         *     fields are pinned against the enum by a test.
+         */
+        AnalysisStageCounts: {
+            /** @default 0 */
+            completed: number;
+            /** @default 0 */
+            failed: number;
+            /** @default 0 */
+            queued: number;
+            /** @default 0 */
+            scoring: number;
+            /**
+             * @description **Not a failure** and the panel must not paint it as one (§2.4).
+             * @default 0
+             */
+            skipped: number;
+            /** @default 0 */
+            transcribing: number;
+        };
+        /**
+         * AnalysisStateResponse
+         * @description ``call_analysis_state`` as the panel reads it (§6.2).
+         *
+         *     Also the whole answer to ``POST /analysis/calls/{id}``: queueing returns
+         *     the state and nothing else, so a first press and a re-press are
+         *     indistinguishable (§5's shape, applied to a panel write).
+         */
+        AnalysisStateResponse: {
+            /** @description Requests that reached a provider, i.e. that cost money. */
+            asr_calls: number;
+            attempts: number;
+            /** @description Measured units x the admin-entered price. 0 also means **not priced** — see `AnalysisMonthResponse.priced` (§11.1). */
+            cost_micro_usd: number;
+            /** @description Why the call stopped. Present exactly when the stage is `failed` or `skipped` — a database CHECK, not a habit. The Uzbek headline is keyed off this in the panel's uz.json. */
+            failure_code: components["schemas"]["AnalysisFailure"] | null;
+            /** @description The provider's own message, redacted. Technical English beside the code, never the sentence a user reads. */
+            failure_detail: string | null;
+            /** @description `transcribe` or `score` — which half spent money before stopping. */
+            failure_stage: string | null;
+            last_run_at: string | null;
+            llm_calls: number;
+            /** Format: date-time */
+            queued_at: string;
+            scored_at: string | null;
+            stage: components["schemas"]["AnalysisStage"];
+            transcribed_at: string | null;
+        };
+        /**
+         * AnalysisStatusResponse
+         * @description The operational view: what is waiting, what broke, what it cost (§7.5).
+         *
+         *     This is where an admin answers "why has nothing been scored since
+         *     Tuesday". It exists in phase 1 because without it that question has no
+         *     answer short of opening the database.
+         */
+        AnalysisStatusResponse: {
+            /** @description Only the roles currently sitting out; empty is the normal state. */
+            cooldowns: components["schemas"]["ProviderCooldownResponse"][];
+            enabled: boolean;
+            month: components["schemas"]["AnalysisMonthResponse"];
+            /** @description Skips by reason, so '412 calls are waiting on the line directory' is visible rather than silent (§2.6). */
+            not_analysable: components["schemas"]["NotAnalysableCount"][];
+            /** @description Newest first, capped at 20 server-side. Not a paged list (§6.2). */
+            recent_failures: components["schemas"]["AnalysisFailureRow"][];
+            stages: components["schemas"]["AnalysisStageCounts"];
+            /** @description Failed on a transient code and inside the nightly retry's reach, so it will be tried again by itself. Separate from `stages.failed` on purpose: one of them needs a person and the other does not. */
+            waiting_retry: number;
+        };
         /**
          * AppVariant
          * @description The ``targetSdk`` product flavour (D-06).
@@ -1487,6 +1793,29 @@ export interface components {
             version_code: number;
         };
         /**
+         * CallAnalysisResponse
+         * @description Everything the detail page needs, in one request (§6.2, §7.4).
+         *
+         *     ``state``, ``transcript`` and ``score`` are **independently nullable**. A
+         *     call the pipeline has never touched answers 200 with all three null — not
+         *     404, because the page must be able to tell "not analysed" from "no such
+         *     call", and only one of those two is worth an error.
+         *
+         *     ``enabled`` is repeated here rather than left to ``/analysis/status`` for
+         *     the same reason: deciding what to render must not cost two round trips to
+         *     learn a boolean.
+         */
+        CallAnalysisResponse: {
+            call: components["schemas"]["AnalysisCallHeader"];
+            /** Format: uuid */
+            call_id: string;
+            /** @description `analysis.enabled`. False plus a null state means the page says 'o'chirilgan' and offers no button — pressing it would 409 (§7.4). */
+            enabled: boolean;
+            score: components["schemas"]["ScoreResponse"] | null;
+            state: components["schemas"]["AnalysisStateResponse"] | null;
+            transcript: components["schemas"]["TranscriptResponse"] | null;
+        };
+        /**
          * CallAudioSummary
          * @description What the call list and the detail page need to know about the audio.
          *
@@ -1604,6 +1933,12 @@ export interface components {
             /** Format: date-time */
             started_at: string;
         };
+        /**
+         * CallSentiment
+         * @description The model's reading of how the conversation went.
+         * @enum {string}
+         */
+        CallSentiment: "positive" | "neutral" | "negative";
         /**
          * CallSource
          * @description How the record reached us.
@@ -2310,6 +2645,14 @@ export interface components {
          * @enum {string}
          */
         NetworkType: "wifi" | "cellular" | "none";
+        /**
+         * NotAnalysableCount
+         * @description One reason calls are being skipped, and how many (§7.5).
+         */
+        NotAnalysableCount: {
+            calls: number;
+            code: components["schemas"]["AnalysisFailure"];
+        };
         /** NumberListResponse */
         NumberListResponse: {
             items: components["schemas"]["NumberResponse"][];
@@ -2344,6 +2687,38 @@ export interface components {
             /** @description Never folded into either side of the rate — the fail-closed rule made visible. */
             subscription_unknown_count: number;
             uploaded_count: number;
+        };
+        /**
+         * OutcomeSignalOut
+         * @description What the conversation ended in, when it said so.
+         */
+        OutcomeSignalOut: {
+            /** @description The model's own 0..1 confidence in this signal. A float inside a JSONB document, which §10's no-float rule is about columns. */
+            confidence: number;
+            evidence: string | null;
+            products_mentioned: string[];
+            quantity_mentioned: number | null;
+            /** @description The rubric's outcome vocabulary; see `RedFlagOut.type`. */
+            type: string;
+        };
+        /**
+         * ProviderCooldownResponse
+         * @description A role sitting out a quota or an outage.
+         *
+         *     The first thing an operator needs when the queue goes quiet, which is why
+         *     the cooldown is a table and not a cache key with a TTL (§1.3).
+         */
+        ProviderCooldownResponse: {
+            detail: string | null;
+            /** @description A daily quota and a 503 read very differently. */
+            reason_code: components["schemas"]["AnalysisFailure"];
+            /** @description asr | llm. One cooldown per role. */
+            role: string;
+            seconds_left: number;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            until_at: string;
         };
         /**
          * PublicReleaseListResponse
@@ -2383,6 +2758,17 @@ export interface components {
             variant: components["schemas"]["AppVariant"];
             version: string;
             version_code: number;
+        };
+        /**
+         * QueueCallRequest
+         * @description ``POST /analysis/calls/{call_id}`` — the panel's button (§6.2).
+         */
+        QueueCallRequest: {
+            /**
+             * @description Clear the existing transcript and score so both are recomputed. **The only way to spend money twice on one call**, which is why it is a body field and not a query parameter somebody pastes.
+             * @default false
+             */
+            force: boolean;
         };
         /**
          * ReadyResponse
@@ -2442,6 +2828,26 @@ export interface components {
             entry: components["schemas"]["DirectoryEntryResponse"];
         };
         /**
+         * RedFlagOut
+         * @description One incident, with the evidence for it.
+         *
+         *     Every incident is returned, including repeats of one type: a manager
+         *     confirming an accusation needs the time and the quote of both. ``counted``
+         *     marks the one that actually moved the score — the penalty is charged once
+         *     per type, and the array's penalties sum to the total applied.
+         */
+        RedFlagOut: {
+            counted: boolean;
+            label: string;
+            penalty: number;
+            quote: string;
+            severity: string;
+            /** @description '[MM:SS]' into the recording, when the model located it. */
+            timestamp: string | null;
+            /** @description The rubric's red-flag key. A string and not a closed enum on purpose: the rubric is versioned (`rubric_version`) and phase 2 reads it from a row, so a score written under v1 must stay readable after v2 adds a flag. The panel renders an unknown key as the key. */
+            type: string;
+        };
+        /**
          * RevokeRequest
          * @description ``POST /api/v1/installations/{id}/revoke`` (UC-08).
          */
@@ -2465,6 +2871,43 @@ export interface components {
             /** Format: date-time */
             revoked_at: string;
             status: components["schemas"]["InstallationStatus"];
+        };
+        /**
+         * ScoreResponse
+         * @description One call's verdict and the evidence for it (§7.4's score block).
+         */
+        ScoreResponse: {
+            /** @description {blocks: {...evidence per criterion...}, meta: {...}} — how the number was reached, so 'why 78?' is answerable without paying to re-run. `meta.applicable_max` is what lets a header read '68 / 75' honestly when criteria did not apply (§7.4). */
+            block_details: {
+                [key: string]: unknown;
+            };
+            /** @description FLAT {block_key: points}, already normalised to the criteria that applied. **Never recomputed in the panel.** Keyed by the rubric's own block keys, so it is a map rather than four named fields: a rubric change must not need a server release to render. */
+            blocks: {
+                [key: string]: number;
+            };
+            coaching_note: string | null;
+            completion_tokens: number | null;
+            confidence_pct: number;
+            /** @description NULL while the price is unset — null means not priced, never free. */
+            cost_micro_usd: number | null;
+            model: string;
+            needs_review: boolean;
+            outcome_signal: components["schemas"]["OutcomeSignalOut"] | null;
+            /** @description 0-100, recomputed by the validator. */
+            overall_score: number;
+            prompt_tokens: number | null;
+            provider: string;
+            red_flags: components["schemas"]["RedFlagOut"][];
+            /** @description [{code, params}]. The panel renders the sentence from uz.json, so the column holds a machine reason and never display copy (§1.6). */
+            review_reasons: {
+                [key: string]: unknown;
+            }[];
+            /** @description Stamped per score: a rubric change never re-bases old numbers. */
+            rubric_version: string;
+            /** Format: date-time */
+            scored_at: string;
+            sentiment: components["schemas"]["CallSentiment"] | null;
+            transcript_quality: components["schemas"]["TranscriptQuality"];
         };
         /**
          * SetMinimumVersionRequest
@@ -2551,6 +2994,37 @@ export interface components {
             installation_id: string;
             last_heartbeat_at: string | null;
             status: components["schemas"]["InstallationStatus"];
+        };
+        /**
+         * TranscriptQuality
+         * @description The model's own assessment of the transcript it was handed.
+         *
+         *     A column rather than a derived value because the review rule reads it: a
+         *     score computed from a transcript the model itself called ``low`` is one a
+         *     person should look at before it reaches an employee's average.
+         * @enum {string}
+         */
+        TranscriptQuality: "high" | "medium" | "low";
+        /**
+         * TranscriptResponse
+         * @description One call's transcript (§7.4's transcript block).
+         *
+         *     ``audio_bytes`` and ``asr_ms`` are stored but not returned: they are cost
+         *     measurement (§11.1), they belong to the month's figures on the status page,
+         *     and a per-call byte count is not something the detail page renders.
+         */
+        TranscriptResponse: {
+            audio_duration_ms: number | null;
+            /** @description What was asked of the provider, or NULL when it detected it. */
+            language: string | null;
+            model: string;
+            provider: string;
+            /** @description Verbatim, in the '[MM:SS] SPEAKER_n: ...' form. The timestamps are not decoration — phase 2's click-a-line-to-seek reads them. */
+            text: string;
+            /** Format: date-time */
+            transcribed_at: string;
+            /** @description Real spoken words, service tokens stripped (`rules.count_words`). Stored so the review rule and the panel agree on one number. */
+            word_count: number;
         };
         /**
          * UpdateAgentRequest
@@ -2960,6 +3434,131 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_analysed_calls_api_v1_analysis_calls_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                cursor?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                limit?: number;
+                needs_review?: boolean | null;
+                score_band?: ("excellent" | "good" | "average" | "poor")[] | null;
+                stage?: components["schemas"]["AnalysisStage"][] | null;
+                with_total?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisListResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_call_analysis_api_v1_analysis_calls__call_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallAnalysisResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    queue_call_analysis_api_v1_analysis_calls__call_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueCallRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisStateResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analysis_status_api_v1_analysis_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisStatusResponse"];
                 };
             };
         };

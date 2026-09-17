@@ -108,7 +108,7 @@
         "type": "object"
       },
       "AlertKind": {
-        "description": "Every cause that can raise an alert (SPEC §10.3).\n\nSPEC §3.1 says \"24 values\"; §10.3's table groups the three\n``permission_lost_*`` causes on one line and pairs\n``retention_job_failed``/``backup_failed`` on another. Expanded, the closed\nset is the 27 below — the count in §3.1 is a count of table rows.",
+        "description": "Every cause that can raise an alert (SPEC §10.3).\n\nSPEC §3.1 says \"24 values\"; §10.3's table groups the three\n``permission_lost_*`` causes on one line and pairs\n``retention_job_failed``/``backup_failed`` on another. Expanded, release 1's\nclosed set was the first 27 below — the count in §3.1 is a count of table\nrows.\n\nThe last two arrive with the analysis module (SPEC-ANALYTICS §2.1, §5,\nmigration 011) and each exists because the nearest existing value would\npoint an admin at the wrong subsystem: a stalled AI pipeline raising\n``retention_job_failed`` sends somebody to look at deletion, and a monthly\ncap stopping the queue is not a failure at all — it is the safety rail\nworking, and it needs a name that says so.",
         "enum": [
           "capture_disabled",
           "permission_lost_microphone",
@@ -136,7 +136,9 @@
           "retention_job_failed",
           "backup_failed",
           "storage_capacity_low",
-          "min_version_refusals"
+          "min_version_refusals",
+          "analysis_job_failed",
+          "analysis_cost_cap_reached"
         ],
         "title": "AlertKind",
         "type": "string"
@@ -333,6 +335,512 @@
         ],
         "title": "AlertSeverity",
         "type": "string"
+      },
+      "AnalysisCallHeader": {
+        "description": "Which conversation this is (§7.4).\n\nCarried in the analysis response on purpose: the detail page must say\n*whose call, when, with whom and how long* without sending the reader to\nthe calls section to find out. The analysis section is a section of its own\n(§7), so a link there is a navigation away from the page, not a tooltip.\n\n``agent_name`` is resolved server-side for the same reason\n``CallResponse`` resolves it — a name lookup per row in the browser is the\nN+1 problem with a different owner.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "call_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "call_type": {
+            "$ref": "#/components/schemas/CallType",
+            "description": "Why a call was or was not scored: only `external` is scored, and `unknown` means the line directory cannot tell yet (§2.6)."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "type": "integer"
+          },
+          "remote_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As the device saw it. NULL when the caller withheld it."
+          },
+          "started_at": {
+            "description": "When the conversation happened. The list sorts on this (§7.3).",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "call_id",
+          "started_at",
+          "agent_id",
+          "agent_name",
+          "remote_number",
+          "duration_sec",
+          "direction",
+          "disposition",
+          "call_type"
+        ],
+        "title": "AnalysisCallHeader",
+        "type": "object"
+      },
+      "AnalysisFailure": {
+        "description": "Why a call stopped. Closed, and ``NOT NULL`` whenever the stage is\n``skipped`` or ``failed`` (a CHECK on ``call_analysis_state``).\n\n``stage`` says whether the row is terminal; this says why. The three groups\nbelow are not decoration — only the transient ones are re-queued by\n``analysis_retry_transient``, and getting that membership wrong is how 885\nrate-limited calls stayed permanently failed in BonviZvonki after the quota\nthey were waiting on had reset.",
+        "enum": [
+          "no_audio",
+          "audio_expired",
+          "call_too_short",
+          "call_type_unknown",
+          "call_type_internal",
+          "provider_rate_limit",
+          "provider_cooldown",
+          "provider_unavailable",
+          "provider_network",
+          "interrupted",
+          "timeout",
+          "transcript_empty",
+          "score_invalid",
+          "ai_not_configured",
+          "provider_auth",
+          "provider_model",
+          "sdk_missing",
+          "audio_too_large",
+          "internal"
+        ],
+        "title": "AnalysisFailure",
+        "type": "string"
+      },
+      "AnalysisFailureRow": {
+        "description": "One recent failure, with enough to act on it (§7.5).",
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "call_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "code": {
+            "$ref": "#/components/schemas/AnalysisFailure"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which half was running: transcribe | score."
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "call_id",
+          "started_at",
+          "stage",
+          "code",
+          "detail",
+          "attempts",
+          "last_run_at"
+        ],
+        "title": "AnalysisFailureRow",
+        "type": "object"
+      },
+      "AnalysisListItem": {
+        "description": "One row of the scored-call list (§7.3).\n\nThe columns §7.3 names and nothing more. No transcript text: a list of\nfifty conversations is not a place to ship fifty transcripts, and the\ndetail page is one click away.",
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/AnalysisCallHeader"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "overall_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL until the call is scored — a queued row still has a place in the list."
+          },
+          "red_flag_types": {
+            "description": "Sorted and de-duplicated, for the chips. The quotes stay on the detail page: a customer's words do not belong in a list payload.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scored_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage": {
+            "$ref": "#/components/schemas/AnalysisStage"
+          }
+        },
+        "required": [
+          "call",
+          "stage",
+          "failure_code",
+          "overall_score",
+          "needs_review",
+          "red_flag_types",
+          "scored_at"
+        ],
+        "title": "AnalysisListItem",
+        "type": "object"
+      },
+      "AnalysisListResponse": {
+        "description": "A cursor page of analysed calls, newest conversation first (§7.3).",
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisListItem"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Counted only when asked, exactly as /calls does it."
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "AnalysisListResponse",
+        "type": "object"
+      },
+      "AnalysisMonthResponse": {
+        "description": "This Tashkent calendar month's spend against the caps (§4.5, §11.1).\n\nTashkent and not UTC because the person reading the bill lives there: a\nmonth turning over at 05:00 local would put the first five hours of every\nmonth into the previous one's cap.",
+        "properties": {
+          "audio_minutes": {
+            "description": "Measured ASR input — the billing unit.",
+            "type": "integer"
+          },
+          "calls": {
+            "description": "State rows that reached `completed` this month.",
+            "type": "integer"
+          },
+          "cap_calls": {
+            "description": "The cap that actually protects the account until a price is entered, because an unpriced month can never reach the money one.",
+            "type": "integer"
+          },
+          "cap_micro_usd": {
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "type": "integer"
+          },
+          "cost_micro_usd": {
+            "type": "integer"
+          },
+          "date_from": {
+            "description": "First day of the current Asia/Tashkent month. Named like every other window in this API; §6.2 sketched it as `from`, which is not a Python identifier.",
+            "format": "date",
+            "type": "string"
+          },
+          "priced": {
+            "description": "Whether any vendor price has been entered. **False is what stops the panel rendering $0.00 and implying the feature is free** — a cost of zero because nobody typed a price is not a free feature.",
+            "type": "boolean"
+          },
+          "prompt_tokens": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "calls",
+          "audio_minutes",
+          "prompt_tokens",
+          "completion_tokens",
+          "cost_micro_usd",
+          "priced",
+          "cap_micro_usd",
+          "cap_calls"
+        ],
+        "title": "AnalysisMonthResponse",
+        "type": "object"
+      },
+      "AnalysisStage": {
+        "description": "Where one call stands in the analysis pipeline (SPEC-ANALYTICS §2.4).\n\nThe state row *is* the status: there is no ``calls.status`` column and\nnothing on ``calls`` is written by the analysis module.\n\nBonviZvonki's ``locked`` is deliberately absent. Locking is the claim query\n(``FOR UPDATE SKIP LOCKED``) plus the worker's advisory lock, and neither\nsurvives a crash — a persisted ``locked`` would, leaving a row that no\ndispatch picks up and no operator can explain.",
+        "enum": [
+          "queued",
+          "transcribing",
+          "scoring",
+          "completed",
+          "skipped",
+          "failed"
+        ],
+        "title": "AnalysisStage",
+        "type": "string"
+      },
+      "AnalysisStageCounts": {
+        "description": "Calls per stage. One field per ``AnalysisStage`` member, always present.\n\nA fixed object rather than a map, so a stage with nothing in it is a\nvisible zero instead of an absent key the panel has to default. The six\nfields are pinned against the enum by a test.",
+        "properties": {
+          "completed": {
+            "default": 0,
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "type": "integer"
+          },
+          "queued": {
+            "default": 0,
+            "type": "integer"
+          },
+          "scoring": {
+            "default": 0,
+            "type": "integer"
+          },
+          "skipped": {
+            "default": 0,
+            "description": "**Not a failure** and the panel must not paint it as one (§2.4).",
+            "type": "integer"
+          },
+          "transcribing": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        "title": "AnalysisStageCounts",
+        "type": "object"
+      },
+      "AnalysisStateResponse": {
+        "description": "``call_analysis_state`` as the panel reads it (§6.2).\n\nAlso the whole answer to ``POST /analysis/calls/{id}``: queueing returns\nthe state and nothing else, so a first press and a re-press are\nindistinguishable (§5's shape, applied to a panel write).",
+        "properties": {
+          "asr_calls": {
+            "description": "Requests that reached a provider, i.e. that cost money.",
+            "type": "integer"
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "cost_micro_usd": {
+            "description": "Measured units x the admin-entered price. 0 also means **not priced** — see `AnalysisMonthResponse.priced` (§11.1).",
+            "type": "integer"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisFailure"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the call stopped. Present exactly when the stage is `failed` or `skipped` — a database CHECK, not a habit. The Uzbek headline is keyed off this in the panel's uz.json."
+          },
+          "failure_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider's own message, redacted. Technical English beside the code, never the sentence a user reads."
+          },
+          "failure_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`transcribe` or `score` — which half spent money before stopping."
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "llm_calls": {
+            "type": "integer"
+          },
+          "queued_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "scored_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage": {
+            "$ref": "#/components/schemas/AnalysisStage"
+          },
+          "transcribed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "stage",
+          "attempts",
+          "asr_calls",
+          "llm_calls",
+          "cost_micro_usd",
+          "queued_at",
+          "last_run_at",
+          "transcribed_at",
+          "scored_at",
+          "failure_code",
+          "failure_stage",
+          "failure_detail"
+        ],
+        "title": "AnalysisStateResponse",
+        "type": "object"
+      },
+      "AnalysisStatusResponse": {
+        "description": "The operational view: what is waiting, what broke, what it cost (§7.5).\n\nThis is where an admin answers \"why has nothing been scored since\nTuesday\". It exists in phase 1 because without it that question has no\nanswer short of opening the database.",
+        "properties": {
+          "cooldowns": {
+            "description": "Only the roles currently sitting out; empty is the normal state.",
+            "items": {
+              "$ref": "#/components/schemas/ProviderCooldownResponse"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "month": {
+            "$ref": "#/components/schemas/AnalysisMonthResponse"
+          },
+          "not_analysable": {
+            "description": "Skips by reason, so '412 calls are waiting on the line directory' is visible rather than silent (§2.6).",
+            "items": {
+              "$ref": "#/components/schemas/NotAnalysableCount"
+            },
+            "type": "array"
+          },
+          "recent_failures": {
+            "description": "Newest first, capped at 20 server-side. Not a paged list (§6.2).",
+            "items": {
+              "$ref": "#/components/schemas/AnalysisFailureRow"
+            },
+            "type": "array"
+          },
+          "stages": {
+            "$ref": "#/components/schemas/AnalysisStageCounts"
+          },
+          "waiting_retry": {
+            "description": "Failed on a transient code and inside the nightly retry's reach, so it will be tried again by itself. Separate from `stages.failed` on purpose: one of them needs a person and the other does not.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "stages",
+          "waiting_retry",
+          "not_analysable",
+          "cooldowns",
+          "month",
+          "recent_failures"
+        ],
+        "title": "AnalysisStatusResponse",
+        "type": "object"
       },
       "AppVariant": {
         "description": "The ``targetSdk`` product flavour (D-06).\n\nReported on every heartbeat, stored on every call, so capture rate is\nmeasurable per variant and not only per handset model.",
@@ -779,6 +1287,62 @@
         "title": "Body_upload_version_api_v1_app_versions_post",
         "type": "object"
       },
+      "CallAnalysisResponse": {
+        "description": "Everything the detail page needs, in one request (§6.2, §7.4).\n\n``state``, ``transcript`` and ``score`` are **independently nullable**. A\ncall the pipeline has never touched answers 200 with all three null — not\n404, because the page must be able to tell \"not analysed\" from \"no such\ncall\", and only one of those two is worth an error.\n\n``enabled`` is repeated here rather than left to ``/analysis/status`` for\nthe same reason: deciding what to render must not cost two round trips to\nlearn a boolean.",
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/AnalysisCallHeader"
+          },
+          "call_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "`analysis.enabled`. False plus a null state means the page says 'o'chirilgan' and offers no button — pressing it would 409 (§7.4).",
+            "type": "boolean"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisStateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TranscriptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "call_id",
+          "enabled",
+          "call",
+          "state",
+          "transcript",
+          "score"
+        ],
+        "title": "CallAnalysisResponse",
+        "type": "object"
+      },
       "CallAudioSummary": {
         "description": "What the call list and the detail page need to know about the audio.\n\n``capture_route`` is here and not folded into \"audio: yes/no\" because\n``S1-RECORDING.md`` is explicit that ``app_voice_recognition`` and\n``app_mic`` must stay distinguishable: the per-model capture rate is the M0\nbaseline, and UC-23's regression alert compares against it. Collapsing the\nroutes would make \"which mechanism actually works on this handset\" an\nunanswerable question.",
         "properties": {
@@ -1132,6 +1696,16 @@
         ],
         "title": "CallResponse",
         "type": "object"
+      },
+      "CallSentiment": {
+        "description": "The model's reading of how the conversation went.",
+        "enum": [
+          "positive",
+          "neutral",
+          "negative"
+        ],
+        "title": "CallSentiment",
+        "type": "string"
       },
       "CallSource": {
         "description": "How the record reached us.",
@@ -3688,6 +4262,23 @@
         "title": "NetworkType",
         "type": "string"
       },
+      "NotAnalysableCount": {
+        "description": "One reason calls are being skipped, and how many (§7.5).",
+        "properties": {
+          "calls": {
+            "type": "integer"
+          },
+          "code": {
+            "$ref": "#/components/schemas/AnalysisFailure"
+          }
+        },
+        "required": [
+          "code",
+          "calls"
+        ],
+        "title": "NotAnalysableCount",
+        "type": "object"
+      },
       "NumberListResponse": {
         "properties": {
           "items": {
@@ -3804,6 +4395,98 @@
         "title": "OpenDeltaOut",
         "type": "object"
       },
+      "OutcomeSignalOut": {
+        "description": "What the conversation ended in, when it said so.",
+        "properties": {
+          "confidence": {
+            "description": "The model's own 0..1 confidence in this signal. A float inside a JSONB document, which §10's no-float rule is about columns.",
+            "type": "number"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "products_mentioned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "quantity_mentioned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "description": "The rubric's outcome vocabulary; see `RedFlagOut.type`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "products_mentioned",
+          "quantity_mentioned",
+          "confidence",
+          "evidence"
+        ],
+        "title": "OutcomeSignalOut",
+        "type": "object"
+      },
+      "ProviderCooldownResponse": {
+        "description": "A role sitting out a quota or an outage.\n\nThe first thing an operator needs when the queue goes quiet, which is why\nthe cooldown is a table and not a cache key with a TTL (§1.3).",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason_code": {
+            "$ref": "#/components/schemas/AnalysisFailure",
+            "description": "A daily quota and a 503 read very differently."
+          },
+          "role": {
+            "description": "asr | llm. One cooldown per role.",
+            "type": "string"
+          },
+          "seconds_left": {
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "until_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "seconds_left",
+          "reason_code",
+          "started_at",
+          "until_at",
+          "detail"
+        ],
+        "title": "ProviderCooldownResponse",
+        "type": "object"
+      },
       "PublicReleaseListResponse": {
         "description": "The current build of each variant. Empty before the first publish.\n\n``total`` can only ever be 0, 1 or 2 — there are two variants — and it is\nhere anyway, because every list response in this API carries the same two\nfields and a generated client that has to special-case one of them is worse\nthan a field that is always ``len(items)``.",
         "properties": {
@@ -3880,6 +4563,18 @@
           "published_at"
         ],
         "title": "PublicReleaseResponse",
+        "type": "object"
+      },
+      "QueueCallRequest": {
+        "description": "``POST /analysis/calls/{call_id}`` — the panel's button (§6.2).",
+        "properties": {
+          "force": {
+            "default": false,
+            "description": "Clear the existing transcript and score so both are recomputed. **The only way to spend money twice on one call**, which is why it is a body field and not a query parameter somebody pastes.",
+            "type": "boolean"
+          }
+        },
+        "title": "QueueCallRequest",
         "type": "object"
       },
       "ReadyResponse": {
@@ -3991,6 +4686,52 @@
         "title": "ReclassifyResponse",
         "type": "object"
       },
+      "RedFlagOut": {
+        "description": "One incident, with the evidence for it.\n\nEvery incident is returned, including repeats of one type: a manager\nconfirming an accusation needs the time and the quote of both. ``counted``\nmarks the one that actually moved the score — the penalty is charged once\nper type, and the array's penalties sum to the total applied.",
+        "properties": {
+          "counted": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "penalty": {
+            "type": "integer"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "'[MM:SS]' into the recording, when the model located it."
+          },
+          "type": {
+            "description": "The rubric's red-flag key. A string and not a closed enum on purpose: the rubric is versioned (`rubric_version`) and phase 2 reads it from a row, so a score written under v1 must stay readable after v2 adds a flag. The panel renders an unknown key as the key.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "severity",
+          "timestamp",
+          "quote",
+          "penalty",
+          "counted"
+        ],
+        "title": "RedFlagOut",
+        "type": "object"
+      },
       "RevokeRequest": {
         "description": "``POST /api/v1/installations/{id}/revoke`` (UC-08).",
         "properties": {
@@ -4057,6 +4798,147 @@
           "confirmed"
         ],
         "title": "RevokeResponse",
+        "type": "object"
+      },
+      "ScoreResponse": {
+        "description": "One call's verdict and the evidence for it (§7.4's score block).",
+        "properties": {
+          "block_details": {
+            "additionalProperties": true,
+            "description": "{blocks: {...evidence per criterion...}, meta: {...}} — how the number was reached, so 'why 78?' is answerable without paying to re-run. `meta.applicable_max` is what lets a header read '68 / 75' honestly when criteria did not apply (§7.4).",
+            "type": "object"
+          },
+          "blocks": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "FLAT {block_key: points}, already normalised to the criteria that applied. **Never recomputed in the panel.** Keyed by the rubric's own block keys, so it is a map rather than four named fields: a rubric change must not need a server release to render.",
+            "type": "object"
+          },
+          "coaching_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence_pct": {
+            "type": "integer"
+          },
+          "cost_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL while the price is unset — null means not priced, never free."
+          },
+          "model": {
+            "type": "string"
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "outcome_signal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutcomeSignalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overall_score": {
+            "description": "0-100, recomputed by the validator.",
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "red_flags": {
+            "items": {
+              "$ref": "#/components/schemas/RedFlagOut"
+            },
+            "type": "array"
+          },
+          "review_reasons": {
+            "description": "[{code, params}]. The panel renders the sentence from uz.json, so the column holds a machine reason and never display copy (§1.6).",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "rubric_version": {
+            "description": "Stamped per score: a rubric change never re-bases old numbers.",
+            "type": "string"
+          },
+          "scored_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sentiment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallSentiment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transcript_quality": {
+            "$ref": "#/components/schemas/TranscriptQuality"
+          }
+        },
+        "required": [
+          "overall_score",
+          "blocks",
+          "block_details",
+          "red_flags",
+          "outcome_signal",
+          "sentiment",
+          "transcript_quality",
+          "coaching_note",
+          "confidence_pct",
+          "needs_review",
+          "review_reasons",
+          "rubric_version",
+          "provider",
+          "model",
+          "prompt_tokens",
+          "completion_tokens",
+          "cost_micro_usd",
+          "scored_at"
+        ],
+        "title": "ScoreResponse",
         "type": "object"
       },
       "SetMinimumVersionRequest": {
@@ -4301,6 +5183,71 @@
           "last_heartbeat_at"
         ],
         "title": "StrandedInstallationOut",
+        "type": "object"
+      },
+      "TranscriptQuality": {
+        "description": "The model's own assessment of the transcript it was handed.\n\nA column rather than a derived value because the review rule reads it: a\nscore computed from a transcript the model itself called ``low`` is one a\nperson should look at before it reaches an employee's average.",
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "TranscriptQuality",
+        "type": "string"
+      },
+      "TranscriptResponse": {
+        "description": "One call's transcript (§7.4's transcript block).\n\n``audio_bytes`` and ``asr_ms`` are stored but not returned: they are cost\nmeasurement (§11.1), they belong to the month's figures on the status page,\nand a per-call byte count is not something the detail page renders.",
+        "properties": {
+          "audio_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What was asked of the provider, or NULL when it detected it."
+          },
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "text": {
+            "description": "Verbatim, in the '[MM:SS] SPEAKER_n: ...' form. The timestamps are not decoration — phase 2's click-a-line-to-seek reads them.",
+            "type": "string"
+          },
+          "transcribed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "word_count": {
+            "description": "Real spoken words, service tokens stripped (`rules.count_words`). Stored so the review rule and the panel agree on one number.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "text",
+          "language",
+          "provider",
+          "model",
+          "word_count",
+          "audio_duration_ms",
+          "transcribed_at"
+        ],
+        "title": "TranscriptResponse",
         "type": "object"
       },
       "UpdateAgentRequest": {
@@ -5090,6 +6037,310 @@
         "summary": "Acknowledge Alert",
         "tags": [
           "Alerts"
+        ]
+      }
+    },
+    "/api/v1/analysis/calls": {
+      "get": {
+        "description": "A cursor page, newest conversation first (§7.3).\n\nKeyset and not offset, through the same ``cursor`` idiom as the calls list:\nno row that existed when paging started is skipped or returned twice, which\nan OFFSET cannot give while the pipeline keeps finishing calls underneath.\n\nThe sort is fixed at ``started_at DESC``. There is one ordering a reader of\nthis page wants — the newest conversation — and a sort control that can\ndisagree with the cursor is a way to lose rows for no gain.",
+        "operationId": "list_analysed_calls_api_v1_analysis_calls_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "With Total",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stage",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisStage"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stage"
+            }
+          },
+          {
+            "in": "query",
+            "name": "score_band",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "excellent",
+                      "good",
+                      "average",
+                      "poor"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Score Band"
+            }
+          },
+          {
+            "in": "query",
+            "name": "needs_review",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Needs Review"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "List Analysed Calls",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/calls/{call_id}": {
+      "get": {
+        "description": "One call's state, transcript and score, plus the call's own facts.\n\nA call the pipeline has never touched answers 200 with all three null —\n**not 404** — because the page must tell \"not analysed\" from \"no such\ncall\". A call belonging to another agent is the 404.",
+        "operationId": "get_call_analysis_api_v1_analysis_calls__call_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Get Call Analysis",
+        "tags": [
+          "Analysis"
+        ]
+      },
+      "post": {
+        "description": "Queue one call; the worker picks it up within two minutes.\n\n**Never runs a provider call inside the request.** An LLM round trip behind\nan HTTP request is how a panel times out and a user presses the button\nagain — and each press would be a second bill.\n\nReturns 200 with the state row whether it was created or already there, so\na re-press is indistinguishable from the first press. The four ways this\nanswers 409 — the feature is off, the call is not analysable, the month's\ncap is reached, no provider is configured — are decided in the service.",
+        "operationId": "queue_call_analysis_api_v1_analysis_calls__call_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Call Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Queue Call Analysis",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/status": {
+      "get": {
+        "description": "What is waiting, what broke, and what the month has cost (§7.5).\n\nDeclared **above** ``/calls/{call_id}``: the two do not collide, but the\nliteral route staying above the parameterised one is the habit that keeps\nthem from colliding the day a path is renamed.\n\nNot paged. ``recent_failures`` is capped at twenty server-side, and none of\nthe four fields below it is a list of rows to walk (§6.2).",
+        "operationId": "analysis_status_api_v1_analysis_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Analysis Status",
+        "tags": [
+          "Analysis"
         ]
       }
     },
