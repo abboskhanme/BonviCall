@@ -88,6 +88,19 @@ export const Perm = {
    */
   ANALYSIS_READ: 'analysis:read',
   ANALYSIS_RUN: 'analysis:run',
+
+  /**
+   * The Telegram group directory and the customer ratings it collects.
+   *
+   * `surveys:read:own` is the one own-scope permission a salesperson holds
+   * beyond their own calls and their own handset: a customer's rating is the
+   * customer's own words about them. `analysis:read` is deliberately withheld
+   * from the same role — an unreviewed machine score is a different thing.
+   */
+  GROUPS_READ: 'groups:read',
+  GROUPS_WRITE: 'groups:write',
+  SURVEYS_READ: 'surveys:read',
+  SURVEYS_READ_OWN: 'surveys:read:own',
 } as const
 
 export type Permission = (typeof Perm)[keyof typeof Perm]

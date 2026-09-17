@@ -276,6 +276,74 @@
         "title": "AgentActivityRow",
         "type": "object"
       },
+      "AgentBreakdownOut": {
+        "description": "One employee's slice of the report.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null — sales whose branch is linked to nobody."
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmed": {
+            "type": "integer"
+          },
+          "justified": {
+            "type": "integer"
+          },
+          "new": {
+            "description": "Suspicious and not yet decided — the work queue.",
+            "type": "integer"
+          },
+          "not_checkable": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "integer"
+          },
+          "over_limit": {
+            "default": 0,
+            "type": "integer"
+          },
+          "over_limit_amount": {
+            "default": 0.0,
+            "type": "number"
+          },
+          "sales": {
+            "type": "integer"
+          },
+          "suspicious": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sales",
+          "ok",
+          "suspicious",
+          "not_checkable",
+          "new",
+          "justified",
+          "confirmed"
+        ],
+        "title": "AgentBreakdownOut",
+        "type": "object"
+      },
       "AgentListResponse": {
         "properties": {
           "items": {
@@ -1434,6 +1502,36 @@
         "title": "AppVersionResponse",
         "type": "object"
       },
+      "AssignBranchRequest": {
+        "description": "One change to the map. BOTH fields are optional.\n\nThey answer SEPARATE questions and do not substitute for one another —\n\"who is responsible\" and \"is this branch checked at all\" — so a field that\nis not sent is NOT touched. `agent_id: null` is a full value (\"unlink\"),\nwhich is different from \"not sent\".",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The employee. `null` unlinks."
+          },
+          "excluded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`true` — take the branch out of sales control (its sales move to the out-of-scope section and are NOT deleted); `false` — put it back (the whole history returns with no re-import); omitted — leave it alone."
+          }
+        },
+        "title": "AssignBranchRequest",
+        "type": "object"
+      },
       "AssignmentListResponse": {
         "description": "Full history for a number — this is the timeline the agent page renders.",
         "properties": {
@@ -1769,6 +1867,62 @@
         "title": "BlockScoreOut",
         "type": "object"
       },
+      "Body_import_contacts_api_v1_contacts_import_post": {
+        "properties": {
+          "file": {
+            "description": "A `.csv` or `.tsv` export.",
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_contacts_api_v1_contacts_import_post",
+        "type": "object"
+      },
+      "Body_import_preview_api_v1_sales_import_preview_post": {
+        "properties": {
+          "file": {
+            "description": "The `.xlsx` export.",
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_preview_api_v1_sales_import_preview_post",
+        "type": "object"
+      },
+      "Body_import_sales_api_v1_sales_import_post": {
+        "properties": {
+          "file": {
+            "description": "The `.xlsx` export.",
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_sales_api_v1_sales_import_post",
+        "type": "object"
+      },
+      "Body_preview_import_api_v1_contacts_import_preview_post": {
+        "properties": {
+          "file": {
+            "description": "A `.csv` or `.tsv` export.",
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_import_api_v1_contacts_import_preview_post",
+        "type": "object"
+      },
       "Body_upload_version_api_v1_app_versions_post": {
         "properties": {
           "apk": {
@@ -1811,6 +1965,126 @@
           "variant"
         ],
         "title": "Body_upload_version_api_v1_app_versions_post",
+        "type": "object"
+      },
+      "BroadcastRequest": {
+        "properties": {
+          "force": {
+            "default": true,
+            "description": "Defaults to true, unlike the single-group send. The whole point of the button is 'send to everyone now'; silently sending nothing because of a ten-day window would be the broken behaviour.",
+            "type": "boolean"
+          }
+        },
+        "title": "BroadcastRequest",
+        "type": "object"
+      },
+      "BroadcastResponse": {
+        "description": "What the broadcast did. The three numbers always account for every group.\n\n``created + reused + len(skipped) == total_groups`` is an invariant, and a\ntest asserts it. \"8 sent\" on its own made an admin go and count rows on the\ngroups page to find out what happened to the rest.",
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "delivered": {
+            "description": "How many were actually posted. **Zero in this deployment** — see `DispatchResponse.delivered`.",
+            "type": "integer"
+          },
+          "reused": {
+            "description": "Groups that already had an unsent survey queued.",
+            "type": "integer"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BroadcastSkip"
+            },
+            "type": "array"
+          },
+          "total_groups": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created",
+          "reused",
+          "skipped",
+          "total_groups",
+          "delivered"
+        ],
+        "title": "BroadcastResponse",
+        "type": "object"
+      },
+      "BroadcastSkip": {
+        "description": "One group the broadcast passed over, and why.",
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "group_not_bound | group_inactive | survey_suppressed.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "title",
+          "reason"
+        ],
+        "title": "BroadcastSkip",
+        "type": "object"
+      },
+      "BulkPatchRequest": {
+        "description": "The same change applied to many groups at once.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "type": "array"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "group_ids"
+        ],
+        "title": "BulkPatchRequest",
+        "type": "object"
+      },
+      "BulkPatchResponse": {
+        "properties": {
+          "updated": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "title": "BulkPatchResponse",
         "type": "object"
       },
       "CallAnalysisResponse": {
@@ -2480,6 +2754,427 @@
         "title": "ChangePasswordRequest",
         "type": "object"
       },
+      "ClientAgentRow": {
+        "description": "An employee who spoke to this customer.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "calls": {
+            "type": "integer"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "last_call_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "full_name",
+          "calls",
+          "last_call_at"
+        ],
+        "title": "ClientAgentRow",
+        "type": "object"
+      },
+      "ClientCallRow": {
+        "description": "One conversation with this customer.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "call_type": {
+            "$ref": "#/components/schemas/CallType"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/CallDirection"
+          },
+          "disposition": {
+            "$ref": "#/components/schemas/CallDisposition"
+          },
+          "duration_sec": {
+            "type": "integer"
+          },
+          "has_audio": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "received_at": {
+            "description": "Shown beside `started_at` because the two differ whenever a phone was off or a recovery sweep found an old call (SPEC §3.12).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "red_flag_count": {
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "started_at",
+          "received_at",
+          "duration_sec",
+          "direction",
+          "disposition",
+          "call_type",
+          "has_audio",
+          "agent_id",
+          "agent_name",
+          "score",
+          "red_flag_count",
+          "needs_review"
+        ],
+        "title": "ClientCallRow",
+        "type": "object"
+      },
+      "ClientCallsResponse": {
+        "description": "One keyset page of this customer's conversations, newest first.",
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientCallRow"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more",
+          "total"
+        ],
+        "title": "ClientCallsResponse",
+        "type": "object"
+      },
+      "ClientDetailResponse": {
+        "description": "The card: the same aggregate as the list row, plus who spoke to them.",
+        "properties": {
+          "agents": {
+            "description": "Employees who spoke to this customer, most first.",
+            "items": {
+              "$ref": "#/components/schemas/ClientAgentRow"
+            },
+            "type": "array"
+          },
+          "client": {
+            "$ref": "#/components/schemas/ClientRowOut"
+          },
+          "scope": {
+            "description": "The cut the customer was actually FOUND in. It can differ from the one asked for: a card link with no `scope` on it would otherwise never open an internal number. The panel echoes it so the two lists below the card are asked with the same cut.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client",
+          "agents",
+          "scope"
+        ],
+        "title": "ClientDetailResponse",
+        "type": "object"
+      },
+      "ClientKind": {
+        "description": "Sales control is split into **two separate sections**.\n\n⚠️ WHY THEY CANNOT BE MIXED. A walk-in buyer is never written into the\ncatalogue by name and number — they pass under one of a few shared codes\n(``sales.walk_in_codes``). For a sale under such a code the question \"was\nthis customer spoken to first?\" is meaningless: one code, a hundred people.\nThey used to sit in the same list as regular customers and were counted as\n``not_checkable``, which wrote \"could not be checked\" into an employee's\ncolumn — when what it actually described was the KIND OF WORK, not the\nquality of our data.\n\nMeasured (24.08.2026): 718 sales and $531,432 under ``К00001`` alone — a\nsizeable share of what looked like the regular-customer list.\n\n· :attr:`REGULAR` — regular customers. Shared codes are EXCLUDED.\n· :attr:`WALK_IN` — shared codes only. The rules do not apply; the measure\n  is different — is any single ticket over the limit.",
+        "enum": [
+          "regular",
+          "walk_in"
+        ],
+        "title": "ClientKind",
+        "type": "string"
+      },
+      "ClientPageResponse": {
+        "description": "One keyset page of the directory.",
+        "properties": {
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive, Asia/Tashkent."
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientRowOut"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque. Pass it back as `cursor`; null means this is the last page."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many customers the filter matches. Only the FIRST page asks for it (`with_total`), so every later page answers null — a count over a grouped aggregate is affordable once per filter change and not once per page."
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more",
+          "total",
+          "date_from",
+          "date_to"
+        ],
+        "title": "ClientPageResponse",
+        "type": "object"
+      },
+      "ClientRowOut": {
+        "description": "One customer in the directory — one phone number and its history.",
+        "properties": {
+          "agent_count": {
+            "description": "How many employees have spoken to them.",
+            "type": "integer"
+          },
+          "avg_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "calls_total": {
+            "type": "integer"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The customer code read out of the contact name. Null — the dictionary holds no code for this number."
+          },
+          "first_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null — there was no contact inside the chosen period. That is not the same as an unknown customer: the card still opens and shows zeros."
+          },
+          "inbound": {
+            "type": "integer"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "main_agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "main_agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whoever spoke to them most. The list shows this one and `+N`."
+          },
+          "missed": {
+            "description": "Incoming and unanswered — the company's responsibility. The same definition the activity report uses: `rejected` counts here with `missed`, because the phone rang and there was no conversation.",
+            "type": "integer"
+          },
+          "missed_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Missed as a percent of incoming. Null when there were none."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The uploaded contact list first, the handset's own resolution as the fallback. Null — nobody has ever named this number."
+          },
+          "outbound": {
+            "type": "integer"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone_key": {
+            "description": "The last-9 matching key (`calls.remote_number_key`, N37). The identifier for both the list and the card, and the same value `MissedClientRow.phone_key` carries.",
+            "type": "string"
+          },
+          "scored": {
+            "description": "How many conversations were scored — what the average is over.",
+            "type": "integer"
+          },
+          "talk_seconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "phone_key",
+          "name",
+          "phone",
+          "code",
+          "calls_total",
+          "inbound",
+          "outbound",
+          "missed",
+          "missed_rate",
+          "talk_seconds",
+          "first_call_at",
+          "last_call_at",
+          "agent_count",
+          "main_agent_id",
+          "main_agent_name",
+          "avg_score",
+          "scored"
+        ],
+        "title": "ClientRowOut",
+        "type": "object"
+      },
+      "ClientScope": {
+        "description": "Who is in the list.\n\n``CLIENTS`` is the default: everything except internal conversations. It is\ndeliberately NOT a strict \"external only\" filter — unclassified rows\n(``call_type = 'unknown'``) can exist and being unclassified does not mean\n\"not a customer\", it means not yet decided. Hiding them quietly would make\nthe list incomplete.\n\n⚠️ The source has to write this as ``call_type IS NULL OR call_type <>\n'internal'`` and carries a comment about why: in SQL ``NULL <> 'internal'``\nis NULL, so unclassified rows vanish silently. BonviCall's ``call_type`` is\na NOT NULL enum defaulting to ``unknown`` (UC-25 — an empty line directory\nyields ``unknown``, never ``external``), so the plain inequality is correct\nhere and the NULL guard is dropped rather than translated.",
+        "enum": [
+          "clients",
+          "internal",
+          "all"
+        ],
+        "title": "ClientScope",
+        "type": "string"
+      },
+      "ClientSort": {
+        "description": "What the directory is ordered by.",
+        "enum": [
+          "last_call",
+          "calls",
+          "missed",
+          "talk",
+          "score",
+          "name"
+        ],
+        "title": "ClientSort",
+        "type": "string"
+      },
       "CloseAssignmentRequest": {
         "description": "``PATCH /api/v1/assignments/{id}`` — end a holding period.",
         "properties": {
@@ -2656,6 +3351,838 @@
         ],
         "title": "CommandStatus",
         "type": "string"
+      },
+      "ComplianceItem": {
+        "description": "One sale: the SAP fact, the verdict, and THE EVIDENCE.\n\nThe evidence fields (`last_call_at` … `calls_total`) are not optional\ndecoration. The manager re-derives the number by hand, so every suspicious\nrow has to carry \"when was the last conversation, with whom, how many days\nbefore\" beside it. Without that the list is not believed.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whoever SPOKE to the customer, else whoever holds the branch. Null when neither is known — that sale belongs to nobody yet."
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In the document's own currency."
+          },
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same amount in dollars, straight from SAP. Stored as `numeric`; every comparison against a threshold happens in SQL, so no client ever has to compare money as a float."
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "broken_rules": {
+            "description": "Always in this order (R1, R2, R3) so badges do not move about.",
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "type": "array"
+          },
+          "calls_between": {
+            "description": "Conversations between the previous sale and this one (R2).",
+            "type": "integer"
+          },
+          "calls_total": {
+            "description": "Conversations in the WHOLE history, the period included and not bounded by it — R3 is the harshest signal and is stated in its most cautious form.",
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "days_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Days before the sale. `0` — the same day."
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SAP's product line."
+          },
+          "doc_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SAP's `Номер документа` — the piece of paper the manager searches for. NOT interchangeable with `external_id`."
+          },
+          "external_id": {
+            "description": "SAP's `Номер операции` — the import key.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_call_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The nearest conversation before the sale (or on its own day). NOT bounded by the window: a conversation nine days ago is still shown, because that number is what explains the rule."
+          },
+          "last_call_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The call row itself, so the panel can open the recording. BonviZvonki shows a date and a name with nothing behind them."
+          },
+          "occurred_on": {
+            "description": "A DATE with no time — SAP gives no clock for a sale.",
+            "format": "date",
+            "type": "string"
+          },
+          "over_limit": {
+            "description": "A walk-in sale over the single-ticket limit. ALWAYS false in the regular-customer section: a large sale to a regular customer is a normal event.",
+            "type": "boolean"
+          },
+          "partner_code": {
+            "description": "The customer. A customer IS the code.",
+            "type": "string"
+          },
+          "partner_excluded": {
+            "description": "The customer is out of sales control. Does not affect the verdict — it is for the BUTTON: without it the card would open saying 'Exclude' even for a customer already excluded, and there would be no way back from the screen.",
+            "type": "boolean"
+          },
+          "partner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As SAP wrote it — for display, never for matching."
+          },
+          "phone_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last-9 key the match was made on (N37)."
+          },
+          "previous_sale_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "This customer's previous sale. Null — a FIRST sale, so R2 is silent."
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SaleReviewOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`generic_code` — a shared code, many customers behind one; `no_phone` — no usable number anywhere. Set only with `not_checkable`, which is NOT a kind of `ok`."
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_on",
+          "external_id",
+          "partner_code",
+          "currency",
+          "partner_excluded",
+          "over_limit",
+          "verdict",
+          "broken_rules",
+          "calls_between",
+          "calls_total"
+        ],
+        "title": "ComplianceItem",
+        "type": "object"
+      },
+      "ComplianceListResponse": {
+        "description": "A cursor page of the review queue.\n\n``total`` is computed only when asked: the three class counts live on\n`GET /sales/compliance/summary`, which deliberately ignores the verdict\nfilters, so the FILTERED count is the one thing the list has to supply.",
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceItem"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "window_days": {
+            "description": "Which window the verdicts were computed with — shown on the screen.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more",
+          "window_days"
+        ],
+        "title": "ComplianceListResponse",
+        "type": "object"
+      },
+      "ComplianceSummaryResponse": {
+        "description": "The three class counts and the per-employee cut.\n\nThe verdict filters are deliberately absent from this endpoint: all three\ncounts have to stay on the screen, or choosing \"suspicious\" would drop two\nof the three cards to zero and \"how many could not be checked\" — the\nmeasure of SAP's own data quality — would have no answer.",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentBreakdownOut"
+            },
+            "type": "array"
+          },
+          "confirmed": {
+            "type": "integer"
+          },
+          "justified": {
+            "type": "integer"
+          },
+          "new": {
+            "type": "integer"
+          },
+          "not_checkable": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "integer"
+          },
+          "over_limit": {
+            "default": 0,
+            "description": "Walk-in section only; always 0 for regular customers.",
+            "type": "integer"
+          },
+          "over_limit_amount": {
+            "default": 0.0,
+            "type": "number"
+          },
+          "suspicious": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "walk_in_limit": {
+            "default": 0,
+            "description": "Which limit these were computed against — stated, not implied.",
+            "type": "integer"
+          },
+          "window_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "ok",
+          "suspicious",
+          "not_checkable",
+          "new",
+          "justified",
+          "confirmed",
+          "window_days",
+          "agents"
+        ],
+        "title": "ComplianceSummaryResponse",
+        "type": "object"
+      },
+      "ComplianceTimelineResponse": {
+        "properties": {
+          "clients": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineClientOut"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "Whether `max_clients` cut the list. Stated, or the list would silently be incomplete.",
+            "type": "boolean"
+          },
+          "window_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_days",
+          "truncated"
+        ],
+        "title": "ComplianceTimelineResponse",
+        "type": "object"
+      },
+      "ContactCallsBrief": {
+        "description": "What this number's traffic looks like — the card's right-hand half.",
+        "properties": {
+          "agent_count": {
+            "type": "integer"
+          },
+          "calls_total": {
+            "type": "integer"
+          },
+          "first_call_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inbound": {
+            "type": "integer"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "main_agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missed": {
+            "type": "integer"
+          },
+          "outbound": {
+            "type": "integer"
+          },
+          "talk_seconds": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calls_total",
+          "inbound",
+          "outbound",
+          "missed",
+          "talk_seconds",
+          "first_call_at",
+          "last_call_at",
+          "agent_count",
+          "main_agent_name"
+        ],
+        "title": "ContactCallsBrief",
+        "type": "object"
+      },
+      "ContactDetailResponse": {
+        "description": "Everything known about one number.",
+        "properties": {
+          "calls": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactCallsBrief"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null — no call has ever been made to or from this number."
+          },
+          "contact": {
+            "$ref": "#/components/schemas/ContactRowOut"
+          },
+          "other_numbers": {
+            "description": "Our other numbers under the same code.",
+            "items": {
+              "$ref": "#/components/schemas/ContactRowOut"
+            },
+            "type": "array"
+          },
+          "phone_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_key",
+          "contact",
+          "other_numbers",
+          "calls"
+        ],
+        "title": "ContactDetailResponse",
+        "type": "object"
+      },
+      "ContactImportResponse": {
+        "description": "What the upload DID.",
+        "properties": {
+          "bad_phone": {
+            "type": "integer"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "duplicates": {
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ImportMode"
+          },
+          "no_name": {
+            "type": "integer"
+          },
+          "no_phone": {
+            "type": "integer"
+          },
+          "read": {
+            "type": "integer"
+          },
+          "skipped_filter": {
+            "description": "Rows left out by the chosen mode. Existing rows are never skipped.",
+            "type": "integer"
+          },
+          "unchanged": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file",
+          "mode",
+          "read",
+          "created",
+          "updated",
+          "unchanged",
+          "no_phone",
+          "bad_phone",
+          "no_name",
+          "duplicates",
+          "skipped_filter"
+        ],
+        "title": "ContactImportResponse",
+        "type": "object"
+      },
+      "ContactKind": {
+        "description": "Whose contact this is — a PERSON confirms it, the system only suggests.\n\n⚠️ The field exists because an employee's phone holds everything mixed\ntogether: customers, colleagues, warehouses and PRIVATE acquaintances.\nLeaving them all in one list labelled \"customer\" does two kinds of damage —\na private person's name leaks into company reports, and a conversation with\na colleague gets scored as a sales conversation.\n\n**Stored as ``String(16)``, not as a PostgreSQL enum.** Adopted from the\nsource with its reason: a new kind must not require an ``ALTER TYPE`` on a\nlive database. CONVENTIONS.md §10 requires a native enum for the four\nvocabularies the *device* contract depends on; this is not one of them — it\nis panel-only, it never crosses the device or service surface, and the\nclosed set is enforced where it is read, by this enum, in ``schemas.py``.",
+        "enum": [
+          "client",
+          "internal",
+          "personal",
+          "unknown"
+        ],
+        "title": "ContactKind",
+        "type": "string"
+      },
+      "ContactPageResponse": {
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContactRowOut"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only the first page asks for it, like every other list here."
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more",
+          "total"
+        ],
+        "title": "ContactPageResponse",
+        "type": "object"
+      },
+      "ContactPatchRequest": {
+        "description": "An admin's correction.\n\n⚠️ The `code` is editable. A code can be mistyped on a handset, and if\nfixing one meant re-uploading the whole file nobody would ever fix one.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ContactPatchRequest",
+        "type": "object"
+      },
+      "ContactPreviewResponse": {
+        "description": "What an upload WOULD do. Nothing has been written.",
+        "properties": {
+          "bad_phone": {
+            "description": "A number is there but no key could be built (foreign, service, junk).",
+            "type": "integer"
+          },
+          "calls_covered": {
+            "type": "integer"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "duplicates": {
+            "description": "Extra records for a number already seen. Ordinary: measured, 38 numbers carried more than two different names and one carried seven.",
+            "type": "integer"
+          },
+          "file": {
+            "type": "string"
+          },
+          "no_name": {
+            "type": "integer"
+          },
+          "no_phone": {
+            "description": "Rows with no number at all. Counted SEPARATELY from `bad_phone` and the difference is large: measured, 7,316 of 9,103 rows had no number (the export gave none) against 11 with an unusable one. Added together they would read as '7,327 bad rows'.",
+            "type": "integer"
+          },
+          "parsed": {
+            "description": "Distinct numbers the file yielded.",
+            "type": "integer"
+          },
+          "read": {
+            "description": "Rows in the file with any content in them.",
+            "type": "integer"
+          },
+          "rows": {
+            "description": "A sample, capped — the whole file would be megabytes.",
+            "items": {
+              "$ref": "#/components/schemas/ContactRowOut"
+            },
+            "type": "array"
+          },
+          "suggested": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "The suggested `ContactKind` -> how many rows. A proposal, never applied.",
+            "type": "object"
+          },
+          "unchanged": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "with_code": {
+            "type": "integer"
+          },
+          "would_cover": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "An `ImportMode` -> how many CALLS it would cover. The number the decision is actually taken on: a row count flatters the wide mode.",
+            "type": "object"
+          },
+          "would_import": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "An `ImportMode` -> how many rows it would write.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "file",
+          "read",
+          "parsed",
+          "no_phone",
+          "bad_phone",
+          "no_name",
+          "duplicates",
+          "with_code",
+          "created",
+          "updated",
+          "unchanged",
+          "calls_covered",
+          "suggested",
+          "would_import",
+          "would_cover",
+          "rows"
+        ],
+        "title": "ContactPreviewResponse",
+        "type": "object"
+      },
+      "ContactRowOut": {
+        "description": "One row of the dictionary — one phone number, one name, maybe a code.",
+        "properties": {
+          "calls": {
+            "default": 0,
+            "description": "How many calls this number has. Filled by the upload preview and by the card; **0 in the list**, deliberately — a per-row count over the whole calls table would make every page pay for a figure the card shows better.",
+            "type": "integer"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The customer code, transliterated to Cyrillic. Null — none in the name."
+          },
+          "code_numbers": {
+            "default": 1,
+            "description": "How many of OUR numbers carry this code. Two numbers for one customer is the ordinary case, not an error; without this the row reads as a duplicate.",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ContactKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The human name with the code cut out. Null — the name was only a code."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "As the uploaded file wrote it, for display."
+          },
+          "phone_key": {
+            "description": "The last 9 digits — the one matching key in the product (N37), and the same value `calls.remote_number_key` and `ClientRowOut.phone_key` carry.",
+            "type": "string"
+          },
+          "raw_name": {
+            "description": "The name exactly as the handset had it. Never edited.",
+            "type": "string"
+          },
+          "source_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which upload produced this row."
+          }
+        },
+        "required": [
+          "phone_key",
+          "phone",
+          "raw_name",
+          "name",
+          "code",
+          "kind",
+          "source_file"
+        ],
+        "title": "ContactRowOut",
+        "type": "object"
+      },
+      "ContactSummaryResponse": {
+        "description": "The header counts.",
+        "properties": {
+          "by_kind": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "A `ContactKind` value -> how many rows carry it. Absent kinds are 0.",
+            "type": "object"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "with_code": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "with_code",
+          "by_kind"
+        ],
+        "title": "ContactSummaryResponse",
+        "type": "object"
       },
       "CountMetricOut": {
         "description": "A count, with its change against the previous period of equal length.",
@@ -3829,6 +5356,77 @@
         "title": "DeviceHealthResponse",
         "type": "object"
       },
+      "DigestTestResponse": {
+        "description": "The answer to the \"test message\" button.\n\n⚠️ `text` IS ALWAYS RETURNED, even when nothing was sent. That is the whole\npoint of the button: see what would go out BEFORE turning the switch on. An\nunfilled setting comes back as `sent=false` with a `reason` rather than an\nerror — showing the text and saying \"now name a chat\" is more use than a\n422.\n\n⚠️ IN THIS DEPLOYMENT NOTHING IS EVER SENT. The only transport\nimplementation writes a log line, so `sent` is false with\n`reason=\"send_failed\"` and `error=\"no_transport_configured\"` once a chat is\nconfigured. That is deliberate and is not a fault to be fixed by the panel.",
+        "properties": {
+          "chars": {
+            "description": "Message length. The transport's limit is 4096.",
+            "type": "integer"
+          },
+          "chat_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which day the message covers — the last IMPORTED day, not yesterday: the export arrives by hand and is usually behind."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`disabled` — the switch is off (scheduled runs only) | `no_chat` — no chat configured | `no_sales` — no sales in the database | `no_new_import` — nothing new since the last message (scheduled runs only) | `send_failed` — the transport refused it."
+          },
+          "sent": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sent",
+          "text",
+          "chars"
+        ],
+        "title": "DigestTestResponse",
+        "type": "object"
+      },
       "DirectoryEntryListResponse": {
         "properties": {
           "items": {
@@ -3898,6 +5496,45 @@
         ],
         "title": "DirectoryRuleKind",
         "type": "string"
+      },
+      "DispatchRequest": {
+        "description": "Ask for a survey in one group.",
+        "properties": {
+          "force": {
+            "default": false,
+            "description": "Ignore the suppression window. It never clears a structural block: an unbound group or a chat the bot is out of is refused whatever this says, because there would be no employee to attribute the rating to.",
+            "type": "boolean"
+          }
+        },
+        "title": "DispatchRequest",
+        "type": "object"
+      },
+      "DispatchResponse": {
+        "properties": {
+          "delivered": {
+            "description": "Whether the transport actually posted it. **False in this deployment, always**: there is no Telegram bot, the shipped transport is a logging one, and the row stays `pending`.",
+            "type": "boolean"
+          },
+          "reused": {
+            "description": "True when a survey was already queued for this group and that one was returned instead of a second being created. Not an error — it is what stops the same chat receiving two identical messages.",
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "survey_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "survey_id",
+          "status",
+          "reused",
+          "delivered"
+        ],
+        "title": "DispatchResponse",
+        "type": "object"
       },
       "EnrolmentAttemptKind": {
         "description": "``step_timing`` carries the per-screen durations that make N40 measurable.",
@@ -4183,6 +5820,139 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "FeedbackItem": {
+        "description": "One customer's answer.\n\n⚠️ **Never present for a `sales` caller**, whatever the access setting\nsays — see `SurveyService.feedback`.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null means no comment was written, or comments are withheld."
+          },
+          "csat": {
+            "description": "1..5 stars.",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "red_flags": {
+            "description": "Ticked criterion KEYS; labels come from /surveys/red-flags.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "yes | partial | no, or null when the customer skipped the question. Null is a real answer and must not be read as `no`."
+          },
+          "responded_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agent_id",
+          "agent_name",
+          "csat",
+          "resolution",
+          "comment",
+          "red_flags",
+          "responded_at"
+        ],
+        "title": "FeedbackItem",
+        "type": "object"
+      },
+      "FeedbackResponse": {
+        "description": "The rating page: the headline, the shape of it, and the rows behind it.",
+        "properties": {
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while `ready` is false — never 0.0. A zero would be drawn as 'rated badly' by every chart, and the gate exists so one customer's bad morning does not become a published score."
+          },
+          "count": {
+            "type": "integer"
+          },
+          "distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "{\"1\"..\"5\"} -> answers, zero-filled so the chart has five bars.",
+            "type": "object"
+          },
+          "items": {
+            "description": "Empty for a `sales` caller, always. One group is one customer, so a single visible row identifies who wrote it.",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackItem"
+            },
+            "type": "array"
+          },
+          "items_withheld": {
+            "description": "True when rows exist but are not being returned to this caller. Lets the panel say 'your average, without the individual ratings' rather than rendering an empty list that reads as 'no customer has ever rated you'.",
+            "type": "boolean"
+          },
+          "min_responses": {
+            "description": "The threshold in force, from `survey.min_responses`.",
+            "type": "integer"
+          },
+          "ready": {
+            "description": "True once `count >= min_responses`.",
+            "type": "boolean"
+          },
+          "response_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Percent of surveys SENT in the window that were ANSWERED in it. Null when none were sent — not 0, which reads as 'nobody answered'."
+          }
+        },
+        "required": [
+          "average",
+          "count",
+          "ready",
+          "min_responses",
+          "distribution",
+          "response_rate",
+          "items",
+          "items_withheld"
+        ],
+        "title": "FeedbackResponse",
+        "type": "object"
+      },
       "FunnelStage": {
         "description": "Where an agent is in the rollout (UC-17, SPEC §10.1).\n\n``verified_by_admin`` is visibly distinct from ``number_verified`` because\nattested is weaker evidence than proven, and the identity anchor must never\ndegrade silently (T142).",
         "enum": [
@@ -4398,6 +6168,214 @@
         "title": "GapReportResponse",
         "type": "object"
       },
+      "GroupPageResponse": {
+        "description": "One keyset page of groups (§4.0).\n\nKeyset and not ``page``/``page_size`` as BonviZvonki has it: an offset page\nover a table somebody is actively re-binding skips and repeats rows, and\nthis list is exactly the one an admin pages through while editing it.",
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupResponse"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque marker for the next page; null on the last one."
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "GroupPageResponse",
+        "type": "object"
+      },
+      "GroupPatchRequest": {
+        "description": "Change one group. Unset fields are left alone.",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Setting this marks the row `manual`, so automatic binding stops touching it. Explicit null releases the employee."
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "GroupPatchRequest",
+        "type": "object"
+      },
+      "GroupResponse": {
+        "description": "One Telegram group as the panel's list and detail render it.",
+        "properties": {
+          "agent_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent's avatar colour. Decoration, never identity."
+          },
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The salesperson answerable for this chat. Null means nobody is, and this group therefore receives nothing."
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bot_status": {
+            "description": "member | administrator | left | kicked.",
+            "type": "string"
+          },
+          "bound_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bound_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "auto | manual. A `manual` row is one an admin holds: automatic binding never touches it again, and the panel shows a badge so the admin knows which rows they are holding."
+          },
+          "chat_id": {
+            "description": "Telegram's own chat id. Negative for a group; 64-bit.",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "last_survey_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "member_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Telegram's approximate count. Information only — it classifies NOTHING. A chat with four people in it may hold no customer at all, and the bot cannot see who is inside."
+          },
+          "response_count": {
+            "description": "Answers ever collected from it.",
+            "type": "integer"
+          },
+          "survey_count": {
+            "description": "Surveys ever created for this group.",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "chat_id",
+          "title",
+          "agent_id",
+          "agent_name",
+          "agent_color",
+          "member_count",
+          "is_active",
+          "bot_status",
+          "bound_by",
+          "bound_at",
+          "last_survey_at",
+          "survey_count",
+          "response_count"
+        ],
+        "title": "GroupResponse",
+        "type": "object"
+      },
+      "GroupTreeResponse": {
+        "description": "The page's skeleton: one light aggregate, drawn without opening a node.\n\n⚠️ The counts are always of ACTIVE groups and the tree takes no parameters.\nThe panel's \"show inactive too\" switch therefore changes the leaves and\nnever the node counts — deliberately, so a node count keeps one meaning:\n\"groups that are working\".",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/TreeAgentNode"
+            },
+            "type": "array"
+          },
+          "unassigned": {
+            "$ref": "#/components/schemas/TreeBucket",
+            "description": "Groups no employee is bound to. The panel puts this at the TOP of the page and opens it when it is non-empty: these groups receive nothing and nothing anywhere raises an error about it."
+          }
+        },
+        "required": [
+          "agents",
+          "unassigned"
+        ],
+        "title": "GroupTreeResponse",
+        "type": "object"
+      },
       "HealthResponse": {
         "description": "Process liveness.",
         "properties": {
@@ -4466,6 +6444,199 @@
           "rows"
         ],
         "title": "ImportAgentsResponse",
+        "type": "object"
+      },
+      "ImportMode": {
+        "description": "What to take OUT of the file.\n\n⚠️ THIS CHOICE IS MANDATORY. What gets uploaded is a full export of an\nemployee's phone, and it contains everything: customers, colleagues,\nfamily, friends, the taxi driver, the doctor. Measured — about 9,000\ncontacts collected from 6-7 employees, of which only a small part are\ncustomers. Taking all of them does two kinds of damage: strangers' names\nend up stored in the company's database, and the customer list disappears\namong them.",
+        "enum": [
+          "known",
+          "coded",
+          "all"
+        ],
+        "title": "ImportMode",
+        "type": "string"
+      },
+      "ImportPreviewResponse": {
+        "description": "What the import WOULD do. Nothing has been written when this is returned.\n\nWriting happens only when the user confirms and sends the SAME file to\n`POST /sales/import`.",
+        "properties": {
+          "by_day": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewDayCount"
+            },
+            "type": "array"
+          },
+          "by_type": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewTypeCount"
+            },
+            "type": "array"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "existing_rows": {
+            "description": "Keys already present — they are overwritten, not duplicated.",
+            "type": "integer"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "Decided from the file's HEADER, never from its name.",
+            "enum": [
+              "register",
+              "catalog",
+              "balance"
+            ],
+            "type": "string"
+          },
+          "new_rows": {
+            "description": "Keys not yet in the database. `0` means the file has already been uploaded. NOT comparable with `rows`: a key repeats inside a file (measured: 2,383 distinct operation numbers in 2,384 rows).",
+            "type": "integer"
+          },
+          "rows": {
+            "description": "Meaningful rows in the file.",
+            "type": "integer"
+          },
+          "unknown_partner_count": {
+            "type": "integer"
+          },
+          "unknown_partners": {
+            "description": "At most 20 codes; the count is separate.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unmatched_branches": {
+            "description": "Branches linked to no employee, by NAME. Nothing is written here — a branch reaches `sale_branches` only during the real import.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewWarningOut"
+            },
+            "type": "array"
+          },
+          "without_phone": {
+            "description": "Rows with no usable number — outside sales control.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "filename",
+          "rows",
+          "new_rows",
+          "existing_rows",
+          "unknown_partner_count",
+          "without_phone"
+        ],
+        "title": "ImportPreviewResponse",
+        "type": "object"
+      },
+      "ImportReportResponse": {
+        "description": "What the import did. Every number answers a SEPARATE question.",
+        "properties": {
+          "attributed_sales": {
+            "description": "Sales whose attributed conversation changed because of this import.",
+            "type": "integer"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "inactive_deactivated": {
+            "description": "Catalogue rows this file marked inactive. MARKED, never deleted: deleting would take the `excluded_at` decision with it.",
+            "type": "integer"
+          },
+          "inactive_skipped": {
+            "description": "Contractors the file marks inactive — not written as active.",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "register",
+              "catalog",
+              "balance"
+            ],
+            "type": "string"
+          },
+          "linked_sales": {
+            "description": "Sales whose branch link was restored after the map changed.",
+            "type": "integer"
+          },
+          "phones_filled": {
+            "description": "Numbers taken from the balance report that the catalogue lacked.",
+            "type": "integer"
+          },
+          "read": {
+            "type": "integer"
+          },
+          "skipped": {
+            "description": "Rows with no customer code or no date — not storable.",
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          },
+          "unknown_op_type": {
+            "description": "A SAP type we do not know. Stored as `other`, checked by no rule.",
+            "type": "integer"
+          },
+          "unknown_partner": {
+            "description": "Codes absent from the catalogue. The sale is STORED; it simply has no catalogue row behind it, so the rules cannot check it.",
+            "type": "integer"
+          },
+          "unmatched_branches": {
+            "description": "By NAME, not as a count: nothing can be done with '7 branches were not linked', while a list of names starts the work.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "updated": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "source",
+          "read",
+          "created",
+          "updated",
+          "skipped",
+          "unknown_partner",
+          "unknown_op_type",
+          "inactive_skipped",
+          "inactive_deactivated",
+          "phones_filled",
+          "linked_sales",
+          "attributed_sales",
+          "unmatched_branches"
+        ],
+        "title": "ImportReportResponse",
         "type": "object"
       },
       "ImportRowResult": {
@@ -5144,6 +7315,126 @@
         "title": "OutcomeSignalOut",
         "type": "object"
       },
+      "PartnerExclusionRequest": {
+        "description": "Exclude a customer or put them back — one key, and it is REQUIRED.\n\nUnlike `AssignBranchRequest` there is only one action here, so an optional\nfield would let an empty body answer \"I did nothing\" silently.",
+        "properties": {
+          "excluded": {
+            "description": "true — take the customer out of sales control (their sales move to the out-of-scope section and are NOT deleted) | false — put them back.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "excluded"
+        ],
+        "title": "PartnerExclusionRequest",
+        "type": "object"
+      },
+      "PartnerExclusionResponse": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sales": {
+            "description": "Sales carrying this code. The REAL number comes back even after exclusion — which is what proves nothing was deleted.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "excluded",
+          "sales"
+        ],
+        "title": "PartnerExclusionResponse",
+        "type": "object"
+      },
+      "PreviewDayCount": {
+        "description": "One day's slice — filled for the register only.",
+        "properties": {
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "count"
+        ],
+        "title": "PreviewDayCount",
+        "type": "object"
+      },
+      "PreviewTypeCount": {
+        "description": "One slice: the operation type (register) or the group/branch.",
+        "properties": {
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when this slice carries no money at all."
+          },
+          "count": {
+            "type": "integer"
+          },
+          "label": {
+            "description": "The word SAP itself printed, e.g. `Продажа`. Deliberately the source language: the reader compares this count against the same report inside SAP, and a translated word makes that impossible. It is also the fallback for a type SAP invents tomorrow.",
+            "type": "string"
+          },
+          "type": {
+            "description": "The machine value the panel translates from.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "count"
+        ],
+        "title": "PreviewTypeCount",
+        "type": "object"
+      },
+      "PreviewWarningOut": {
+        "description": "A machine-readable warning. The panel owns the sentence.",
+        "properties": {
+          "code": {
+            "description": "`rows_without_date` | `rows_without_partner_code` | `rows_without_amount` | `duplicate_keys_in_file` | `unknown_operation_types` | `contractors_without_usable_phone` | `inactive_contractors` | `codes_absent_from_catalogue`",
+            "type": "string"
+          },
+          "count": {
+            "description": "How many rows. A zero-count warning is never sent.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "count"
+        ],
+        "title": "PreviewWarningOut",
+        "type": "object"
+      },
       "PromptSection": {
         "description": "One named part of the assembled system prompt.\n\nSent with ``editable`` because the admin edits exactly one of them and has to\nsee the rest: without the surrounding context they repeat an instruction that\nis already there (and pay for the tokens) or contradict it.",
         "properties": {
@@ -5512,6 +7803,23 @@
         "title": "RedFlagCountOut",
         "type": "object"
       },
+      "RedFlagOption": {
+        "description": "One misconduct criterion. The registry is the server's, never copied.\n\nThe label is Uzbek because it is what a customer reads in their own chat;\nthe key is what is stored. A key is never renamed, only added to, or every\nhistorical answer changes meaning.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "RedFlagOption",
+        "type": "object"
+      },
       "RedFlagOut": {
         "description": "One incident, with the evidence for it.\n\nEvery incident is returned, including repeats of one type: a manager\nconfirming an accusation needs the time and the quote of both. ``counted``\nmarks the one that actually moved the score — the penalty is charged once\nper type, and the array's penalties sum to the total applied.",
         "properties": {
@@ -5557,6 +7865,50 @@
         ],
         "title": "RedFlagOut",
         "type": "object"
+      },
+      "ReviewSaleRequest": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SaleReviewReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only with `justified`: walked in / Telegram / a visit / a contract. Sent with `confirmed` it is REFUSED rather than dropped — a field that looks accepted and is not is how a panel ships a dead control."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SaleReviewStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ReviewSaleRequest",
+        "type": "object"
+      },
+      "ReviewState": {
+        "description": "Where a sale sits in the review queue.\n\n:attr:`NEW` — nobody has decided yet. The list shows exactly these by\ndefault: a sale that has been looked at must not be back at the top of the\nqueue tomorrow, or the queue never ends.",
+        "enum": [
+          "new",
+          "justified",
+          "confirmed",
+          "all"
+        ],
+        "title": "ReviewState",
+        "type": "string"
       },
       "RevokeRequest": {
         "description": "``POST /api/v1/installations/{id}/revoke`` (UC-08).",
@@ -5943,6 +8295,161 @@
         "title": "RubricVersionSummary",
         "type": "object"
       },
+      "Rule": {
+        "description": "Which rule was broken. Always reported in this order (R1, R2, R3).",
+        "enum": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "title": "Rule",
+        "type": "string"
+      },
+      "SaleBranchListResponse": {
+        "description": "The whole map, busiest branch first.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SaleBranchOut"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "SaleBranchListResponse",
+        "type": "object"
+      },
+      "SaleBranchOut": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branch": {
+            "type": "string"
+          },
+          "excluded": {
+            "description": "Out of sales control. Its sales move to their own section and are NOT deleted. An excluded branch STAYS in this list, or it could never be put back.",
+            "type": "boolean"
+          },
+          "matched_automatically": {
+            "description": "True — the system matched it by name; false — a person set it, or it is not linked yet.",
+            "type": "boolean"
+          },
+          "sales": {
+            "description": "Sales behind this branch — how much the linking matters.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "branch",
+          "matched_automatically",
+          "sales",
+          "excluded"
+        ],
+        "title": "SaleBranchOut",
+        "type": "object"
+      },
+      "SaleReviewOut": {
+        "description": "The human's decision — the only subjective value in this module.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SaleReviewReason"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only ever set together with `justified`."
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the account has since been removed; the decision stays."
+          },
+          "status": {
+            "$ref": "#/components/schemas/SaleReviewStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SaleReviewOut",
+        "type": "object"
+      },
+      "SaleReviewReason": {
+        "description": "Why a sale was justified. Only meaningful with ``justified``.",
+        "enum": [
+          "walk_in",
+          "telegram",
+          "visit",
+          "contract",
+          "other"
+        ],
+        "title": "SaleReviewReason",
+        "type": "string"
+      },
+      "SaleReviewStatus": {
+        "description": "``sale_reviews.status`` — the only subjective value in the database.",
+        "enum": [
+          "justified",
+          "confirmed"
+        ],
+        "title": "SaleReviewStatus",
+        "type": "string"
+      },
       "ScoreBucketOut": {
         "description": "One ten-point band of the histogram.",
         "properties": {
@@ -6285,6 +8792,14 @@
         "title": "SettingResponse",
         "type": "object"
       },
+      "SortOrder": {
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "title": "SortOrder",
+        "type": "string"
+      },
       "StoragePointOut": {
         "description": "One day of the growth curve.",
         "properties": {
@@ -6414,6 +8929,239 @@
         "title": "StrandedInstallationOut",
         "type": "object"
       },
+      "TimelineClientOut": {
+        "properties": {
+          "agents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "amount_usd": {
+            "type": "number"
+          },
+          "calls_count": {
+            "type": "integer"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEventOut"
+            },
+            "type": "array"
+          },
+          "partner_code": {
+            "type": "string"
+          },
+          "partner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SAP card's number, for display. Not the matching key: the chain covers every number known for this customer."
+          },
+          "sales_count": {
+            "type": "integer"
+          },
+          "suspicious_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "partner_code",
+          "sales_count",
+          "suspicious_count",
+          "amount_usd",
+          "calls_count"
+        ],
+        "title": "TimelineClientOut",
+        "type": "object"
+      },
+      "TimelineEventOut": {
+        "description": "One event — a conversation or a sale.\n\n⚠️ BOTH COME BACK AS ONE TYPE (told apart by `kind`) AND ALREADY ORDERED.\nAs two lists, interleaving them would fall to the panel, and the rule \"on\none day the conversation comes before the sale\" would have to be written a\nsecond time there.",
+        "properties": {
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answered": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "at": {
+            "description": "A call: the real instant. A sale: 00:00 of that Asia/Tashkent day, because SAP gives a sale no time.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "broken_rules": {
+            "items": {
+              "$ref": "#/components/schemas/Rule"
+            },
+            "type": "array"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doc_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_audio": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the conversation can be listened to."
+          },
+          "kind": {
+            "enum": [
+              "call",
+              "sale"
+            ],
+            "type": "string"
+          },
+          "sale_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "at"
+        ],
+        "title": "TimelineEventOut",
+        "type": "object"
+      },
       "TimeseriesPointOut": {
         "description": "One period of the trend line.\n\n``period_start`` and not BonviZvonki's ``date``: in the weekly bucket the\nvalue is the Monday and in the monthly one the first of the month, so\n\"date\" invites a reader to plot it as the day something happened.",
         "properties": {
@@ -6509,6 +9257,60 @@
           "transcribed_at"
         ],
         "title": "TranscriptResponse",
+        "type": "object"
+      },
+      "TreeAgentNode": {
+        "description": "One employee node of the group tree, with its counts.\n\n``enrolled`` is **not** ported. In BonviZvonki it means \"this employee has\nsent their phone number to the bot\", which is what lets the bot recognise\nthem in a chat, and it is read off ``agents.telegram_user_id``. This\nproduct has no Telegram identity for an agent and this port does not invent\none, so the field would have been either always-false — a warning banner\nover every employee, which is the \"banner that is always red\" this repo\nalready deleted once — or hard-coded true, which is a field that says\nnothing. The panel's enrolment notice and its three-step instruction modal\ngo with it.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "group_count": {
+            "type": "integer"
+          },
+          "response_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_id",
+          "full_name",
+          "color",
+          "group_count",
+          "response_count"
+        ],
+        "title": "TreeAgentNode",
+        "type": "object"
+      },
+      "TreeBucket": {
+        "description": "The groups that sit outside every node.",
+        "properties": {
+          "group_count": {
+            "type": "integer"
+          },
+          "response_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "group_count",
+          "response_count"
+        ],
+        "title": "TreeBucket",
         "type": "object"
       },
       "UpdateAgentRequest": {
@@ -6836,6 +9638,16 @@
           "sales"
         ],
         "title": "UserRole",
+        "type": "string"
+      },
+      "Verdict": {
+        "description": "The three classes. ``not_checkable`` is not a kind of ``ok``.",
+        "enum": [
+          "ok",
+          "suspicious",
+          "not_checkable"
+        ],
+        "title": "Verdict",
         "type": "string"
       },
       "VerificationMethod": {
@@ -10772,6 +13584,488 @@
         ]
       }
     },
+    "/api/v1/clients": {
+      "get": {
+        "description": "Who has been spoken to, how often, and when last.\n\nThe search matches a name, a customer code or a number in any format\n(\"90 123\", \"+998901112233\") — comparison is on digits alone.\n\nA ``sales`` caller sees only the customers they have spoken to, and the\n``agent_id`` filter is ignored for them rather than merged.",
+        "operationId": "list_clients_api_v1_clients_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientSort",
+              "default": "last_call"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder",
+              "default": "desc"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "From the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "From the previous page.",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Ask for the count. First page only.",
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Ask for the count. First page only.",
+              "title": "With Total",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "`clients` — everything except internal lines (default).",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientScope",
+              "default": "clients",
+              "description": "`clients` — everything except internal lines (default)."
+            }
+          },
+          {
+            "description": "Name, code or number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, code or number.",
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "List Clients",
+        "tags": [
+          "Clients"
+        ]
+      }
+    },
+    "/api/v1/clients/{key}": {
+      "get": {
+        "description": "One customer: the same aggregate the list showed, plus who spoke to them.\n\n⚠️ The card takes the SAME filter the list took. Otherwise a customer\nlisted with \"12 calls\" opens onto a different number and the reader cannot\ntell which to believe.\n\nAn empty period is not an unknown customer: the card opens and shows zeros\n(``ClientDirectory.summary``). A cut that hides the number is not one\neither: the cut is widened and the answer says which one found them.",
+        "operationId": "get_client_api_v1_clients__key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "`clients` — everything except internal lines (default).",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientScope",
+              "default": "clients",
+              "description": "`clients` — everything except internal lines (default)."
+            }
+          },
+          {
+            "description": "Name, code or number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, code or number.",
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Get Client",
+        "tags": [
+          "Clients"
+        ]
+      }
+    },
+    "/api/v1/clients/{key}/calls": {
+      "get": {
+        "description": "Every conversation with this customer, newest first.\n\n⚠️ Same widening rule as the card, and for the same reason: an internal\nnumber's card would otherwise open with an empty table under it. The second\nlookup only happens when the first page came back EMPTY — while there are\nrows the cut is right and nothing extra is asked.",
+        "operationId": "client_calls_api_v1_clients__key__calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "With Total",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "`clients` — everything except internal lines (default).",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientScope",
+              "default": "clients",
+              "description": "`clients` — everything except internal lines (default)."
+            }
+          },
+          {
+            "description": "Name, code or number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, code or number.",
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientCallsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Client Calls",
+        "tags": [
+          "Clients"
+        ]
+      }
+    },
     "/api/v1/commands/{command_id}": {
       "get": {
         "description": "Status, latency and the failure reason — UC-16 requires the reason.",
@@ -10813,6 +14107,366 @@
         "summary": "Get Command",
         "tags": [
           "Commands"
+        ]
+      }
+    },
+    "/api/v1/contacts": {
+      "get": {
+        "description": "The dictionary, ordered by the name the handset had.",
+        "operationId": "list_contacts_api_v1_contacts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ContactKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "description": "Name, code or number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Name, code or number.",
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 200,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "With Total",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "List Contacts",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/import": {
+      "post": {
+        "description": "Write the list, upserting on the NUMBER.\n\n⚠️ The default is the NARROW mode. What gets uploaded is a full export of\nsomebody's phone, private contacts included; if the default were\n\"everything\", strangers' names would land in the database on the very first\nupload and getting them out again is hard.\n\n⚠️ BonviZvonki recomputes every call's stored customer code here, in the\nsame request. **That step does not exist in BonviCall and must not be\nadded**: there is no ``calls.client_code`` column to recompute — SPEC\n§3.5's table has none and SPEC-ANALYTICS §0 rule 1 forbids adding one — and\nthe directory resolves the name and code at read time from this table,\nwhich is what makes the phones uploadable one at a time with nothing to\npress afterwards. The source stores the value because it joins 84,692 calls\nagainst 12,349 sales rows; there is no such join here.",
+        "operationId": "import_contacts_api_v1_contacts_import_post",
+        "parameters": [
+          {
+            "description": "coded — only the rows with a code in the name (default); known — code or partner catalogue; all — everything.",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ImportMode",
+              "default": "coded",
+              "description": "coded — only the rows with a code in the name (default); known — code or partner catalogue; all — everything."
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_contacts_api_v1_contacts_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactImportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Import Contacts",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/import/preview": {
+      "post": {
+        "description": "Read the file and say what WOULD happen. Writes nothing.\n\nThe steps are: file -> this -> the user confirms -> the SAME file goes to\n``POST /contacts/import``. Both read from one function, so the screen and\nthe database cannot promise different numbers.\n\n⚠️ Gated on ``settings:write`` even though it writes nothing: it reads an\nuploaded file and reports what is in every employee's phonebook, which is\nnot something the read gate was granted for.",
+        "operationId": "preview_import_api_v1_contacts_import_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_import_api_v1_contacts_import_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Preview Import",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/summary": {
+      "get": {
+        "description": "The header counts, by kind.\n\n⚠️ Declared ABOVE ``/{phone_key}`` so the literal path stays above the\nparameterised one. The two do not collide under FastAPI's ordered matching,\nbut keeping the literal first is the habit that stops them colliding the\nday somebody renames a path.",
+        "operationId": "contacts_summary_api_v1_contacts_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Contacts Summary",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/{phone_key}": {
+      "delete": {
+        "description": "⚠️ Only the CONTACT is removed. Calls are untouched — this list is a\ndictionary over them, never their source.",
+        "operationId": "delete_contact_api_v1_contacts__phone_key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "phone_key",
+            "required": true,
+            "schema": {
+              "title": "Phone Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Delete Contact",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "get": {
+        "description": "Everything known about one number.\n\n⚠️ Opened by NUMBER only. The source also accepts a code, because some of\nits rows come from the partner catalogue alone and a few of those have no\nphone number at all — clicking one would otherwise open nothing. Every row\nhere has a number by construction (it is the primary key of the\ndictionary), so the second door has nothing behind it. It returns with the\n``sales`` module, and with the rows that need it.",
+        "operationId": "contact_detail_api_v1_contacts__phone_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "phone_key",
+            "required": true,
+            "schema": {
+              "title": "Phone Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Contact Detail",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "patch": {
+        "description": "Correct a contact's kind, code or name by hand.",
+        "operationId": "patch_contact_api_v1_contacts__phone_key__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "phone_key",
+            "required": true,
+            "schema": {
+              "title": "Phone Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Patch Contact",
+        "tags": [
+          "Contacts"
         ]
       }
     },
@@ -11168,6 +14822,434 @@
         "summary": "Receiver Status",
         "tags": [
           "Enrolment"
+        ]
+      }
+    },
+    "/api/v1/groups": {
+      "get": {
+        "description": "One page of groups, for one opened node.\n\n``has_agent=false`` is the query behind the warning bucket at the top of\nthe page: those groups will never receive a survey and nothing anywhere\nraises an error about it, so it is the one cut that must be a real\nserver-side filter rather than something the panel assembles by walking\nevery page.",
+        "operationId": "list_groups_api_v1_groups_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "False returns only the groups nobody is bound to.",
+            "in": "query",
+            "name": "has_agent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "False returns only the groups nobody is bound to.",
+              "title": "Has Agent"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "List Groups",
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/bulk": {
+      "patch": {
+        "description": "One change applied to up to 200 groups.\n\n⚠️ Declared BEFORE ``/{group_id}``: Starlette matches in declaration order,\nand the other way round ``bulk`` is parsed as a UUID and answers 422.\n\nA larger selection is the panel's problem, and it chunks it — reporting\neach chunk separately, because \"400 groups, the first 200 saved and the\nsecond 200 failed\" is something an admin has to be told precisely rather\nthan with the single word \"error\".",
+        "operationId": "bulk_patch_api_v1_groups_bulk_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Bulk Patch",
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/surveys/broadcast": {
+      "post": {
+        "description": "Queue a survey for every eligible group.\n\n⚠️ Declared BEFORE ``/{group_id}/survey``, for the same reason ``/bulk``\nis declared before ``/{group_id}``.\n\n⚠️ ``created + reused + len(skipped) == total_groups`` always. A partial\nanswer sends an admin to the groups page to count rows and work out what\nhappened to the rest.\n\n``delivered`` is **0 in this deployment**: the shipped transport posts\nnothing, so the rows sit at ``pending`` and honestly say so.",
+        "operationId": "broadcast_api_v1_groups_surveys_broadcast_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/BroadcastRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BroadcastResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Broadcast",
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/tree": {
+      "get": {
+        "description": "The page's skeleton: one employee per node, with counts.\n\nONE light aggregate. The group rows themselves are pulled only for the node\nsomebody opens, 50 at a time — at roughly one group per customer this table\nis a thousand rows, and an endpoint that returned all of them would answer\nno question anybody has and would take a browser with it.",
+        "operationId": "group_tree_api_v1_groups_tree_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupTreeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Group Tree",
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/{group_id}": {
+      "delete": {
+        "description": "Remove a group — refused while the bot is still in the chat (409).\n\nA chat the bot is sitting in is re-registered on its next message, so the\ndelete would look like it worked and then silently undo itself.",
+        "operationId": "delete_group_api_v1_groups__group_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Delete Group",
+        "tags": [
+          "Groups"
+        ]
+      },
+      "get": {
+        "operationId": "get_group_api_v1_groups__group_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Get Group",
+        "tags": [
+          "Groups"
+        ]
+      },
+      "patch": {
+        "description": "Bind, release or park one group.\n\nTouching the binding by hand marks the row ``manual``, and automatic\nbinding then never touches it again. That badge is shown in the list on\npurpose: an admin has to be able to see which rows they are holding.",
+        "operationId": "patch_group_api_v1_groups__group_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Patch Group",
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/{group_id}/survey": {
+      "post": {
+        "description": "Queue a survey for one group.\n\nTwo of the 409s are ordinary states rather than faults, and the panel shows\nthe reason instead of a red error: ``group_not_bound`` (nobody to\nattribute the rating to) and ``survey_suppressed`` (asked too recently).\nThe second is cleared by ``force``; the first never is.",
+        "operationId": "send_survey_api_v1_groups__group_id__survey_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DispatchRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Send Survey",
+        "tags": [
+          "Groups"
         ]
       }
     },
@@ -11928,6 +16010,910 @@
         ]
       }
     },
+    "/api/v1/sales/branches": {
+      "get": {
+        "description": "Busiest branch first — that is where the linking should start.\n\nExcluded branches are in this list too (``excluded``): otherwise they could\nnever be put back.",
+        "operationId": "branches_api_v1_sales_branches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleBranchListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "The branch map, with its evidence",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/branches/{branch}": {
+      "put": {
+        "description": "Two separate actions on one route — both optional.\n\n· ``agent_id`` — link by hand (or unlink with ``null``). A manual link is\n  not changed by later imports, and this branch's sales MOVE to the new\n  employee at once; without that, correcting a wrong link would leave the\n  old sales on the old employee and the report would be a lie.\n· ``excluded`` — take the branch out of sales control, or put it back. Its\n  sales STAY IN THE DATABASE and only move section.\n\n⚠️ SENT TOGETHER, THE ORDER MATTERS: link first, then exclude. The answer\ncomes from the LAST action, so the other way round the employee on the\nscreen would be stale.",
+        "operationId": "assign_branch_api_v1_sales_branches__branch__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "title": "Branch",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignBranchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleBranchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Link an employee to a branch, or take the branch out of scope",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/compliance": {
+      "get": {
+        "description": "The verdict is recomputed on EVERY request and is stored nowhere.\n\nA call can synchronise after the sale, and a flag written at import time\nwould by then be a lie that nobody would recompute.\n\n⚠️ ``review`` defaults to ``new``. That IS the review queue: a sale that has\nbeen decided leaves the list, or the manager sees the rows they have\nalready dealt with again every day and the queue never ends. ``justified``\nand ``confirmed`` are the archive; ``all`` is everything.\n\nPaged by cursor, ordered ``occurred_on, id``. An ``OFFSET`` is wrong here\nfor a reason specific to this list: deciding on a sale removes it from the\ndefault set, every later page shifts by one, and a sale is never seen at\nall.",
+        "operationId": "compliance_api_v1_sales_compliance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "with_total",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "With Total",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "pattern": "^(asc|desc)$",
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ok | suspicious | not_checkable",
+            "in": "query",
+            "name": "verdict",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Verdict"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ok | suspicious | not_checkable",
+              "title": "Verdict"
+            }
+          },
+          {
+            "description": "new — undecided (DEFAULT) | justified | confirmed | all — every sale regardless of a decision.",
+            "in": "query",
+            "name": "review",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ReviewState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "new",
+              "description": "new — undecided (DEFAULT) | justified | confirmed | all — every sale regardless of a decision.",
+              "title": "Review"
+            }
+          },
+          {
+            "description": "R1 | R2 | R3",
+            "in": "query",
+            "name": "rule",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Rule"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "R1 | R2 | R3",
+              "title": "Rule"
+            }
+          },
+          {
+            "description": "Only meaningful with client_kind=walk_in: true — over the ticket limit, false — under it, omitted — everything.",
+            "in": "query",
+            "name": "over_limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only meaningful with client_kind=walk_in: true — over the ticket limit, false — under it, omitted — everything.",
+              "title": "Over Limit"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, inclusive.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, inclusive.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Employees.",
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Employees.",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "SAP branches.",
+            "in": "query",
+            "name": "branch",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "SAP branches.",
+              "title": "Branch"
+            }
+          },
+          {
+            "description": "Customer name, code, phone digits or operation number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Customer name, code, phone digits or operation number.",
+              "title": "Search"
+            }
+          },
+          {
+            "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules.",
+            "in": "query",
+            "name": "client_kind",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientKind",
+              "default": "regular",
+              "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules."
+            }
+          },
+          {
+            "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+            "in": "query",
+            "name": "out_of_scope",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+              "title": "Out Of Scope",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "The review queue — sales and their verdicts",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/compliance/summary": {
+      "get": {
+        "description": "All three counts — nothing is hidden.\n\n⚠️ ``verdict`` / ``rule`` / ``review`` ARE DELIBERATELY NOT PARAMETERS HERE.\nWith the report following the list's filter, choosing \"suspicious\" would\ndrop two of the three cards to zero and \"how many could not be checked\" —\nthe measure of SAP's own data quality — would have no answer.",
+        "operationId": "compliance_summary_api_v1_sales_compliance_summary_get",
+        "parameters": [
+          {
+            "description": "Asia/Tashkent calendar date, inclusive.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, inclusive.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Employees.",
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Employees.",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "SAP branches.",
+            "in": "query",
+            "name": "branch",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "SAP branches.",
+              "title": "Branch"
+            }
+          },
+          {
+            "description": "Customer name, code, phone digits or operation number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Customer name, code, phone digits or operation number.",
+              "title": "Search"
+            }
+          },
+          {
+            "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules.",
+            "in": "query",
+            "name": "client_kind",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientKind",
+              "default": "regular",
+              "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules."
+            }
+          },
+          {
+            "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+            "in": "query",
+            "name": "out_of_scope",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+              "title": "Out Of Scope",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "The three class counts and the per-employee cut",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/compliance/timeline": {
+      "get": {
+        "description": "\"Which customers has this employee worked with, and how did it go.\"\n\nThe queue returns SALE rows; this returns a CUSTOMER cut, with the whole\nperiod's chain beside each one — call, sale, call…\n\n⚠️ ``verdict`` / ``rule`` / ``review`` are deliberately absent. The chain is\na SEQUENCE, and removing some of its sales would falsify the history: the\npattern a manager reads is \"sold after talking, then sold without talking\",\nand that needs the complete row. The selection is made at customer level\n(``only_suspicious``).\n\n⚠️ On one day the CONVERSATION comes before the SALE — a sale has no time,\nand the rules read it the same way.",
+        "operationId": "compliance_timeline_api_v1_sales_compliance_timeline_get",
+        "parameters": [
+          {
+            "description": "true (default) — only customers with at least ONE suspicious sale. The chain is still complete: such a customer's clean sales stay in it.",
+            "in": "query",
+            "name": "only_suspicious",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "true (default) — only customers with at least ONE suspicious sale. The chain is still complete: such a customer's clean sales stay in it.",
+              "title": "Only Suspicious",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "How many customers. Cut -> `truncated=true`.",
+            "in": "query",
+            "name": "max_clients",
+            "required": false,
+            "schema": {
+              "default": 300,
+              "description": "How many customers. Cut -> `truncated=true`.",
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Max Clients",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, inclusive.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, inclusive.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Employees.",
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Employees.",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "SAP branches.",
+            "in": "query",
+            "name": "branch",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "SAP branches.",
+              "title": "Branch"
+            }
+          },
+          {
+            "description": "Customer name, code, phone digits or operation number.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Customer name, code, phone digits or operation number.",
+              "title": "Search"
+            }
+          },
+          {
+            "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules.",
+            "in": "query",
+            "name": "client_kind",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ClientKind",
+              "default": "regular",
+              "description": "regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules."
+            }
+          },
+          {
+            "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+            "in": "query",
+            "name": "out_of_scope",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control.",
+              "title": "Out Of Scope",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceTimelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "By customer — the conversation/sale sequence",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/digest/test": {
+      "post": {
+        "description": "Assemble the message and hand it to the transport seam.\n\n``sales.digest_enabled`` is NOT checked — that is the whole point of the\nbutton: see the text before turning the switch on. The row lands with\n``kind='test'`` and has no effect on the scheduled message.\n\n⚠️ **THIS REACHES NO NETWORK.** The only transport implementation in this\nrepository writes a log line and returns \"not sent\"\n(``modules/sales/telegram.py``); there is no bot token here and no HTTP\nclient in that path. The answer therefore carries the TEXT and\n``sent=false``, which is the honest report and is exactly what the button\nis for.",
+        "operationId": "digest_test_api_v1_sales_digest_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Assemble the daily message now (test)",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/import": {
+      "post": {
+        "description": "The file's KIND is read from its header; its name is ignored.\n\nUsers name the same export differently every time (\"Workbook3\", \"wb3\",\n\"savdo kunlik\"), and trusting the name leads quietly to the wrong import.",
+        "operationId": "import_sales_api_v1_sales_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_sales_api_v1_sales_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Load a SAP export (register / catalogue / balance)",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/import/preview": {
+      "post": {
+        "description": "Read the file and say what would happen. **NOTHING IS WRITTEN.**\n\nThe sequence is: file -> this estimate -> the user confirms -> the SAME file\ngoes to ``POST /sales/import``. Cancel, and the database is untouched —\nwhich is a test, not a promise.",
+        "operationId": "import_preview_api_v1_sales_import_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_preview_api_v1_sales_import_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "What the import would do — writes nothing",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/partners/{code}/exclusion": {
+      "put": {
+        "description": "For rows that are contractors in SAP but not BUYERS.\n\nOur own departments, the warehouse, internal supply: a transfer between\nthem is booked as a sale and comes out permanently suspicious — \"was the\ncustomer called before the sale?\" is meaningless for our own warehouse.\n\n⚠️ NO SALE IS DELETED. An excluded customer's sales leave the main list, the\nreport's counts and the WALK-IN section, and appear in the out-of-scope\nsection. Put them back and the whole history returns at once, with no\nre-import.\n\n⚠️ ``code`` is the SAP code and its ``К`` is CYRILLIC (``К02711``); it\narrives URL-encoded. A code that is not found is a **404**: one typed with\nthe Latin letter, or an obsolete one, must not quietly get \"done\" for an\nanswer.",
+        "operationId": "partner_exclusion_api_v1_sales_partners__code__exclusion_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerExclusionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerExclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Take a customer out of sales control, or put them back",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
+    "/api/v1/sales/{sale_id}/review": {
+      "post": {
+        "description": "ONE decision per sale — a repeat overwrites it.\n\nA decided sale leaves the review queue (the default ``review=new`` filter)\nbut does not disappear: ``review=justified`` or ``review=confirmed`` brings\nit back.\n\nChanging your mind is normal, so the table holds the LAST decision rather\nthan a history — a second row would show the sale twice in the list.",
+        "operationId": "review_sale_api_v1_sales__sale_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sale_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sale Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSaleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Record a decision on a sale (justified / confirmed)",
+        "tags": [
+          "Sales control"
+        ]
+      }
+    },
     "/api/v1/settings": {
       "get": {
         "operationId": "list_settings_api_v1_settings_get",
@@ -11986,6 +16972,164 @@
         "summary": "Update Setting",
         "tags": [
           "Settings"
+        ]
+      }
+    },
+    "/api/v1/surveys": {
+      "get": {
+        "description": "What customers said, and how much of it this caller may see.\n\n⚠️ A ``sales`` caller gets the summary and **never the rows**. One Telegram\ngroup is one customer, so one visible rating row identifies who wrote it,\nand the anonymity was promised to that customer in their own chat.\n``items_withheld`` says so explicitly, so the panel can distinguish \"your\nratings are not itemised\" from \"nobody has ever rated you\".\n\nThe ``agent_id`` filter is ignored for a salesperson rather than merged —\nthe service narrows to their own agent whatever the URL says.",
+        "operationId": "feedback_api_v1_surveys_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 90,
+              "maximum": 366,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date. Overrides `days`.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date. Overrides `days`.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "Employee name. The SERVER filters, because the average and the distribution have to match what was found — filtering the rendered list would leave a headline describing a different set of answers.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Employee name. The SERVER filters, because the average and the distribution have to match what was found — filtering the rendered list would leave a headline describing a different set of answers.",
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Feedback",
+        "tags": [
+          "Surveys"
+        ]
+      }
+    },
+    "/api/v1/surveys/red-flags": {
+      "get": {
+        "description": "The misconduct registry — the single source, never copied client-side.\n\nThe panel renders whatever comes back and holds no list of its own, so a\nnew criterion appears without a frontend deploy. The labels are Uzbek\nbecause they are what a customer reads in their own chat; the keys are what\nthe answers store, and a key is never renamed.\n\nBehind the read gate here, where BonviZvonki serves it publicly: there the\ncustomer-facing app needs it and shares a router with the panel. Here that\napp is a separate, unmounted surface with its own copy of the list in its\nown response, so the panel's copy has no reason to be open.",
+        "operationId": "red_flags_api_v1_surveys_red_flags_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RedFlagOption"
+                  },
+                  "title": "Response Red Flags Api V1 Surveys Red Flags Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Red Flags",
+        "tags": [
+          "Surveys"
         ]
       }
     },

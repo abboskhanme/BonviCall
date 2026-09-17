@@ -1054,6 +1054,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Clients
+         * @description Who has been spoken to, how often, and when last.
+         *
+         *     The search matches a name, a customer code or a number in any format
+         *     ("90 123", "+998901112233") — comparison is on digits alone.
+         *
+         *     A ``sales`` caller sees only the customers they have spoken to, and the
+         *     ``agent_id`` filter is ignored for them rather than merged.
+         */
+        get: operations["list_clients_api_v1_clients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clients/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Client
+         * @description One customer: the same aggregate the list showed, plus who spoke to them.
+         *
+         *     ⚠️ The card takes the SAME filter the list took. Otherwise a customer
+         *     listed with "12 calls" opens onto a different number and the reader cannot
+         *     tell which to believe.
+         *
+         *     An empty period is not an unknown customer: the card opens and shows zeros
+         *     (``ClientDirectory.summary``). A cut that hides the number is not one
+         *     either: the cut is widened and the answer says which one found them.
+         */
+        get: operations["get_client_api_v1_clients__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/clients/{key}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Client Calls
+         * @description Every conversation with this customer, newest first.
+         *
+         *     ⚠️ Same widening rule as the card, and for the same reason: an internal
+         *     number's card would otherwise open with an empty table under it. The second
+         *     lookup only happens when the first page came back EMPTY — while there are
+         *     rows the cut is right and nothing extra is asked.
+         */
+        get: operations["client_calls_api_v1_clients__key__calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/commands/{command_id}": {
         parameters: {
             query?: never;
@@ -1066,6 +1145,149 @@ export interface paths {
          * @description Status, latency and the failure reason — UC-16 requires the reason.
          */
         get: operations["get_command_api_v1_commands__command_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Contacts
+         * @description The dictionary, ordered by the name the handset had.
+         */
+        get: operations["list_contacts_api_v1_contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{phone_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contact Detail
+         * @description Everything known about one number.
+         *
+         *     ⚠️ Opened by NUMBER only. The source also accepts a code, because some of
+         *     its rows come from the partner catalogue alone and a few of those have no
+         *     phone number at all — clicking one would otherwise open nothing. Every row
+         *     here has a number by construction (it is the primary key of the
+         *     dictionary), so the second door has nothing behind it. It returns with the
+         *     ``sales`` module, and with the rows that need it.
+         */
+        get: operations["contact_detail_api_v1_contacts__phone_key__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Contact
+         * @description ⚠️ Only the CONTACT is removed. Calls are untouched — this list is a
+         *     dictionary over them, never their source.
+         */
+        delete: operations["delete_contact_api_v1_contacts__phone_key__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Contact
+         * @description Correct a contact's kind, code or name by hand.
+         */
+        patch: operations["patch_contact_api_v1_contacts__phone_key__patch"];
+        trace?: never;
+    };
+    "/api/v1/contacts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Contacts
+         * @description Write the list, upserting on the NUMBER.
+         *
+         *     ⚠️ The default is the NARROW mode. What gets uploaded is a full export of
+         *     somebody's phone, private contacts included; if the default were
+         *     "everything", strangers' names would land in the database on the very first
+         *     upload and getting them out again is hard.
+         *
+         *     ⚠️ BonviZvonki recomputes every call's stored customer code here, in the
+         *     same request. **That step does not exist in BonviCall and must not be
+         *     added**: there is no ``calls.client_code`` column to recompute — SPEC
+         *     §3.5's table has none and SPEC-ANALYTICS §0 rule 1 forbids adding one — and
+         *     the directory resolves the name and code at read time from this table,
+         *     which is what makes the phones uploadable one at a time with nothing to
+         *     press afterwards. The source stores the value because it joins 84,692 calls
+         *     against 12,349 sales rows; there is no such join here.
+         */
+        post: operations["import_contacts_api_v1_contacts_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Import
+         * @description Read the file and say what WOULD happen. Writes nothing.
+         *
+         *     The steps are: file -> this -> the user confirms -> the SAME file goes to
+         *     ``POST /contacts/import``. Both read from one function, so the screen and
+         *     the database cannot promise different numbers.
+         *
+         *     ⚠️ Gated on ``settings:write`` even though it writes nothing: it reads an
+         *     uploaded file and reports what is in every employee's phonebook, which is
+         *     not something the read gate was granted for.
+         */
+        post: operations["preview_import_api_v1_contacts_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contacts Summary
+         * @description The header counts, by kind.
+         *
+         *     ⚠️ Declared ABOVE ``/{phone_key}`` so the literal path stays above the
+         *     parameterised one. The two do not collide under FastAPI's ordered matching,
+         *     but keeping the literal first is the habit that stops them colliding the
+         *     day somebody renames a path.
+         */
+        get: operations["contacts_summary_api_v1_contacts_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1219,6 +1441,172 @@ export interface paths {
          *     anyone tries. Absence of enrolment must be an event, not a quiet stall.
          */
         get: operations["receiver_status_api_v1_enrolment_receiver_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Groups
+         * @description One page of groups, for one opened node.
+         *
+         *     ``has_agent=false`` is the query behind the warning bucket at the top of
+         *     the page: those groups will never receive a survey and nothing anywhere
+         *     raises an error about it, so it is the one cut that must be a real
+         *     server-side filter rather than something the panel assembles by walking
+         *     every page.
+         */
+        get: operations["list_groups_api_v1_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Group */
+        get: operations["get_group_api_v1_groups__group_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Group
+         * @description Remove a group — refused while the bot is still in the chat (409).
+         *
+         *     A chat the bot is sitting in is re-registered on its next message, so the
+         *     delete would look like it worked and then silently undo itself.
+         */
+        delete: operations["delete_group_api_v1_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Group
+         * @description Bind, release or park one group.
+         *
+         *     Touching the binding by hand marks the row ``manual``, and automatic
+         *     binding then never touches it again. That badge is shown in the list on
+         *     purpose: an admin has to be able to see which rows they are holding.
+         */
+        patch: operations["patch_group_api_v1_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/survey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Survey
+         * @description Queue a survey for one group.
+         *
+         *     Two of the 409s are ordinary states rather than faults, and the panel shows
+         *     the reason instead of a red error: ``group_not_bound`` (nobody to
+         *     attribute the rating to) and ``survey_suppressed`` (asked too recently).
+         *     The second is cleared by ``force``; the first never is.
+         */
+        post: operations["send_survey_api_v1_groups__group_id__survey_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Bulk Patch
+         * @description One change applied to up to 200 groups.
+         *
+         *     ⚠️ Declared BEFORE ``/{group_id}``: Starlette matches in declaration order,
+         *     and the other way round ``bulk`` is parsed as a UUID and answers 422.
+         *
+         *     A larger selection is the panel's problem, and it chunks it — reporting
+         *     each chunk separately, because "400 groups, the first 200 saved and the
+         *     second 200 failed" is something an admin has to be told precisely rather
+         *     than with the single word "error".
+         */
+        patch: operations["bulk_patch_api_v1_groups_bulk_patch"];
+        trace?: never;
+    };
+    "/api/v1/groups/surveys/broadcast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Broadcast
+         * @description Queue a survey for every eligible group.
+         *
+         *     ⚠️ Declared BEFORE ``/{group_id}/survey``, for the same reason ``/bulk``
+         *     is declared before ``/{group_id}``.
+         *
+         *     ⚠️ ``created + reused + len(skipped) == total_groups`` always. A partial
+         *     answer sends an admin to the groups page to count rows and work out what
+         *     happened to the rest.
+         *
+         *     ``delivered`` is **0 in this deployment**: the shipped transport posts
+         *     nothing, so the rows sit at ``pending`` and honestly say so.
+         */
+        post: operations["broadcast_api_v1_groups_surveys_broadcast_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Group Tree
+         * @description The page's skeleton: one employee per node, with counts.
+         *
+         *     ONE light aggregate. The group rows themselves are pulled only for the node
+         *     somebody opens, 50 at a time — at roughly one group per customer this table
+         *     is a thousand rows, and an endpoint that returned all of them would answer
+         *     no question anybody has and would take a browser with it.
+         */
+        get: operations["group_tree_api_v1_groups_tree_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1500,6 +1888,289 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales/{sale_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a decision on a sale (justified / confirmed)
+         * @description ONE decision per sale — a repeat overwrites it.
+         *
+         *     A decided sale leaves the review queue (the default ``review=new`` filter)
+         *     but does not disappear: ``review=justified`` or ``review=confirmed`` brings
+         *     it back.
+         *
+         *     Changing your mind is normal, so the table holds the LAST decision rather
+         *     than a history — a second row would show the sale twice in the list.
+         */
+        post: operations["review_sale_api_v1_sales__sale_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The branch map, with its evidence
+         * @description Busiest branch first — that is where the linking should start.
+         *
+         *     Excluded branches are in this list too (``excluded``): otherwise they could
+         *     never be put back.
+         */
+        get: operations["branches_api_v1_sales_branches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/branches/{branch}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link an employee to a branch, or take the branch out of scope
+         * @description Two separate actions on one route — both optional.
+         *
+         *     · ``agent_id`` — link by hand (or unlink with ``null``). A manual link is
+         *       not changed by later imports, and this branch's sales MOVE to the new
+         *       employee at once; without that, correcting a wrong link would leave the
+         *       old sales on the old employee and the report would be a lie.
+         *     · ``excluded`` — take the branch out of sales control, or put it back. Its
+         *       sales STAY IN THE DATABASE and only move section.
+         *
+         *     ⚠️ SENT TOGETHER, THE ORDER MATTERS: link first, then exclude. The answer
+         *     comes from the LAST action, so the other way round the employee on the
+         *     screen would be stale.
+         */
+        put: operations["assign_branch_api_v1_sales_branches__branch__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The review queue — sales and their verdicts
+         * @description The verdict is recomputed on EVERY request and is stored nowhere.
+         *
+         *     A call can synchronise after the sale, and a flag written at import time
+         *     would by then be a lie that nobody would recompute.
+         *
+         *     ⚠️ ``review`` defaults to ``new``. That IS the review queue: a sale that has
+         *     been decided leaves the list, or the manager sees the rows they have
+         *     already dealt with again every day and the queue never ends. ``justified``
+         *     and ``confirmed`` are the archive; ``all`` is everything.
+         *
+         *     Paged by cursor, ordered ``occurred_on, id``. An ``OFFSET`` is wrong here
+         *     for a reason specific to this list: deciding on a sale removes it from the
+         *     default set, every later page shifts by one, and a sale is never seen at
+         *     all.
+         */
+        get: operations["compliance_api_v1_sales_compliance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/compliance/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The three class counts and the per-employee cut
+         * @description All three counts — nothing is hidden.
+         *
+         *     ⚠️ ``verdict`` / ``rule`` / ``review`` ARE DELIBERATELY NOT PARAMETERS HERE.
+         *     With the report following the list's filter, choosing "suspicious" would
+         *     drop two of the three cards to zero and "how many could not be checked" —
+         *     the measure of SAP's own data quality — would have no answer.
+         */
+        get: operations["compliance_summary_api_v1_sales_compliance_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/compliance/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * By customer — the conversation/sale sequence
+         * @description "Which customers has this employee worked with, and how did it go."
+         *
+         *     The queue returns SALE rows; this returns a CUSTOMER cut, with the whole
+         *     period's chain beside each one — call, sale, call…
+         *
+         *     ⚠️ ``verdict`` / ``rule`` / ``review`` are deliberately absent. The chain is
+         *     a SEQUENCE, and removing some of its sales would falsify the history: the
+         *     pattern a manager reads is "sold after talking, then sold without talking",
+         *     and that needs the complete row. The selection is made at customer level
+         *     (``only_suspicious``).
+         *
+         *     ⚠️ On one day the CONVERSATION comes before the SALE — a sale has no time,
+         *     and the rules read it the same way.
+         */
+        get: operations["compliance_timeline_api_v1_sales_compliance_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/digest/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assemble the daily message now (test)
+         * @description Assemble the message and hand it to the transport seam.
+         *
+         *     ``sales.digest_enabled`` is NOT checked — that is the whole point of the
+         *     button: see the text before turning the switch on. The row lands with
+         *     ``kind='test'`` and has no effect on the scheduled message.
+         *
+         *     ⚠️ **THIS REACHES NO NETWORK.** The only transport implementation in this
+         *     repository writes a log line and returns "not sent"
+         *     (``modules/sales/telegram.py``); there is no bot token here and no HTTP
+         *     client in that path. The answer therefore carries the TEXT and
+         *     ``sent=false``, which is the honest report and is exactly what the button
+         *     is for.
+         */
+        post: operations["digest_test_api_v1_sales_digest_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load a SAP export (register / catalogue / balance)
+         * @description The file's KIND is read from its header; its name is ignored.
+         *
+         *     Users name the same export differently every time ("Workbook3", "wb3",
+         *     "savdo kunlik"), and trusting the name leads quietly to the wrong import.
+         */
+        post: operations["import_sales_api_v1_sales_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What the import would do — writes nothing
+         * @description Read the file and say what would happen. **NOTHING IS WRITTEN.**
+         *
+         *     The sequence is: file -> this estimate -> the user confirms -> the SAME file
+         *     goes to ``POST /sales/import``. Cancel, and the database is untouched —
+         *     which is a test, not a promise.
+         */
+        post: operations["import_preview_api_v1_sales_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/partners/{code}/exclusion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a customer out of sales control, or put them back
+         * @description For rows that are contractors in SAP but not BUYERS.
+         *
+         *     Our own departments, the warehouse, internal supply: a transfer between
+         *     them is booked as a sale and comes out permanently suspicious — "was the
+         *     customer called before the sale?" is meaningless for our own warehouse.
+         *
+         *     ⚠️ NO SALE IS DELETED. An excluded customer's sales leave the main list, the
+         *     report's counts and the WALK-IN section, and appear in the out-of-scope
+         *     section. Put them back and the whole history returns at once, with no
+         *     re-import.
+         *
+         *     ⚠️ ``code`` is the SAP code and its ``К`` is CYRILLIC (``К02711``); it
+         *     arrives URL-encoded. A code that is not found is a **404**: one typed with
+         *     the Latin letter, or an obsolete one, must not quietly get "done" for an
+         *     answer.
+         */
+        put: operations["partner_exclusion_api_v1_sales_partners__code__exclusion_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings": {
         parameters: {
             query?: never;
@@ -1518,6 +2189,65 @@ export interface paths {
          *     accident nobody can undo.
          */
         put: operations["update_setting_api_v1_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/surveys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feedback
+         * @description What customers said, and how much of it this caller may see.
+         *
+         *     ⚠️ A ``sales`` caller gets the summary and **never the rows**. One Telegram
+         *     group is one customer, so one visible rating row identifies who wrote it,
+         *     and the anonymity was promised to that customer in their own chat.
+         *     ``items_withheld`` says so explicitly, so the panel can distinguish "your
+         *     ratings are not itemised" from "nobody has ever rated you".
+         *
+         *     The ``agent_id`` filter is ignored for a salesperson rather than merged —
+         *     the service narrows to their own agent whatever the URL says.
+         */
+        get: operations["feedback_api_v1_surveys_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/surveys/red-flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Red Flags
+         * @description The misconduct registry — the single source, never copied client-side.
+         *
+         *     The panel renders whatever comes back and holds no list of its own, so a
+         *     new criterion appears without a frontend deploy. The labels are Uzbek
+         *     because they are what a customer reads in their own chat; the keys are what
+         *     the answers store, and a key is never renamed.
+         *
+         *     Behind the read gate here, where BonviZvonki serves it publicly: there the
+         *     customer-facing app needs it and shares a router with the panel. Here that
+         *     app is a separate, unmounted surface with its own copy of the list in its
+         *     own response, so the panel's copy has no reason to be open.
+         */
+        get: operations["red_flags_api_v1_surveys_red_flags_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1730,6 +2460,27 @@ export interface components {
             outbound_total: number;
             talk_seconds: number;
             total: number;
+        };
+        /**
+         * AgentBreakdownOut
+         * @description One employee's slice of the report.
+         */
+        AgentBreakdownOut: {
+            /** @description Null — sales whose branch is linked to nobody. */
+            agent_id?: string | null;
+            agent_name?: string | null;
+            confirmed: number;
+            justified: number;
+            /** @description Suspicious and not yet decided — the work queue. */
+            new: number;
+            not_checkable: number;
+            ok: number;
+            /** @default 0 */
+            over_limit: number;
+            /** @default 0 */
+            over_limit_amount: number;
+            sales: number;
+            suspicious: number;
         };
         /** AgentListResponse */
         AgentListResponse: {
@@ -2146,6 +2897,21 @@ export interface components {
             version_code: number;
         };
         /**
+         * AssignBranchRequest
+         * @description One change to the map. BOTH fields are optional.
+         *
+         *     They answer SEPARATE questions and do not substitute for one another —
+         *     "who is responsible" and "is this branch checked at all" — so a field that
+         *     is not sent is NOT touched. `agent_id: null` is a full value ("unlink"),
+         *     which is different from "not sent".
+         */
+        AssignBranchRequest: {
+            /** @description The employee. `null` unlinks. */
+            agent_id?: string | null;
+            /** @description `true` — take the branch out of sales control (its sales move to the out-of-scope section and are NOT deleted); `false` — put it back (the whole history returns with no re-import); omitted — leave it alone. */
+            excluded?: boolean | null;
+        };
+        /**
          * AssignmentListResponse
          * @description Full history for a number — this is the timeline the agent page renders.
          */
@@ -2265,6 +3031,38 @@ export interface components {
             /** @description Calls this block's average is taken over. */
             scored_calls: number;
         };
+        /** Body_import_contacts_api_v1_contacts_import_post */
+        Body_import_contacts_api_v1_contacts_import_post: {
+            /**
+             * Format: binary
+             * @description A `.csv` or `.tsv` export.
+             */
+            file: string;
+        };
+        /** Body_import_preview_api_v1_sales_import_preview_post */
+        Body_import_preview_api_v1_sales_import_preview_post: {
+            /**
+             * Format: binary
+             * @description The `.xlsx` export.
+             */
+            file: string;
+        };
+        /** Body_import_sales_api_v1_sales_import_post */
+        Body_import_sales_api_v1_sales_import_post: {
+            /**
+             * Format: binary
+             * @description The `.xlsx` export.
+             */
+            file: string;
+        };
+        /** Body_preview_import_api_v1_contacts_import_preview_post */
+        Body_preview_import_api_v1_contacts_import_preview_post: {
+            /**
+             * Format: binary
+             * @description A `.csv` or `.tsv` export.
+             */
+            file: string;
+        };
         /** Body_upload_version_api_v1_app_versions_post */
         Body_upload_version_api_v1_app_versions_post: {
             /**
@@ -2280,6 +3078,55 @@ export interface components {
             variant: components["schemas"]["AppVariant"];
             version: string;
             version_code: number;
+        };
+        /** BroadcastRequest */
+        BroadcastRequest: {
+            /**
+             * @description Defaults to true, unlike the single-group send. The whole point of the button is 'send to everyone now'; silently sending nothing because of a ten-day window would be the broken behaviour.
+             * @default true
+             */
+            force: boolean;
+        };
+        /**
+         * BroadcastResponse
+         * @description What the broadcast did. The three numbers always account for every group.
+         *
+         *     ``created + reused + len(skipped) == total_groups`` is an invariant, and a
+         *     test asserts it. "8 sent" on its own made an admin go and count rows on the
+         *     groups page to find out what happened to the rest.
+         */
+        BroadcastResponse: {
+            created: number;
+            /** @description How many were actually posted. **Zero in this deployment** — see `DispatchResponse.delivered`. */
+            delivered: number;
+            /** @description Groups that already had an unsent survey queued. */
+            reused: number;
+            skipped: components["schemas"]["BroadcastSkip"][];
+            total_groups: number;
+        };
+        /**
+         * BroadcastSkip
+         * @description One group the broadcast passed over, and why.
+         */
+        BroadcastSkip: {
+            /** Format: uuid */
+            group_id: string;
+            /** @description group_not_bound | group_inactive | survey_suppressed. */
+            reason: string;
+            title: string;
+        };
+        /**
+         * BulkPatchRequest
+         * @description The same change applied to many groups at once.
+         */
+        BulkPatchRequest: {
+            agent_id?: string | null;
+            group_ids: string[];
+            is_active?: boolean | null;
+        };
+        /** BulkPatchResponse */
+        BulkPatchResponse: {
+            updated: number;
         };
         /**
          * CallAnalysisResponse
@@ -2569,6 +3416,159 @@ export interface components {
             new_password: string;
         };
         /**
+         * ClientAgentRow
+         * @description An employee who spoke to this customer.
+         */
+        ClientAgentRow: {
+            /** Format: uuid */
+            agent_id: string;
+            calls: number;
+            full_name: string;
+            /** Format: date-time */
+            last_call_at: string;
+        };
+        /**
+         * ClientCallRow
+         * @description One conversation with this customer.
+         */
+        ClientCallRow: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            call_type: components["schemas"]["CallType"];
+            direction: components["schemas"]["CallDirection"];
+            disposition: components["schemas"]["CallDisposition"];
+            duration_sec: number;
+            has_audio: boolean;
+            /** Format: uuid */
+            id: string;
+            needs_review: boolean;
+            /**
+             * Format: date-time
+             * @description Shown beside `started_at` because the two differ whenever a phone was off or a recovery sweep found an old call (SPEC §3.12).
+             */
+            received_at: string;
+            red_flag_count: number;
+            score: number | null;
+            /** Format: date-time */
+            started_at: string;
+        };
+        /**
+         * ClientCallsResponse
+         * @description One keyset page of this customer's conversations, newest first.
+         */
+        ClientCallsResponse: {
+            has_more: boolean;
+            items: components["schemas"]["ClientCallRow"][];
+            next_cursor: string | null;
+            total: number | null;
+        };
+        /**
+         * ClientDetailResponse
+         * @description The card: the same aggregate as the list row, plus who spoke to them.
+         */
+        ClientDetailResponse: {
+            /** @description Employees who spoke to this customer, most first. */
+            agents: components["schemas"]["ClientAgentRow"][];
+            client: components["schemas"]["ClientRowOut"];
+            /** @description The cut the customer was actually FOUND in. It can differ from the one asked for: a card link with no `scope` on it would otherwise never open an internal number. The panel echoes it so the two lists below the card are asked with the same cut. */
+            scope: string;
+        };
+        /**
+         * ClientKind
+         * @description Sales control is split into **two separate sections**.
+         *
+         *     ⚠️ WHY THEY CANNOT BE MIXED. A walk-in buyer is never written into the
+         *     catalogue by name and number — they pass under one of a few shared codes
+         *     (``sales.walk_in_codes``). For a sale under such a code the question "was
+         *     this customer spoken to first?" is meaningless: one code, a hundred people.
+         *     They used to sit in the same list as regular customers and were counted as
+         *     ``not_checkable``, which wrote "could not be checked" into an employee's
+         *     column — when what it actually described was the KIND OF WORK, not the
+         *     quality of our data.
+         *
+         *     Measured (24.08.2026): 718 sales and $531,432 under ``К00001`` alone — a
+         *     sizeable share of what looked like the regular-customer list.
+         *
+         *     · :attr:`REGULAR` — regular customers. Shared codes are EXCLUDED.
+         *     · :attr:`WALK_IN` — shared codes only. The rules do not apply; the measure
+         *       is different — is any single ticket over the limit.
+         * @enum {string}
+         */
+        ClientKind: "regular" | "walk_in";
+        /**
+         * ClientPageResponse
+         * @description One keyset page of the directory.
+         */
+        ClientPageResponse: {
+            date_from: string | null;
+            /** @description Inclusive, Asia/Tashkent. */
+            date_to: string | null;
+            has_more: boolean;
+            items: components["schemas"]["ClientRowOut"][];
+            /** @description Opaque. Pass it back as `cursor`; null means this is the last page. */
+            next_cursor: string | null;
+            /** @description How many customers the filter matches. Only the FIRST page asks for it (`with_total`), so every later page answers null — a count over a grouped aggregate is affordable once per filter change and not once per page. */
+            total: number | null;
+        };
+        /**
+         * ClientRowOut
+         * @description One customer in the directory — one phone number and its history.
+         */
+        ClientRowOut: {
+            /** @description How many employees have spoken to them. */
+            agent_count: number;
+            avg_score: number | null;
+            calls_total: number;
+            /** @description The customer code read out of the contact name. Null — the dictionary holds no code for this number. */
+            code: string | null;
+            /** @description Null — there was no contact inside the chosen period. That is not the same as an unknown customer: the card still opens and shows zeros. */
+            first_call_at: string | null;
+            inbound: number;
+            last_call_at: string | null;
+            main_agent_id: string | null;
+            /** @description Whoever spoke to them most. The list shows this one and `+N`. */
+            main_agent_name: string | null;
+            /** @description Incoming and unanswered — the company's responsibility. The same definition the activity report uses: `rejected` counts here with `missed`, because the phone rang and there was no conversation. */
+            missed: number;
+            /** @description Missed as a percent of incoming. Null when there were none. */
+            missed_rate: number | null;
+            /** @description The uploaded contact list first, the handset's own resolution as the fallback. Null — nobody has ever named this number. */
+            name: string | null;
+            outbound: number;
+            phone: string | null;
+            /** @description The last-9 matching key (`calls.remote_number_key`, N37). The identifier for both the list and the card, and the same value `MissedClientRow.phone_key` carries. */
+            phone_key: string;
+            /** @description How many conversations were scored — what the average is over. */
+            scored: number;
+            talk_seconds: number;
+        };
+        /**
+         * ClientScope
+         * @description Who is in the list.
+         *
+         *     ``CLIENTS`` is the default: everything except internal conversations. It is
+         *     deliberately NOT a strict "external only" filter — unclassified rows
+         *     (``call_type = 'unknown'``) can exist and being unclassified does not mean
+         *     "not a customer", it means not yet decided. Hiding them quietly would make
+         *     the list incomplete.
+         *
+         *     ⚠️ The source has to write this as ``call_type IS NULL OR call_type <>
+         *     'internal'`` and carries a comment about why: in SQL ``NULL <> 'internal'``
+         *     is NULL, so unclassified rows vanish silently. BonviCall's ``call_type`` is
+         *     a NOT NULL enum defaulting to ``unknown`` (UC-25 — an empty line directory
+         *     yields ``unknown``, never ``external``), so the plain inequality is correct
+         *     here and the NULL guard is dropped rather than translated.
+         * @enum {string}
+         */
+        ClientScope: "clients" | "internal" | "all";
+        /**
+         * ClientSort
+         * @description What the directory is ordered by.
+         * @enum {string}
+         */
+        ClientSort: "last_call" | "calls" | "missed" | "talk" | "score" | "name";
+        /**
          * CloseAssignmentRequest
          * @description ``PATCH /api/v1/assignments/{id}`` — end a holding period.
          */
@@ -2621,6 +3621,286 @@ export interface components {
          * @enum {string}
          */
         CommandStatus: "pending" | "sent" | "acknowledged" | "failed" | "expired";
+        /**
+         * ComplianceItem
+         * @description One sale: the SAP fact, the verdict, and THE EVIDENCE.
+         *
+         *     The evidence fields (`last_call_at` … `calls_total`) are not optional
+         *     decoration. The manager re-derives the number by hand, so every suspicious
+         *     row has to carry "when was the last conversation, with whom, how many days
+         *     before" beside it. Without that the list is not believed.
+         */
+        ComplianceItem: {
+            /** @description Whoever SPOKE to the customer, else whoever holds the branch. Null when neither is known — that sale belongs to nobody yet. */
+            agent_id?: string | null;
+            agent_name?: string | null;
+            /** @description In the document's own currency. */
+            amount?: number | null;
+            /** @description The same amount in dollars, straight from SAP. Stored as `numeric`; every comparison against a threshold happens in SQL, so no client ever has to compare money as a float. */
+            amount_usd?: number | null;
+            branch?: string | null;
+            /** @description Always in this order (R1, R2, R3) so badges do not move about. */
+            broken_rules: components["schemas"]["Rule"][];
+            /** @description Conversations between the previous sale and this one (R2). */
+            calls_between: number;
+            /** @description Conversations in the WHOLE history, the period included and not bounded by it — R3 is the harshest signal and is stated in its most cautious form. */
+            calls_total: number;
+            currency: string;
+            /** @description Days before the sale. `0` — the same day. */
+            days_before?: number | null;
+            /** @description SAP's product line. */
+            direction?: string | null;
+            /** @description SAP's `Номер документа` — the piece of paper the manager searches for. NOT interchangeable with `external_id`. */
+            doc_number?: string | null;
+            /** @description SAP's `Номер операции` — the import key. */
+            external_id: string;
+            /** Format: uuid */
+            id: string;
+            last_call_agent?: string | null;
+            /** @description The nearest conversation before the sale (or on its own day). NOT bounded by the window: a conversation nine days ago is still shown, because that number is what explains the rule. */
+            last_call_at?: string | null;
+            /** @description The call row itself, so the panel can open the recording. BonviZvonki shows a date and a name with nothing behind them. */
+            last_call_id?: string | null;
+            /**
+             * Format: date
+             * @description A DATE with no time — SAP gives no clock for a sale.
+             */
+            occurred_on: string;
+            /** @description A walk-in sale over the single-ticket limit. ALWAYS false in the regular-customer section: a large sale to a regular customer is a normal event. */
+            over_limit: boolean;
+            /** @description The customer. A customer IS the code. */
+            partner_code: string;
+            /** @description The customer is out of sales control. Does not affect the verdict — it is for the BUTTON: without it the card would open saying 'Exclude' even for a customer already excluded, and there would be no way back from the screen. */
+            partner_excluded: boolean;
+            partner_name?: string | null;
+            /** @description As SAP wrote it — for display, never for matching. */
+            phone?: string | null;
+            /** @description The last-9 key the match was made on (N37). */
+            phone_key?: string | null;
+            /** @description This customer's previous sale. Null — a FIRST sale, so R2 is silent. */
+            previous_sale_on?: string | null;
+            review?: components["schemas"]["SaleReviewOut"] | null;
+            /** @description `generic_code` — a shared code, many customers behind one; `no_phone` — no usable number anywhere. Set only with `not_checkable`, which is NOT a kind of `ok`. */
+            skip_reason?: string | null;
+            verdict: components["schemas"]["Verdict"];
+        };
+        /**
+         * ComplianceListResponse
+         * @description A cursor page of the review queue.
+         *
+         *     ``total`` is computed only when asked: the three class counts live on
+         *     `GET /sales/compliance/summary`, which deliberately ignores the verdict
+         *     filters, so the FILTERED count is the one thing the list has to supply.
+         */
+        ComplianceListResponse: {
+            has_more: boolean;
+            items: components["schemas"]["ComplianceItem"][];
+            next_cursor: string | null;
+            total?: number | null;
+            /** @description Which window the verdicts were computed with — shown on the screen. */
+            window_days: number;
+        };
+        /**
+         * ComplianceSummaryResponse
+         * @description The three class counts and the per-employee cut.
+         *
+         *     The verdict filters are deliberately absent from this endpoint: all three
+         *     counts have to stay on the screen, or choosing "suspicious" would drop two
+         *     of the three cards to zero and "how many could not be checked" — the
+         *     measure of SAP's own data quality — would have no answer.
+         */
+        ComplianceSummaryResponse: {
+            agents: components["schemas"]["AgentBreakdownOut"][];
+            confirmed: number;
+            justified: number;
+            new: number;
+            not_checkable: number;
+            ok: number;
+            /**
+             * @description Walk-in section only; always 0 for regular customers.
+             * @default 0
+             */
+            over_limit: number;
+            /** @default 0 */
+            over_limit_amount: number;
+            suspicious: number;
+            total: number;
+            /**
+             * @description Which limit these were computed against — stated, not implied.
+             * @default 0
+             */
+            walk_in_limit: number;
+            window_days: number;
+        };
+        /** ComplianceTimelineResponse */
+        ComplianceTimelineResponse: {
+            clients?: components["schemas"]["TimelineClientOut"][];
+            /** @description Whether `max_clients` cut the list. Stated, or the list would silently be incomplete. */
+            truncated: boolean;
+            window_days: number;
+        };
+        /**
+         * ContactCallsBrief
+         * @description What this number's traffic looks like — the card's right-hand half.
+         */
+        ContactCallsBrief: {
+            agent_count: number;
+            calls_total: number;
+            first_call_at: string | null;
+            inbound: number;
+            last_call_at: string | null;
+            main_agent_name: string | null;
+            missed: number;
+            outbound: number;
+            talk_seconds: number;
+        };
+        /**
+         * ContactDetailResponse
+         * @description Everything known about one number.
+         */
+        ContactDetailResponse: {
+            /** @description Null — no call has ever been made to or from this number. */
+            calls: components["schemas"]["ContactCallsBrief"] | null;
+            contact: components["schemas"]["ContactRowOut"];
+            /** @description Our other numbers under the same code. */
+            other_numbers: components["schemas"]["ContactRowOut"][];
+            phone_key: string;
+        };
+        /**
+         * ContactImportResponse
+         * @description What the upload DID.
+         */
+        ContactImportResponse: {
+            bad_phone: number;
+            created: number;
+            duplicates: number;
+            file: string;
+            mode: components["schemas"]["ImportMode"];
+            no_name: number;
+            no_phone: number;
+            read: number;
+            /** @description Rows left out by the chosen mode. Existing rows are never skipped. */
+            skipped_filter: number;
+            unchanged: number;
+            updated: number;
+        };
+        /**
+         * ContactKind
+         * @description Whose contact this is — a PERSON confirms it, the system only suggests.
+         *
+         *     ⚠️ The field exists because an employee's phone holds everything mixed
+         *     together: customers, colleagues, warehouses and PRIVATE acquaintances.
+         *     Leaving them all in one list labelled "customer" does two kinds of damage —
+         *     a private person's name leaks into company reports, and a conversation with
+         *     a colleague gets scored as a sales conversation.
+         *
+         *     **Stored as ``String(16)``, not as a PostgreSQL enum.** Adopted from the
+         *     source with its reason: a new kind must not require an ``ALTER TYPE`` on a
+         *     live database. CONVENTIONS.md §10 requires a native enum for the four
+         *     vocabularies the *device* contract depends on; this is not one of them — it
+         *     is panel-only, it never crosses the device or service surface, and the
+         *     closed set is enforced where it is read, by this enum, in ``schemas.py``.
+         * @enum {string}
+         */
+        ContactKind: "client" | "internal" | "personal" | "unknown";
+        /** ContactPageResponse */
+        ContactPageResponse: {
+            has_more: boolean;
+            items: components["schemas"]["ContactRowOut"][];
+            next_cursor: string | null;
+            /** @description Only the first page asks for it, like every other list here. */
+            total: number | null;
+        };
+        /**
+         * ContactPatchRequest
+         * @description An admin's correction.
+         *
+         *     ⚠️ The `code` is editable. A code can be mistyped on a handset, and if
+         *     fixing one meant re-uploading the whole file nobody would ever fix one.
+         */
+        ContactPatchRequest: {
+            code?: string | null;
+            kind?: components["schemas"]["ContactKind"] | null;
+            name?: string | null;
+        };
+        /**
+         * ContactPreviewResponse
+         * @description What an upload WOULD do. Nothing has been written.
+         */
+        ContactPreviewResponse: {
+            /** @description A number is there but no key could be built (foreign, service, junk). */
+            bad_phone: number;
+            calls_covered: number;
+            created: number;
+            /** @description Extra records for a number already seen. Ordinary: measured, 38 numbers carried more than two different names and one carried seven. */
+            duplicates: number;
+            file: string;
+            no_name: number;
+            /** @description Rows with no number at all. Counted SEPARATELY from `bad_phone` and the difference is large: measured, 7,316 of 9,103 rows had no number (the export gave none) against 11 with an unusable one. Added together they would read as '7,327 bad rows'. */
+            no_phone: number;
+            /** @description Distinct numbers the file yielded. */
+            parsed: number;
+            /** @description Rows in the file with any content in them. */
+            read: number;
+            /** @description A sample, capped — the whole file would be megabytes. */
+            rows: components["schemas"]["ContactRowOut"][];
+            /** @description The suggested `ContactKind` -> how many rows. A proposal, never applied. */
+            suggested: {
+                [key: string]: number;
+            };
+            unchanged: number;
+            updated: number;
+            with_code: number;
+            /** @description An `ImportMode` -> how many CALLS it would cover. The number the decision is actually taken on: a row count flatters the wide mode. */
+            would_cover: {
+                [key: string]: number;
+            };
+            /** @description An `ImportMode` -> how many rows it would write. */
+            would_import: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * ContactRowOut
+         * @description One row of the dictionary — one phone number, one name, maybe a code.
+         */
+        ContactRowOut: {
+            /**
+             * @description How many calls this number has. Filled by the upload preview and by the card; **0 in the list**, deliberately — a per-row count over the whole calls table would make every page pay for a figure the card shows better.
+             * @default 0
+             */
+            calls: number;
+            /** @description The customer code, transliterated to Cyrillic. Null — none in the name. */
+            code: string | null;
+            /**
+             * @description How many of OUR numbers carry this code. Two numbers for one customer is the ordinary case, not an error; without this the row reads as a duplicate.
+             * @default 1
+             */
+            code_numbers: number;
+            kind: components["schemas"]["ContactKind"];
+            /** @description The human name with the code cut out. Null — the name was only a code. */
+            name: string | null;
+            /** @description As the uploaded file wrote it, for display. */
+            phone: string | null;
+            /** @description The last 9 digits — the one matching key in the product (N37), and the same value `calls.remote_number_key` and `ClientRowOut.phone_key` carry. */
+            phone_key: string;
+            /** @description The name exactly as the handset had it. Never edited. */
+            raw_name: string;
+            /** @description Which upload produced this row. */
+            source_file: string | null;
+        };
+        /**
+         * ContactSummaryResponse
+         * @description The header counts.
+         */
+        ContactSummaryResponse: {
+            /** @description A `ContactKind` value -> how many rows carry it. Absent kinds are 0. */
+            by_kind: {
+                [key: string]: number;
+            };
+            total: number;
+            with_code: number;
+        };
         /**
          * CountMetricOut
          * @description A count, with its change against the previous period of equal length.
@@ -2866,6 +4146,36 @@ export interface components {
             /** @description Shown separately from is_online on purpose: a socket can be alive while capture is dead, and conflating the two is how a broken phone looks fine. */
             ws_connected?: boolean | null;
         };
+        /**
+         * DigestTestResponse
+         * @description The answer to the "test message" button.
+         *
+         *     ⚠️ `text` IS ALWAYS RETURNED, even when nothing was sent. That is the whole
+         *     point of the button: see what would go out BEFORE turning the switch on. An
+         *     unfilled setting comes back as `sent=false` with a `reason` rather than an
+         *     error — showing the text and saying "now name a chat" is more use than a
+         *     422.
+         *
+         *     ⚠️ IN THIS DEPLOYMENT NOTHING IS EVER SENT. The only transport
+         *     implementation writes a log line, so `sent` is false with
+         *     `reason="send_failed"` and `error="no_transport_configured"` once a chat is
+         *     configured. That is deliberate and is not a fault to be fixed by the panel.
+         */
+        DigestTestResponse: {
+            /** @description Message length. The transport's limit is 4096. */
+            chars: number;
+            chat_id?: string | null;
+            counts?: {
+                [key: string]: number;
+            };
+            /** @description Which day the message covers — the last IMPORTED day, not yesterday: the export arrives by hand and is usually behind. */
+            day?: string | null;
+            error?: string | null;
+            /** @description `disabled` — the switch is off (scheduled runs only) | `no_chat` — no chat configured | `no_sales` — no sales in the database | `no_new_import` — nothing new since the last message (scheduled runs only) | `send_failed` — the transport refused it. */
+            reason?: string | null;
+            sent: boolean;
+            text: string;
+        };
         /** DirectoryEntryListResponse */
         DirectoryEntryListResponse: {
             items: components["schemas"]["DirectoryEntryResponse"][];
@@ -2888,6 +4198,27 @@ export interface components {
          * @enum {string}
          */
         DirectoryRuleKind: "exact" | "prefix" | "suffix";
+        /**
+         * DispatchRequest
+         * @description Ask for a survey in one group.
+         */
+        DispatchRequest: {
+            /**
+             * @description Ignore the suppression window. It never clears a structural block: an unbound group or a chat the bot is out of is refused whatever this says, because there would be no employee to attribute the rating to.
+             * @default false
+             */
+            force: boolean;
+        };
+        /** DispatchResponse */
+        DispatchResponse: {
+            /** @description Whether the transport actually posted it. **False in this deployment, always**: there is no Telegram bot, the shipped transport is a logging one, and the row stays `pending`. */
+            delivered: boolean;
+            /** @description True when a survey was already queued for this group and that one was returned instead of a second being created. Not an error — it is what stops the same chat receiving two identical messages. */
+            reused: boolean;
+            status: string;
+            /** Format: uuid */
+            survey_id: string;
+        };
         /**
          * EnrolmentAttemptKind
          * @description ``step_timing`` carries the per-screen durations that make N40 measurable.
@@ -2978,6 +4309,53 @@ export interface components {
             error: components["schemas"]["ErrorBody"];
         };
         /**
+         * FeedbackItem
+         * @description One customer's answer.
+         *
+         *     ⚠️ **Never present for a `sales` caller**, whatever the access setting
+         *     says — see `SurveyService.feedback`.
+         */
+        FeedbackItem: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            /** @description Null means no comment was written, or comments are withheld. */
+            comment: string | null;
+            /** @description 1..5 stars. */
+            csat: number;
+            /** Format: uuid */
+            id: string;
+            /** @description Ticked criterion KEYS; labels come from /surveys/red-flags. */
+            red_flags: string[];
+            /** @description yes | partial | no, or null when the customer skipped the question. Null is a real answer and must not be read as `no`. */
+            resolution: string | null;
+            /** Format: date-time */
+            responded_at: string;
+        };
+        /**
+         * FeedbackResponse
+         * @description The rating page: the headline, the shape of it, and the rows behind it.
+         */
+        FeedbackResponse: {
+            /** @description Null while `ready` is false — never 0.0. A zero would be drawn as 'rated badly' by every chart, and the gate exists so one customer's bad morning does not become a published score. */
+            average: number | null;
+            count: number;
+            /** @description {"1".."5"} -> answers, zero-filled so the chart has five bars. */
+            distribution: {
+                [key: string]: number;
+            };
+            /** @description Empty for a `sales` caller, always. One group is one customer, so a single visible row identifies who wrote it. */
+            items: components["schemas"]["FeedbackItem"][];
+            /** @description True when rows exist but are not being returned to this caller. Lets the panel say 'your average, without the individual ratings' rather than rendering an empty list that reads as 'no customer has ever rated you'. */
+            items_withheld: boolean;
+            /** @description The threshold in force, from `survey.min_responses`. */
+            min_responses: number;
+            /** @description True once `count >= min_responses`. */
+            ready: boolean;
+            /** @description Percent of surveys SENT in the window that were ANSWERED in it. Null when none were sent — not 0, which reads as 'nobody answered'. */
+            response_rate: number | null;
+        };
+        /**
          * FunnelStage
          * @description Where an agent is in the rollout (UC-17, SPEC §10.1).
          *
@@ -3040,6 +4418,72 @@ export interface components {
             open_deltas: components["schemas"]["OpenDeltaOut"][];
         };
         /**
+         * GroupPageResponse
+         * @description One keyset page of groups (§4.0).
+         *
+         *     Keyset and not ``page``/``page_size`` as BonviZvonki has it: an offset page
+         *     over a table somebody is actively re-binding skips and repeats rows, and
+         *     this list is exactly the one an admin pages through while editing it.
+         */
+        GroupPageResponse: {
+            has_more: boolean;
+            items: components["schemas"]["GroupResponse"][];
+            /** @description Opaque marker for the next page; null on the last one. */
+            next_cursor: string | null;
+        };
+        /**
+         * GroupPatchRequest
+         * @description Change one group. Unset fields are left alone.
+         */
+        GroupPatchRequest: {
+            /** @description Setting this marks the row `manual`, so automatic binding stops touching it. Explicit null releases the employee. */
+            agent_id?: string | null;
+            is_active?: boolean | null;
+        };
+        /**
+         * GroupResponse
+         * @description One Telegram group as the panel's list and detail render it.
+         */
+        GroupResponse: {
+            /** @description The agent's avatar colour. Decoration, never identity. */
+            agent_color: string | null;
+            /** @description The salesperson answerable for this chat. Null means nobody is, and this group therefore receives nothing. */
+            agent_id: string | null;
+            agent_name: string | null;
+            /** @description member | administrator | left | kicked. */
+            bot_status: string;
+            bound_at: string | null;
+            /** @description auto | manual. A `manual` row is one an admin holds: automatic binding never touches it again, and the panel shows a badge so the admin knows which rows they are holding. */
+            bound_by: string | null;
+            /** @description Telegram's own chat id. Negative for a group; 64-bit. */
+            chat_id: number;
+            /** Format: uuid */
+            id: string;
+            is_active: boolean;
+            last_survey_at: string | null;
+            /** @description Telegram's approximate count. Information only — it classifies NOTHING. A chat with four people in it may hold no customer at all, and the bot cannot see who is inside. */
+            member_count: number | null;
+            /** @description Answers ever collected from it. */
+            response_count: number;
+            /** @description Surveys ever created for this group. */
+            survey_count: number;
+            title: string;
+        };
+        /**
+         * GroupTreeResponse
+         * @description The page's skeleton: one light aggregate, drawn without opening a node.
+         *
+         *     ⚠️ The counts are always of ACTIVE groups and the tree takes no parameters.
+         *     The panel's "show inactive too" switch therefore changes the leaves and
+         *     never the node counts — deliberately, so a node count keeps one meaning:
+         *     "groups that are working".
+         */
+        GroupTreeResponse: {
+            agents: components["schemas"]["TreeAgentNode"][];
+            /** @description Groups no employee is bound to. The panel puts this at the TOP of the page and opens it when it is non-empty: these groups receive nothing and nothing anywhere raises an error about it. */
+            unassigned: components["schemas"]["TreeBucket"];
+        };
+        /**
          * HealthResponse
          * @description Process liveness.
          */
@@ -3071,6 +4515,83 @@ export interface components {
             errors: number;
             rows: components["schemas"]["ImportRowResult"][];
             skipped: number;
+            updated: number;
+        };
+        /**
+         * ImportMode
+         * @description What to take OUT of the file.
+         *
+         *     ⚠️ THIS CHOICE IS MANDATORY. What gets uploaded is a full export of an
+         *     employee's phone, and it contains everything: customers, colleagues,
+         *     family, friends, the taxi driver, the doctor. Measured — about 9,000
+         *     contacts collected from 6-7 employees, of which only a small part are
+         *     customers. Taking all of them does two kinds of damage: strangers' names
+         *     end up stored in the company's database, and the customer list disappears
+         *     among them.
+         * @enum {string}
+         */
+        ImportMode: "known" | "coded" | "all";
+        /**
+         * ImportPreviewResponse
+         * @description What the import WOULD do. Nothing has been written when this is returned.
+         *
+         *     Writing happens only when the user confirms and sends the SAME file to
+         *     `POST /sales/import`.
+         */
+        ImportPreviewResponse: {
+            by_day?: components["schemas"]["PreviewDayCount"][];
+            by_type?: components["schemas"]["PreviewTypeCount"][];
+            date_from?: string | null;
+            date_to?: string | null;
+            /** @description Keys already present — they are overwritten, not duplicated. */
+            existing_rows: number;
+            filename: string;
+            /**
+             * @description Decided from the file's HEADER, never from its name.
+             * @enum {string}
+             */
+            kind: "register" | "catalog" | "balance";
+            /** @description Keys not yet in the database. `0` means the file has already been uploaded. NOT comparable with `rows`: a key repeats inside a file (measured: 2,383 distinct operation numbers in 2,384 rows). */
+            new_rows: number;
+            /** @description Meaningful rows in the file. */
+            rows: number;
+            unknown_partner_count: number;
+            /** @description At most 20 codes; the count is separate. */
+            unknown_partners?: string[];
+            /** @description Branches linked to no employee, by NAME. Nothing is written here — a branch reaches `sale_branches` only during the real import. */
+            unmatched_branches?: string[];
+            warnings?: components["schemas"]["PreviewWarningOut"][];
+            /** @description Rows with no usable number — outside sales control. */
+            without_phone: number;
+        };
+        /**
+         * ImportReportResponse
+         * @description What the import did. Every number answers a SEPARATE question.
+         */
+        ImportReportResponse: {
+            /** @description Sales whose attributed conversation changed because of this import. */
+            attributed_sales: number;
+            created: number;
+            /** @description Catalogue rows this file marked inactive. MARKED, never deleted: deleting would take the `excluded_at` decision with it. */
+            inactive_deactivated: number;
+            /** @description Contractors the file marks inactive — not written as active. */
+            inactive_skipped: number;
+            /** @enum {string} */
+            kind: "register" | "catalog" | "balance";
+            /** @description Sales whose branch link was restored after the map changed. */
+            linked_sales: number;
+            /** @description Numbers taken from the balance report that the catalogue lacked. */
+            phones_filled: number;
+            read: number;
+            /** @description Rows with no customer code or no date — not storable. */
+            skipped: number;
+            source: string;
+            /** @description A SAP type we do not know. Stored as `other`, checked by no rule. */
+            unknown_op_type: number;
+            /** @description Codes absent from the catalogue. The sale is STORED; it simply has no catalogue row behind it, so the rules cannot check it. */
+            unknown_partner: number;
+            /** @description By NAME, not as a count: nothing can be done with '7 branches were not linked', while a list of names starts the work. */
+            unmatched_branches: string[];
             updated: number;
         };
         /**
@@ -3261,6 +4782,58 @@ export interface components {
             type: string;
         };
         /**
+         * PartnerExclusionRequest
+         * @description Exclude a customer or put them back — one key, and it is REQUIRED.
+         *
+         *     Unlike `AssignBranchRequest` there is only one action here, so an optional
+         *     field would let an empty body answer "I did nothing" silently.
+         */
+        PartnerExclusionRequest: {
+            /** @description true — take the customer out of sales control (their sales move to the out-of-scope section and are NOT deleted) | false — put them back. */
+            excluded: boolean;
+        };
+        /** PartnerExclusionResponse */
+        PartnerExclusionResponse: {
+            code: string;
+            excluded: boolean;
+            name: string;
+            /** @description Sales carrying this code. The REAL number comes back even after exclusion — which is what proves nothing was deleted. */
+            sales: number;
+        };
+        /**
+         * PreviewDayCount
+         * @description One day's slice — filled for the register only.
+         */
+        PreviewDayCount: {
+            amount_usd?: number | null;
+            count: number;
+            /** Format: date */
+            day: string;
+        };
+        /**
+         * PreviewTypeCount
+         * @description One slice: the operation type (register) or the group/branch.
+         */
+        PreviewTypeCount: {
+            /** @description Null when this slice carries no money at all. */
+            amount_usd?: number | null;
+            count: number;
+            /** @description The word SAP itself printed, e.g. `Продажа`. Deliberately the source language: the reader compares this count against the same report inside SAP, and a translated word makes that impossible. It is also the fallback for a type SAP invents tomorrow. */
+            label: string;
+            /** @description The machine value the panel translates from. */
+            type: string;
+        };
+        /**
+         * PreviewWarningOut
+         * @description A machine-readable warning. The panel owns the sentence.
+         */
+        PreviewWarningOut: {
+            /** @description `rows_without_date` | `rows_without_partner_code` | `rows_without_amount` | `duplicate_keys_in_file` | `unknown_operation_types` | `contractors_without_usable_phone` | `inactive_contractors` | `codes_absent_from_catalogue` */
+            code: string;
+            /** @description How many rows. A zero-count warning is never sent. */
+            count: number;
+        };
+        /**
          * PromptSection
          * @description One named part of the assembled system prompt.
          *
@@ -3441,6 +5014,18 @@ export interface components {
             type: string;
         };
         /**
+         * RedFlagOption
+         * @description One misconduct criterion. The registry is the server's, never copied.
+         *
+         *     The label is Uzbek because it is what a customer reads in their own chat;
+         *     the key is what is stored. A key is never renamed, only added to, or every
+         *     historical answer changes meaning.
+         */
+        RedFlagOption: {
+            key: string;
+            label: string;
+        };
+        /**
          * RedFlagOut
          * @description One incident, with the evidence for it.
          *
@@ -3460,6 +5045,23 @@ export interface components {
             /** @description The rubric's red-flag key. A string and not a closed enum on purpose: the rubric is versioned (`rubric_version`) and phase 2 reads it from a row, so a score written under v1 must stay readable after v2 adds a flag. The panel renders an unknown key as the key. */
             type: string;
         };
+        /** ReviewSaleRequest */
+        ReviewSaleRequest: {
+            note?: string | null;
+            /** @description Only with `justified`: walked in / Telegram / a visit / a contract. Sent with `confirmed` it is REFUSED rather than dropped — a field that looks accepted and is not is how a panel ships a dead control. */
+            reason?: components["schemas"]["SaleReviewReason"] | null;
+            status: components["schemas"]["SaleReviewStatus"];
+        };
+        /**
+         * ReviewState
+         * @description Where a sale sits in the review queue.
+         *
+         *     :attr:`NEW` — nobody has decided yet. The list shows exactly these by
+         *     default: a sale that has been looked at must not be back at the top of the
+         *     queue tomorrow, or the queue never ends.
+         * @enum {string}
+         */
+        ReviewState: "new" | "justified" | "confirmed" | "all";
         /**
          * RevokeRequest
          * @description ``POST /api/v1/installations/{id}/revoke`` (UC-08).
@@ -3595,6 +5197,57 @@ export interface components {
             version: number;
         };
         /**
+         * Rule
+         * @description Which rule was broken. Always reported in this order (R1, R2, R3).
+         * @enum {string}
+         */
+        Rule: "R1" | "R2" | "R3";
+        /**
+         * SaleBranchListResponse
+         * @description The whole map, busiest branch first.
+         */
+        SaleBranchListResponse: {
+            items: components["schemas"]["SaleBranchOut"][];
+            total: number;
+        };
+        /** SaleBranchOut */
+        SaleBranchOut: {
+            agent_id?: string | null;
+            agent_name?: string | null;
+            branch: string;
+            /** @description Out of sales control. Its sales move to their own section and are NOT deleted. An excluded branch STAYS in this list, or it could never be put back. */
+            excluded: boolean;
+            /** @description True — the system matched it by name; false — a person set it, or it is not linked yet. */
+            matched_automatically: boolean;
+            /** @description Sales behind this branch — how much the linking matters. */
+            sales: number;
+        };
+        /**
+         * SaleReviewOut
+         * @description The human's decision — the only subjective value in this module.
+         */
+        SaleReviewOut: {
+            note?: string | null;
+            /** @description Only ever set together with `justified`. */
+            reason?: components["schemas"]["SaleReviewReason"] | null;
+            reviewed_at?: string | null;
+            /** @description Null when the account has since been removed; the decision stays. */
+            reviewed_by?: string | null;
+            status: components["schemas"]["SaleReviewStatus"];
+        };
+        /**
+         * SaleReviewReason
+         * @description Why a sale was justified. Only meaningful with ``justified``.
+         * @enum {string}
+         */
+        SaleReviewReason: "walk_in" | "telegram" | "visit" | "contract" | "other";
+        /**
+         * SaleReviewStatus
+         * @description ``sale_reviews.status`` — the only subjective value in the database.
+         * @enum {string}
+         */
+        SaleReviewStatus: "justified" | "confirmed";
+        /**
          * ScoreBucketOut
          * @description One ten-point band of the histogram.
          */
@@ -3707,6 +5360,11 @@ export interface components {
             value_type: string;
         };
         /**
+         * SortOrder
+         * @enum {string}
+         */
+        SortOrder: "asc" | "desc";
+        /**
          * StoragePointOut
          * @description One day of the growth curve.
          */
@@ -3751,6 +5409,53 @@ export interface components {
             installation_id: string;
             last_heartbeat_at: string | null;
             status: components["schemas"]["InstallationStatus"];
+        };
+        /** TimelineClientOut */
+        TimelineClientOut: {
+            agents?: string[];
+            amount_usd: number;
+            calls_count: number;
+            events?: components["schemas"]["TimelineEventOut"][];
+            partner_code: string;
+            partner_name?: string | null;
+            /** @description The SAP card's number, for display. Not the matching key: the chain covers every number known for this customer. */
+            phone?: string | null;
+            sales_count: number;
+            suspicious_count: number;
+        };
+        /**
+         * TimelineEventOut
+         * @description One event — a conversation or a sale.
+         *
+         *     ⚠️ BOTH COME BACK AS ONE TYPE (told apart by `kind`) AND ALREADY ORDERED.
+         *     As two lists, interleaving them would fall to the panel, and the rule "on
+         *     one day the conversation comes before the sale" would have to be written a
+         *     second time there.
+         */
+        TimelineEventOut: {
+            agent_name?: string | null;
+            amount?: number | null;
+            amount_usd?: number | null;
+            answered?: boolean | null;
+            /**
+             * Format: date-time
+             * @description A call: the real instant. A sale: 00:00 of that Asia/Tashkent day, because SAP gives a sale no time.
+             */
+            at: string;
+            broken_rules?: components["schemas"]["Rule"][];
+            call_id?: string | null;
+            currency?: string | null;
+            days_before?: number | null;
+            direction?: string | null;
+            doc_number?: string | null;
+            duration_sec?: number | null;
+            external_id?: string | null;
+            /** @description Whether the conversation can be listened to. */
+            has_audio?: boolean | null;
+            /** @enum {string} */
+            kind: "call" | "sale";
+            sale_id?: string | null;
+            verdict?: components["schemas"]["Verdict"] | null;
         };
         /**
          * TimeseriesPointOut
@@ -3800,6 +5505,36 @@ export interface components {
             transcribed_at: string;
             /** @description Real spoken words, service tokens stripped (`rules.count_words`). Stored so the review rule and the panel agree on one number. */
             word_count: number;
+        };
+        /**
+         * TreeAgentNode
+         * @description One employee node of the group tree, with its counts.
+         *
+         *     ``enrolled`` is **not** ported. In BonviZvonki it means "this employee has
+         *     sent their phone number to the bot", which is what lets the bot recognise
+         *     them in a chat, and it is read off ``agents.telegram_user_id``. This
+         *     product has no Telegram identity for an agent and this port does not invent
+         *     one, so the field would have been either always-false — a warning banner
+         *     over every employee, which is the "banner that is always red" this repo
+         *     already deleted once — or hard-coded true, which is a field that says
+         *     nothing. The panel's enrolment notice and its three-step instruction modal
+         *     go with it.
+         */
+        TreeAgentNode: {
+            /** Format: uuid */
+            agent_id: string;
+            color: string | null;
+            full_name: string;
+            group_count: number;
+            response_count: number;
+        };
+        /**
+         * TreeBucket
+         * @description The groups that sit outside every node.
+         */
+        TreeBucket: {
+            group_count: number;
+            response_count: number;
         };
         /**
          * UpdateAgentRequest
@@ -3907,6 +5642,12 @@ export interface components {
          * @enum {string}
          */
         UserRole: "admin" | "manager" | "sales";
+        /**
+         * Verdict
+         * @description The three classes. ``not_checkable`` is not a kind of ``ok``.
+         * @enum {string}
+         */
+        Verdict: "ok" | "suspicious" | "not_checkable";
         /**
          * VerificationMethod
          * @description How we proved the phone holds the registered number (UC-04, T142).
@@ -5557,6 +7298,137 @@ export interface operations {
             };
         };
     };
+    list_clients_api_v1_clients_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                /** @description From the previous page. */
+                cursor?: string | null;
+                /** @description Asia/Tashkent calendar date. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                limit?: number;
+                order?: components["schemas"]["SortOrder"];
+                /** @description `clients` — everything except internal lines (default). */
+                scope?: components["schemas"]["ClientScope"];
+                /** @description Name, code or number. */
+                search?: string | null;
+                sort?: components["schemas"]["ClientSort"];
+                /** @description Ask for the count. First page only. */
+                with_total?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientPageResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_client_api_v1_clients__key__get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                /** @description Asia/Tashkent calendar date. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                /** @description `clients` — everything except internal lines (default). */
+                scope?: components["schemas"]["ClientScope"];
+                /** @description Name, code or number. */
+                search?: string | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientDetailResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    client_calls_api_v1_clients__key__calls_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                cursor?: string | null;
+                /** @description Asia/Tashkent calendar date. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                limit?: number;
+                /** @description `clients` — everything except internal lines (default). */
+                scope?: components["schemas"]["ClientScope"];
+                /** @description Name, code or number. */
+                search?: string | null;
+                with_total?: boolean;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientCallsResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_command_api_v1_commands__command_id__get: {
         parameters: {
             query?: never;
@@ -5584,6 +7456,226 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_contacts_api_v1_contacts_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                kind?: components["schemas"]["ContactKind"] | null;
+                limit?: number | null;
+                /** @description Name, code or number. */
+                search?: string | null;
+                with_total?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPageResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    contact_detail_api_v1_contacts__phone_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactDetailResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_contact_api_v1_contacts__phone_key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_contact_api_v1_contacts__phone_key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRowOut"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_contacts_api_v1_contacts_import_post: {
+        parameters: {
+            query?: {
+                /** @description coded — only the rows with a code in the name (default); known — code or partner catalogue; all — everything. */
+                mode?: components["schemas"]["ImportMode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_contacts_api_v1_contacts_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactImportResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_import_api_v1_contacts_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_import_api_v1_contacts_import_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPreviewResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    contacts_summary_api_v1_contacts_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactSummaryResponse"];
                 };
             };
         };
@@ -5816,6 +7908,259 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiverStatusResponse"];
+                };
+            };
+        };
+    };
+    list_groups_api_v1_groups_get: {
+        parameters: {
+            query?: {
+                agent_id?: string | null;
+                cursor?: string | null;
+                /** @description False returns only the groups nobody is bound to. */
+                has_agent?: boolean | null;
+                include_inactive?: boolean;
+                limit?: number;
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupPageResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_group_api_v1_groups__group_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_group_api_v1_groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_group_api_v1_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_survey_api_v1_groups__group_id__survey_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DispatchRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispatchResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    bulk_patch_api_v1_groups_bulk_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkPatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPatchResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    broadcast_api_v1_groups_surveys_broadcast_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["BroadcastRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BroadcastResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    group_tree_api_v1_groups_tree_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupTreeResponse"];
                 };
             };
         };
@@ -6336,6 +8681,365 @@ export interface operations {
             };
         };
     };
+    review_sale_api_v1_sales__sale_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sale_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSaleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleReviewOut"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    branches_api_v1_sales_branches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleBranchListResponse"];
+                };
+            };
+        };
+    };
+    assign_branch_api_v1_sales_branches__branch__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branch: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignBranchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaleBranchOut"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compliance_api_v1_sales_compliance_get: {
+        parameters: {
+            query?: {
+                /** @description Employees. */
+                agent_id?: string[] | null;
+                /** @description SAP branches. */
+                branch?: string[] | null;
+                /** @description regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules. */
+                client_kind?: components["schemas"]["ClientKind"];
+                cursor?: string | null;
+                /** @description Asia/Tashkent calendar date, inclusive. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                limit?: number;
+                order?: string;
+                /** @description The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control. */
+                out_of_scope?: boolean;
+                /** @description Only meaningful with client_kind=walk_in: true — over the ticket limit, false — under it, omitted — everything. */
+                over_limit?: boolean | null;
+                /** @description new — undecided (DEFAULT) | justified | confirmed | all — every sale regardless of a decision. */
+                review?: components["schemas"]["ReviewState"] | null;
+                /** @description R1 | R2 | R3 */
+                rule?: components["schemas"]["Rule"] | null;
+                /** @description Customer name, code, phone digits or operation number. */
+                search?: string | null;
+                /** @description ok | suspicious | not_checkable */
+                verdict?: components["schemas"]["Verdict"] | null;
+                with_total?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceListResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compliance_summary_api_v1_sales_compliance_summary_get: {
+        parameters: {
+            query?: {
+                /** @description Employees. */
+                agent_id?: string[] | null;
+                /** @description SAP branches. */
+                branch?: string[] | null;
+                /** @description regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules. */
+                client_kind?: components["schemas"]["ClientKind"];
+                /** @description Asia/Tashkent calendar date, inclusive. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                /** @description The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control. */
+                out_of_scope?: boolean;
+                /** @description Customer name, code, phone digits or operation number. */
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceSummaryResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    compliance_timeline_api_v1_sales_compliance_timeline_get: {
+        parameters: {
+            query?: {
+                /** @description Employees. */
+                agent_id?: string[] | null;
+                /** @description SAP branches. */
+                branch?: string[] | null;
+                /** @description regular — regular customers (default; shared codes are EXCLUDED) | walk_in — shared codes only, where the measure is the ticket limit rather than the rules. */
+                client_kind?: components["schemas"]["ClientKind"];
+                /** @description Asia/Tashkent calendar date, inclusive. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                /** @description How many customers. Cut -> `truncated=true`. */
+                max_clients?: number;
+                /** @description true (default) — only customers with at least ONE suspicious sale. The chain is still complete: such a customer's clean sales stay in it. */
+                only_suspicious?: boolean;
+                /** @description The 'out of scope' section. false (default) — the MAIN list: a sale shows when neither its branch nor its customer is excluded | true — ONLY the excluded: branch OR customer out of sales control. */
+                out_of_scope?: boolean;
+                /** @description Customer name, code, phone digits or operation number. */
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceTimelineResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    digest_test_api_v1_sales_digest_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DigestTestResponse"];
+                };
+            };
+        };
+    };
+    import_sales_api_v1_sales_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_sales_api_v1_sales_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReportResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_preview_api_v1_sales_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_preview_api_v1_sales_import_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreviewResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    partner_exclusion_api_v1_sales_partners__code__exclusion_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerExclusionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerExclusionResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_settings_api_v1_settings_get: {
         parameters: {
             query?: never;
@@ -6385,6 +9089,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    feedback_api_v1_surveys_get: {
+        parameters: {
+            query?: {
+                agent_id?: string | null;
+                /** @description Asia/Tashkent calendar date. Overrides `days`. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                days?: number;
+                limit?: number;
+                /** @description Employee name. The SERVER filters, because the average and the distribution have to match what was found — filtering the rendered list would leave a headline describing a different set of answers. */
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    red_flags_api_v1_surveys_red_flags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedFlagOption"][];
                 };
             };
         };

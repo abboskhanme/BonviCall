@@ -194,6 +194,117 @@ class SettingKey:
         "analysis.price_llm_micro_usd_per_1k_output_tokens"
     )
 
+    # --- Customer satisfaction surveys (ported from BonviZvonki) -----------
+    #
+    # A survey is a message posted into a customer's Telegram group asking them
+    # to rate the salesperson they dealt with. Nothing in this product can post
+    # it: `modules/surveys/transport.py` ships a logging implementation and
+    # there is no bot token. These keys are still real, because the panel
+    # creates the rows and the rows are what a bot would later carry.
+
+    #: The master switch, and the rollback. Seeded **false**.
+    #:
+    #: Off, no survey row is created at all: the broadcast button answers 409,
+    #: the per-group send answers 409, and the cadence job returns 0 without
+    #: touching a table. Rows already written stay readable, and the feedback
+    #: page keeps working — reading what was collected is not sending.
+    #:
+    #: It is off for the same reason `analysis.enabled` is: this writes into
+    #: chats real customers are sitting in, and deploying the feature must be a
+    #: no-op on the running system until somebody decides otherwise.
+    SURVEY_ENABLED: Final = "survey.enabled"
+
+    #: May the cadence job queue surveys without a human pressing anything?
+    #: Seeded **false**, and it is a SECOND switch rather than a mode of the
+    #: first: `survey.enabled` asks "may surveys exist", this one asks "may
+    #: they go out unattended". Writing to real customer groups automatically
+    #: is a deliberate step and does not come free with turning the feature on.
+    SURVEY_AUTO_SEND: Final = "survey.auto_send"
+
+    #: Cadence: a group is asked at most once every this many days.
+    SURVEY_PERIOD_DAYS: Final = "survey.period_days"
+
+    #: Suppression: a group asked inside this window is not asked again.
+    #: Separate from the cadence because the "send to everyone now" button
+    #: bypasses this one and nothing else.
+    SURVEY_SUPPRESSION_DAYS: Final = "survey.suppression_days"
+
+    #: Answers needed before an average is shown at all. Below it the panel
+    #: says "collecting" and the average is NULL rather than a number — one
+    #: customer's bad morning must not become an employee's published score.
+    #: Read through `rules.resolve_positive_int`, never as a constant: the
+    #: setting that "looked applied" while the code compared against a
+    #: hard-coded 5 is the defect this key exists to prevent.
+    SURVEY_MIN_RESPONSES: Final = "survey.min_responses"
+
+    #: How many hours the posted message stays in the group before the bot
+    #: removes it, so a customer's chat does not become a notice board. `0`
+    #: means never. Clamped to 47 by `rules.resolve_message_ttl_hours`:
+    #: Telegram refuses to let a bot delete its own message after 48 hours, so
+    #: a larger value promises a removal that cannot happen.
+    SURVEY_MESSAGE_TTL_HOURS: Final = "survey.message_ttl_hours"
+
+    #: What a salesperson may see of their own customer ratings:
+    #: `hidden` | `score_only` | `full`. Seeded `score_only`.
+    #:
+    #: ⚠️ It does not control an item list, because there is never one for a
+    #: salesperson: one group is one customer, so a single visible rating row
+    #: identifies who wrote it, and the anonymity promise made in the customer's
+    #: own chat outranks the setting. It decides between "this section is closed
+    #: to you" (403) and "your average and your star distribution, no rows".
+    ACCESS_SALES_CLIENT_RATING: Final = "access.sales_client_rating"
+
+    # --- Sales control (the SAP register, revision 014) --------------------
+    #
+    # Every value here is an int, a bool or a string, for the reason stated
+    # above the analysis block: ``value_type`` decides which editor the panel
+    # renders and it has no float. The walk-in ticket limit is therefore whole
+    # dollars, which is also the only precision anybody enters it in.
+
+    #: R1's window, in whole Asia/Tashkent days — the sale day plus the N
+    #: before it. A sale carries no clock (SAP gives only a date), so the
+    #: window cannot be measured in hours. Clamped to 0..365 on read: ``99999``
+    #: typed in here would switch the whole section off silently.
+    SALES_WINDOW_DAYS: Final = "sales.window_days"
+
+    #: The shared SAP codes walk-in buyers are booked under (`К00001` and
+    #: friends — the К is Cyrillic). Under one of these "was this customer
+    #: spoken to?" has no meaning: one code, a hundred people. **Never read as
+    #: empty** — an empty set would flood the regular list with walk-in sales
+    #: and blank the walk-in section, both silently — so an unreadable value
+    #: falls back to the list pinned in ``modules/sales/rules.py``.
+    SALES_WALK_IN_CODES: Final = "sales.walk_in_codes"
+
+    #: The single-ticket limit for a walk-in sale, in whole dollars. It is the
+    #: walk-in section's whole measure, because the rules cannot apply there.
+    SALES_WALK_IN_LIMIT_USD: Final = "sales.walk_in_limit_usd"
+
+    #: Our own departments' SAP codes — the convenient way to take a batch of
+    #: contractors out of sales control. ⚠️ NOT a query filter: the list only
+    #: FILLS ``sale_partners.excluded_at`` at the start of an import, and the
+    #: control query reads the flag alone, so the button on the screen and the
+    #: list in the settings can never contradict each other. **Empty is a real
+    #: answer here** and is the default: falling back to a built-in list the
+    #: way the walk-in codes do would quietly remove a real customer.
+    SALES_INTERNAL_CODES: Final = "sales.internal_codes"
+
+    #: The manager's daily Telegram digest. Seeded **false**, and it is the
+    #: rollback as well as the switch: this is the one thing in the product
+    #: that would leave the machine. It cannot in this repository — the only
+    #: transport implementation logs what it would have sent
+    #: (``modules/sales/telegram.py``) — but a feature that arrives already on
+    #: is a feature nobody chose.
+    SALES_DIGEST_ENABLED: Final = "sales.digest_enabled"
+
+    #: Where the digest is addressed. Empty stops it, with a warning in the log
+    #: rather than silence.
+    SALES_DIGEST_CHAT_ID: Final = "sales.digest_chat_id"
+
+    #: Sales below this many dollars are left out of the digest. ``0`` — all of
+    #: them. A sale of UNKNOWN value is never excluded by it: "I do not know"
+    #: is not "small".
+    SALES_DIGEST_MIN_AMOUNT_USD: Final = "sales.digest_min_amount_usd"
+
     @classmethod
     def all(cls) -> frozenset[str]:
         return frozenset(

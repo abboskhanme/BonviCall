@@ -38,14 +38,18 @@ EXPECTED_MATRIX: dict[str, set[str]] = {
         "alerts:read", "alerts:ack", "reports:read", "reports:export", "audit:read",
         "settings:read", "settings:write", "appversions:read", "appversions:write",
         "analysis:read", "analysis:run", "export:read", "export:audio",
+        "groups:read", "groups:write", "surveys:read",
     },
     "manager": {
         "agents:read", "numbers:read", "enrolment:read", "installations:read",
         "devices:read", "calls:read", "calls:note", "audio:play", "audio:download",
         "commands:dial", "alerts:read", "reports:read", "reports:export",
         "settings:read", "appversions:read", "analysis:read",
+        "groups:read", "surveys:read",
     },
-    "sales": {"devices:read:own", "calls:read:own", "audio:play:own"},
+    "sales": {
+        "devices:read:own", "calls:read:own", "audio:play:own", "surveys:read:own",
+    },
     "service": {"export:read", "export:audio", "callback:report"},
 }
 

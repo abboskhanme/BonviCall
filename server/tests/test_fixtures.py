@@ -22,6 +22,7 @@ from src.core.enums import (
     InstallationStatus,
 )
 from src.core.permissions import Perm
+from src.core.settings_keys import ALL_SETTING_KEYS
 
 pytestmark = pytest.mark.asyncio
 
@@ -180,4 +181,10 @@ async def test_truncate_all_leaves_the_seeded_settings(db, truncate_all) -> None
     """Truncation must not delete the migration's seed, or every later test lies."""
     await truncate_all()
     remaining = await db.scalar(sa.text("SELECT count(*) FROM app_settings"))
-    assert remaining == 56
+    # Every key `SettingKey` declares is seeded by a migration, and
+    # `test_schema.py::test_every_settings_key_is_seeded_with_its_documented_default`
+    # checks the values one by one. Counting against that declaration
+    # rather than against a literal keeps this test from needing an edit
+    # every time a module adds a setting — which, with three ports landing
+    # at once, it needed three times in one afternoon.
+    assert remaining == len(ALL_SETTING_KEYS)

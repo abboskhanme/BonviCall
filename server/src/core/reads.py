@@ -46,6 +46,32 @@ CROSS_MODULE_READS: dict[str, frozenset[str]] = {
             "agents.AgentModel",
         }
     ),
+    # The customer directory (ported from BonviZvonki ``modules/clients``):
+    # one phone number, every conversation held with it, and the name the
+    # uploaded phonebooks give it. It owns no table and never will —
+    # everything it reports is derived, which is the same decision §10 makes
+    # about the gap report and the capture-rate delta.
+    #
+    # ``contacts.ClientContactModel`` is read rather than asked for through
+    # ``ContactService`` because the name has to be resolved INSIDE the grouped
+    # aggregate: it is a 1:1 LEFT JOIN on a unique ``phone_key``, and pulling
+    # it out into a second query is what leaves BonviZvonki's list sorted by a
+    # column it does not show. It is a column projection like every other read
+    # here, and the arrow only points one way — ``contacts`` calls
+    # ``ClientDirectory`` for its call counts, never the reverse.
+    #
+    # ``analysis.CallScoreModel`` for the same reason ``analytics`` reads it:
+    # the average score per customer is an aggregate over every score in the
+    # window, and assembling that from per-row service calls is the case this
+    # exception exists for.
+    "clients": frozenset(
+        {
+            "calls.CallModel",
+            "agents.AgentModel",
+            "analysis.CallScoreModel",
+            "contacts.ClientContactModel",
+        }
+    ),
     "gaps": frozenset(
         {
             "calls.CallModel",

@@ -529,6 +529,34 @@ async def test_every_settings_key_is_seeded_with_its_documented_default(db) -> N
         "analysis.price_asr_micro_usd_per_minute": 0,
         "analysis.price_llm_micro_usd_per_1k_input_tokens": 0,
         "analysis.price_llm_micro_usd_per_1k_output_tokens": 0,
+        # Migration 014, sales control. The window is whole Asia/Tashkent days
+        # because a SAP sale carries no clock. The walk-in codes are SAP's own
+        # Cyrillic identifiers (К is U+041A) and are the FLOOR the parser falls
+        # back to, so a seeded and an unseeded database behave identically.
+        "sales.window_days": 3,
+        "sales.walk_in_codes": "К00001,К02370,К03223",
+        "sales.walk_in_limit_usd": 2000,
+        # Empty is a real answer here and is the default: this list only fills
+        # the out-of-scope flag at import time, and a non-empty default would
+        # take a real customer out of control with nobody deciding it.
+        "sales.internal_codes": "",
+        # OFF by default, for the reason `analysis.enabled` is: the digest is
+        # the one action in this product that would leave the machine, and
+        # nothing may start doing that because a migration ran.
+        "sales.digest_enabled": False,
+        "sales.digest_chat_id": "",
+        "sales.digest_min_amount_usd": 0,
+        # Migration 015, customer satisfaction surveys. Both switches are
+        # seeded OFF: this feature writes into Telegram chats real customers
+        # sit in, so deploying it must be a no-op until somebody decides
+        # otherwise — the same line `analysis.enabled` draws.
+        "survey.enabled": False,
+        "survey.auto_send": False,
+        "survey.period_days": 14,
+        "survey.suppression_days": 10,
+        "survey.min_responses": 5,
+        "survey.message_ttl_hours": 24,
+        "access.sales_client_rating": "score_only",
     }
     rows = await db.execute(sa.text("SELECT key, value FROM app_settings"))
     seeded = {key: value for key, value in rows}

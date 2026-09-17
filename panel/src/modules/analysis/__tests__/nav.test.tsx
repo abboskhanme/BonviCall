@@ -94,19 +94,21 @@ afterEach(() => {
 })
 
 describe('the TAHLIL nav group', () => {
-  it('carries exactly the four entries the section has, in that order', () => {
+  it('carries exactly the five entries the section has, in that order', () => {
     const group = NAV.filter((item) => item.group === 'nav.groupAnalysis')
     expect(group.map((item) => item.to)).toEqual([
       '/analytics',
       '/analysis',
       '/analysis/queue',
       '/rubric',
+      '/surveys',
     ])
     expect(group.map((item) => t(item.labelKey))).toEqual([
       'Analitika',
       'Baholashlar',
       'Tahlil navbati',
       'Baholash mezonlari',
+      'Mijoz baholari',
     ])
   })
 
@@ -117,10 +119,22 @@ describe('the TAHLIL nav group', () => {
     )
   })
 
-  it('gates both entries on analysis:read and never on analysis:run', () => {
-    for (const item of NAV.filter((entry) => entry.group === 'nav.groupAnalysis')) {
+  it('gates the four analysis entries on analysis:read and never on analysis:run', () => {
+    // `/surveys` is in this group and is deliberately NOT on `analysis:read`:
+    // it carries the customer's own rating, which a salesperson may see, where
+    // a machine score of the same call is withheld from them.
+    const analysisEntries = NAV.filter(
+      (entry) => entry.group === 'nav.groupAnalysis' && entry.to !== '/surveys',
+    )
+    expect(analysisEntries).toHaveLength(4)
+    for (const item of analysisEntries) {
       expect(item.anyOf).toEqual([Perm.ANALYSIS_READ])
     }
+  })
+
+  it('gates the ratings on the surveys permissions, not on analysis:read', () => {
+    const surveys = NAV.find((item) => item.to === '/surveys')
+    expect(surveys?.anyOf).toEqual([Perm.SURVEYS_READ, Perm.SURVEYS_READ_OWN])
   })
 
   it('does not put the detail route in the menu — it is reached from the list', () => {
@@ -143,12 +157,19 @@ describe('the TAHLIL nav group', () => {
     expect(rubric?.anyOf).not.toContain(Perm.SETTINGS_WRITE)
   })
 
-  it('hides the whole section from a sales user', () => {
-    // `sales` holds `calls:read:own`, `audio:play:own` and `devices:read:own`
+  it('hides every analysis entry from a sales user', () => {
+    // `sales` holds the three own-scope permissions and `surveys:read:own`,
     // and neither analysis permission — a decision, not an oversight (§12 Q1).
     const visible = visibleNav(
-      new Set([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.DEVICES_READ_OWN]),
+      new Set([
+        Perm.CALLS_READ_OWN,
+        Perm.AUDIO_PLAY_OWN,
+        Perm.DEVICES_READ_OWN,
+        Perm.SURVEYS_READ_OWN,
+      ]),
     ).map((item) => item.to)
+    // …but their own customer ratings are theirs to read.
+    expect(visible).toContain('/surveys')
     for (const path of ['/analytics', '/analysis', '/analysis/queue', '/rubric']) {
       expect(visible, `${path} is visible to a sales user`).not.toContain(path)
     }

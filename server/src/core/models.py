@@ -46,6 +46,7 @@ from src.modules.catalog.models import (  # noqa: F401
     SupportedModelModel,
 )
 from src.modules.commands.models import CommandModel  # noqa: F401
+from src.modules.contacts.models import ClientContactModel  # noqa: F401
 from src.modules.devices.models import (  # noqa: F401
     CallLogDeltaModel,
     CapabilityStateModel,
@@ -66,7 +67,19 @@ from src.modules.numbers.models import (  # noqa: F401
     NumberAssignmentModel,
     RegisteredNumberModel,
 )
+from src.modules.sales.models import (  # noqa: F401
+    SaleBranchModel,
+    SaleDigestModel,
+    SaleModel,
+    SalePartnerModel,
+    SaleReviewModel,
+)
 from src.modules.settings.models import AppSettingModel  # noqa: F401
+from src.modules.surveys.models import (  # noqa: F401
+    SurveyModel,
+    SurveyResponseModel,
+    TelegramGroupModel,
+)
 from src.modules.users.models import UserModel  # noqa: F401
 
 #: The metadata every migration and every test builds the schema from.

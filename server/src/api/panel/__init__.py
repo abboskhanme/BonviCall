@@ -22,13 +22,18 @@ from src.api.panel import (
     auth,
     calls,
     catalog,
+    clients,
     commands,
+    contacts,
     devices,
     enrolment,
+    groups,
     installations,
     numbers,
     reports,
+    sales,
     settings,
+    surveys,
     users,
 )
 
@@ -54,3 +59,8 @@ router.include_router(calls.router)
 router.include_router(analysis.router)
 router.include_router(activity.router)
 router.include_router(analytics.router)
+router.include_router(sales.router)
+router.include_router(clients.router)
+router.include_router(contacts.router)
+router.include_router(groups.router)
+router.include_router(surveys.router)

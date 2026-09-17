@@ -22,15 +22,19 @@ import {
   AlertTriangle,
   BarChart3,
   BellRing,
+  BookUser,
   ChevronsLeft,
   ChevronsRight,
   ClipboardCheck,
+  Contact,
   LayoutDashboard,
   ListChecks,
   Menu,
+  MessagesSquare,
   Phone,
   Smartphone,
   Sparkles,
+  Star,
   UserCog,
   Users,
   X,
@@ -113,6 +117,17 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
+    // The same calls again, grouped by the person on the other end. Third
+    // because it answers the question the first two raise — "who is this
+    // number?" — and `/clients/:key` is deliberately absent, like every other
+    // detail route: it opens from a row.
+    to: '/clients',
+    labelKey: 'nav.clients',
+    icon: Contact,
+    anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN],
+    group: 'nav.groupOperations',
+  },
+  {
     to: '/alerts',
     labelKey: 'nav.alerts',
     icon: BellRing,
@@ -150,6 +165,23 @@ export const NAV: readonly NavItem[] = [
     labelKey: 'nav.users',
     icon: UserCog,
     anyOf: [Perm.USERS_READ],
+    group: 'nav.groupAdmin',
+  },
+  {
+    // Reference data, not a report: editing this list changes the names on
+    // every other screen, which is why it gates on settings rather than on
+    // calls and why it lives in MA'MURIYAT.
+    to: '/contacts',
+    labelKey: 'nav.contacts',
+    icon: BookUser,
+    anyOf: [Perm.SETTINGS_READ],
+    group: 'nav.groupAdmin',
+  },
+  {
+    to: '/groups',
+    labelKey: 'nav.groups',
+    icon: MessagesSquare,
+    anyOf: [Perm.GROUPS_READ],
     group: 'nav.groupAdmin',
   },
 
@@ -201,6 +233,16 @@ export const NAV: readonly NavItem[] = [
     labelKey: 'nav.rubric',
     icon: ClipboardCheck,
     anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
+  {
+    // The only entry in this group a salesperson can see, and the only page in
+    // the product that shows them a judgement of their own work — because it is
+    // the customer's judgement and not the machine's.
+    to: '/surveys',
+    labelKey: 'nav.surveys',
+    icon: Star,
+    anyOf: [Perm.SURVEYS_READ, Perm.SURVEYS_READ_OWN],
     group: 'nav.groupAnalysis',
   },
 ]

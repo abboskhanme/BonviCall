@@ -63,6 +63,21 @@ import { Skeleton } from '@/shared/ui/primitives'
 const ActivityPage = lazy(() =>
   import('@/modules/activity/ActivityPage').then((m) => ({ default: m.ActivityPage })),
 )
+const ClientsPage = lazy(() =>
+  import('@/modules/clients/ClientsPage').then((m) => ({ default: m.ClientsPage })),
+)
+const ClientDetailPage = lazy(() =>
+  import('@/modules/clients/ClientDetailPage').then((m) => ({ default: m.ClientDetailPage })),
+)
+const ContactsPage = lazy(() =>
+  import('@/modules/contacts/ContactsPage').then((m) => ({ default: m.ContactsPage })),
+)
+const GroupsPage = lazy(() =>
+  import('@/modules/groups/GroupsPage').then((m) => ({ default: m.GroupsPage })),
+)
+const SurveysPage = lazy(() =>
+  import('@/modules/surveys/SurveysPage').then((m) => ({ default: m.SurveysPage })),
+)
 const AnalyticsPage = lazy(() =>
   import('@/modules/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })),
 )
@@ -128,6 +143,18 @@ export const ROUTES: readonly RouteSpec[] = [
   // rows to their own agent. It sits in Kundalik ish for the same reason — this
   // is call statistics, not scoring.
   { path: '/activity', element: <ActivityPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  //
+  // The customer directory: the same calls, grouped by who was on the other
+  // end. Same gate as the call list for the same reason — it is one question
+  // asked of one table, and own-scope is what a salesperson reaches it by.
+  // `/clients/:key` is a phone key, not an id: this product has no customer
+  // record, and the directory is recomputed from calls on every read.
+  { path: '/clients', element: <ClientsPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  {
+    path: '/clients/:key',
+    element: <ClientDetailPage />,
+    anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN],
+  },
   { path: '/alerts', element: <AlertsPage />, anyOf: [Perm.ALERTS_READ] },
   {
     // Own-scope passes the gate and the SERVER narrows the query to the
@@ -182,9 +209,24 @@ export const ROUTES: readonly RouteSpec[] = [
   // it shows an admin anything to press, and the server refuses the PUT either
   // way.
   { path: '/rubric', element: <RubricPage />, anyOf: [Perm.ANALYSIS_READ] },
+  //
+  // What the customer said, as opposed to what the machine scored. A
+  // salesperson reaches their own ratings here and their own scores nowhere —
+  // see the comment on `surveys:read:own` in `shared/auth/permissions.ts`.
+  {
+    path: '/surveys',
+    element: <SurveysPage />,
+    anyOf: [Perm.SURVEYS_READ, Perm.SURVEYS_READ_OWN],
+  },
 
   // ── Administration ────────────────────────────────────────────────────
   { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },
+  //
+  // The phonebook that decides who a number belongs to. It is reference data
+  // that changes every report's names, which is why it sits here and on the
+  // settings gate rather than beside the call list.
+  { path: '/contacts', element: <ContactsPage />, anyOf: [Perm.SETTINGS_READ] },
+  { path: '/groups', element: <GroupsPage />, anyOf: [Perm.GROUPS_READ] },
   //
   // No `anyOf`: your own account is yours whatever your role. The section
   // inside it that resets OTHER people's passwords is gated on `users:write`

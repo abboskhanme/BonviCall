@@ -101,6 +101,23 @@ class Perm:
     ANALYSIS_READ = "analysis:read"
     ANALYSIS_RUN = "analysis:run"
 
+    # The Telegram group directory and the customer ratings collected through
+    # it (the BonviZvonki port, 2026-09-17). Declared rather than borrowed:
+    # the port shipped gating groups on `numbers:*` because the registry was
+    # closed to the unit that wrote it, and a Telegram chat is not a registered
+    # phone line. The grants below come out identical, so nothing is widened —
+    # what changes is that the matrix now says what it means, and the day
+    # somebody asks "why does reading phone numbers show me Telegram groups?"
+    # there is an answer.
+    GROUPS_READ = "groups:read"
+    GROUPS_WRITE = "groups:write"
+
+    # A customer's rating of an employee. `:own` exists because a salesperson
+    # seeing their own ratings is the point of collecting them, and the service
+    # narrows the query — the same shape as `calls:read:own`.
+    SURVEYS_READ = "surveys:read"
+    SURVEYS_READ_OWN = "surveys:read:own"
+
     APPVERSIONS_READ = "appversions:read"
     APPVERSIONS_WRITE = "appversions:write"
 
@@ -160,6 +177,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.APPVERSIONS_WRITE,
             Perm.ANALYSIS_READ,
             Perm.ANALYSIS_RUN,
+            Perm.GROUPS_READ,
+            Perm.GROUPS_WRITE,
+            Perm.SURVEYS_READ,
             Perm.EXPORT_READ,
             Perm.EXPORT_AUDIO,
             # Not granted: *:*:own — an admin sees everything, so an own-scope
@@ -186,6 +206,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.SETTINGS_READ,
             Perm.APPVERSIONS_READ,
             Perm.ANALYSIS_READ,
+            Perm.GROUPS_READ,
+            Perm.SURVEYS_READ,
+            # Not granted: groups:write — binding a Telegram chat to an
+            # employee decides who is answerable for that customer. That is the
+            # rollout's job, and it sits beside agents:write and numbers:write,
+            # which a manager also does not hold.
             # Not granted: analysis:run — a manager reviews calls, and pressing
             # that button sends a recording to a vendor and spends money. Same
             # line the registry already draws at settings:write and
@@ -205,6 +231,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.DEVICES_READ_OWN,
             Perm.CALLS_READ_OWN,
             Perm.AUDIO_PLAY_OWN,
+            Perm.SURVEYS_READ_OWN,
+            # surveys:read:own is granted where analysis:read is withheld, and
+            # the difference is who is speaking. A machine score of their own
+            # work is an unreviewed judgement (see below); a customer's rating
+            # is the customer's own words about them, which is exactly what
+            # N41's transparency is for. The service narrows it to their agent.
             # Nothing else. N41's transparency is "see your own calls and your
             # own phone's health", not a read-only panel: a salesperson who can
             # list agents or numbers can work out who else is enrolled.

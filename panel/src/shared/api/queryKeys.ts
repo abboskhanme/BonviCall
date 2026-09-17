@@ -46,6 +46,37 @@ export const QUERY_MODULES = [
   // they share one module key and the whole page moves together when the
   // window changes. Read-only, like `activity`.
   'analytics',
+  // The Telegram group directory. Two panel modules read ONE server module
+  // (`server/src/modules/surveys`), and they keep separate keys on purpose:
+  // binding a group changes the tree and the list and nothing about the
+  // ratings already collected, so invalidating those would refetch a page to
+  // show identical numbers. Each module's `api.ts` docstring names the
+  // mapping, as CONVENTIONS-CLIENT.md §1 requires when it is not one to one.
+  'groups',
+  // Customer ratings, read from the same server module. Read-only from the
+  // panel: the only thing that creates a rating is a customer answering in
+  // Telegram, so nothing here invalidates this key.
+  'surveys',
+  // The customer directory: one phone number and every conversation held with
+  // it, read from the server's `clients` module one to one. Read-only, like
+  // `activity` — it owns no mutation, so nothing invalidates this key today.
+  'clients',
+  // The contacts dictionary — the phonebooks uploaded off the handsets, read
+  // from the server's `contacts` module one to one. Its own key rather than a
+  // slice of `clients`: an upload changes which NAME a customer is shown
+  // under, so it must invalidate the directory as well, and a mutation that
+  // has to invalidate two modules is clearer than one module pretending to be
+  // two.
+  'contacts',
+  // Sales control — the SAP register checked against the call history, read
+  // from the server's `sales` module one to one. Unlike `activity` and
+  // `analytics` this module WRITES: a decision, an exclusion and an import all
+  // invalidate `['sales']` whole, because the verdict is recomputed per
+  // request and every one of those three can change it. The partner exclusion
+  // invalidates `['clients']` as well — the same customer's card carries the
+  // same history, and leaving one stale puts contradictory numbers on two
+  // screens.
+  'sales',
 ] as const
 
 export type QueryModule = (typeof QUERY_MODULES)[number]
