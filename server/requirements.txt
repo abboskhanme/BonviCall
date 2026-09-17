@@ -19,6 +19,10 @@ pydantic==2.13.5
 # Backs pydantic's EmailStr: the login form validates the address at the edge
 # rather than letting a typo reach a CITEXT unique index as a 500.
 email-validator==2.2.0
+# Deliberately NOT moved with pydantic above: it declares `pydantic>=2.7.0`,
+# resolves against 2.13.5, and the suite plus a real start-up (`/readyz`,
+# `alembic upgrade head`) exercise the settings layer on it. An unforced bump
+# is a second variable in a change whose whole point is being revertible alone.
 pydantic-settings==2.7.0
 python-jose[cryptography]==3.3.0
 argon2-cffi==23.1.0

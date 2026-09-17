@@ -1308,7 +1308,9 @@ export interface components {
             agent_id: string | null;
             /** @description What to do about it. Derived from `kind`, not stored. */
             body_uz: string | null;
-            detail: Record<string, unknown> | null;
+            detail: {
+                [key: string]: unknown;
+            } | null;
             device_model: string | null;
             /** Format: date-time */
             first_seen_at: string;
@@ -1458,7 +1460,9 @@ export interface components {
             /** Format: date-time */
             at: string;
             /** @description Before/after values and counts. Never a password, a token or an enrolment code (N26). Open by nature — this is a server-side record, not a device payload, so §8's allow-list does not apply. */
-            detail?: Record<string, unknown> | null;
+            detail?: {
+                [key: string]: unknown;
+            } | null;
             /** Format: uuid */
             id: string;
             ip: string | null;
