@@ -641,8 +641,15 @@ anthropic==0.122.0
 openai==3.1.0
 ```
 
-Versions are BonviZvonki's, which are the versions these clients were written
-and measured against.
+**Client decision, 2026-09-17: pin the newest STABLE release of each of these,
+not BonviZvonki's versions.** BonviZvonki's pins are a starting point, not a
+target — the versions above are what those clients were written against, and
+task 1 resolves each to the newest stable release at build time, records the
+resolved version here, and runs the suite against it. The rule is narrow on
+purpose: it governs the NEW dependencies this feature adds and the pydantic bump
+they force. It does not license a sweep of `fastapi`, `sqlalchemy`, `alembic` or
+`uvicorn` in a system that is carrying live traffic — those move on their own
+evidence, not on this feature's schedule.
 
 > **`google-genai==2.18.1` requires `pydantic>=2.12.5`. BonviCall pins
 > `pydantic==2.10.4`.** BonviZvonki's own `requirements.txt` carries the warning
@@ -948,37 +955,74 @@ by `make contract`; CI diffs them (`tests/test_app.py::test_contract_documents_a
 
 ---
 
-## 7. Panel surface — the call detail page and nothing else
+## 7. Panel surface — a section of its own, beside the existing menu
 
-Per `CONVENTIONS-CLIENT.md` §1. New module `panel/src/modules/analysis/`:
+**Client decision, 2026-09-17: the analysis is a SEPARATE SECTION with its own
+menu entries. Nothing inside the existing pages changes.**
+
+That is a stronger constraint than "add a block to the call detail page", and it
+is the safer one: `CallDetailPage.tsx`, `CallsPage.tsx` and every existing nav
+entry keep working exactly as they do in production today, so a mistake in this
+work cannot reach a screen the fleet already depends on. The cost is one extra
+click from a call to its analysis, and phase 2 can add the shortcut once the
+section has earned its place.
+
+### 7.1 Navigation
+
+A new group in `panel/src/shared/layout/AppShell.tsx`'s `NAV`, below
+`MA'MURIYAT`:
+
+```
+TAHLIL
+  Baholashlar        /analysis            analysis:read
+  Tahlil navbati     /analysis/queue      analysis:read
+```
+
+and two routes in `panel/src/app/router.tsx`, each behind
+`<Gate anyOf={[Perm.ANALYSIS_READ]}>`. `nav.parity.test.ts` asserts the two
+lists agree in both directions — adding an entry to one and not the other fails
+the build, which is the point of that test.
+
+### 7.2 Module
 
 ```
 panel/src/modules/analysis/
 ├── api.ts                    TanStack Query hooks only
-├── CallAnalysisSection.tsx   the section
-└── __tests__/CallAnalysisSection.test.tsx
+├── AnalysisListPage.tsx      /analysis        — scored calls, newest first
+├── AnalysisDetailPage.tsx    /analysis/:callId — one call's score + transcript
+├── AnalysisQueuePage.tsx     /analysis/queue  — what is waiting, what failed
+├── labels.ts                 the closed server enums as MessageKeys
+└── __tests__/
 ```
 
 `api.ts` opens with the module-mapping docstring §1 requires: the panel's
 `analysis` module reads the server's `analysis` module one-to-one. Types come
 from `panel/src/shared/api/types.gen.ts` via `make types` — **no hand-written
-interface mirroring a response** (`CONVENTIONS.md` §1). Query key
-`['analysis', 'call', callId]`; the mutation invalidates `['analysis']`.
+interface mirroring a response** (`CONVENTIONS.md` §1). Query keys
+`['analysis', 'list', params]`, `['analysis', 'call', callId]`,
+`['analysis', 'queue']`; a run mutation invalidates `['analysis']`.
 
-`CallAnalysisSection` is rendered by `CallDetailPage.tsx` below the existing
-audio section. It renders **only** the success branch; loading, empty and error
-are `QueryBoundary`'s job, and `grep -rn "isLoading\|isPending" panel/src/modules/`
-must stay empty (§2).
+### 7.3 `/analysis` — the list
+
+Scored calls, newest call first (`started_at desc`, the order the calls list
+itself now uses). Columns: time, agent, remote number, duration, overall score,
+red-flag chips, stage. Filters: date range, agent, stage, score band. Keyset
+paging through the same `cursor` idiom as `CallsPage`, `PAGE_SIZE = 50`.
+
+A row links to `/analysis/:callId`. **It does not link into the calls module** —
+one product, two sections, and phase 1 keeps the seam clean.
+
+### 7.4 `/analysis/:callId` — one call
 
 **The rows below are evaluated in order; the first match wins.** Written as a
 precedence list because the first two overlap, and a reader who takes them as an
 unordered set will make "feature off, never analysed" render a button that
 answers 409.
 
-| Server state | What the section shows |
+| Server state | What the page shows |
 |---|---|
-| No permission | Nothing at all — `can(Perm.ANALYSIS_READ)` is false and the section is not mounted, so no request is issued. |
-| `enabled` false **and** `state` is null | Nothing. A disabled feature does not advertise itself. |
+| No permission | The route gate refuses before the page mounts; no request is issued. |
+| `enabled` false **and** `state` is null | "Tahlil o'chirilgan" and nothing else. A disabled feature does not advertise itself. |
 | `enabled` false **and** rows exist | The rows, read-only. No button — the flag is off, so pressing it would 409. |
 | No state row | "Tahlil qilinmagan" + the **Tahlil qilish** button, shown only with `analysis:run`. |
 | `queued` / `transcribing` / `scoring` | The stage, in Uzbek, with a spinner. Polls every 10 s while in a running stage; stops polling otherwise. |
@@ -995,22 +1039,44 @@ applicable; use it rather than assuming 100.
 
 The transcript block: the raw text in a scrollable pane, speakers visually
 separated, collapsed by default beyond ~15 lines. **Click-to-seek is phase 2** —
-the timestamps are stored for it, and wiring it now means touching `AudioPlayer.tsx`.
+the timestamps are stored for it, and wiring it now would mean touching
+`AudioPlayer.tsx`, which this phase does not do.
+
+The page carries the call's own facts (time, agent, number, duration) in a
+header read from the analysis endpoint, so the reader is not sent to another
+page to know which conversation they are looking at.
+
+### 7.5 `/analysis/queue` — what is waiting and what broke
+
+The operational page: counts per stage, the failures with their reasons and
+retry buttons, the provider-cooldown rows, and the month's spend against the
+cap. This is where an admin answers "why has nothing been scored since
+Tuesday", and it exists in phase 1 because without it that question has no
+answer short of the database.
+
+### 7.6 Shared files touched
+
+Each is an addition, never a rewrite, and each is therefore sequential (§10):
+
+| File | Change |
+|---|---|
+| `panel/src/app/router.tsx` | three route entries |
+| `panel/src/shared/layout/AppShell.tsx` | one nav group, two entries |
+| `panel/src/shared/auth/permissions.ts` | two constants |
+| `panel/src/shared/i18n/uz.json` | the `analysis.*` keys |
+| `panel/src/shared/api/types.gen.ts` | generated by `make types` |
+
+**`CallDetailPage.tsx`, `CallsPage.tsx` and `DashboardPage.tsx` are not
+touched.** If a later phase wants a link from a call to its analysis, that is a
+phase-2 decision with the client, not a side effect of this work.
 
 Uzbek strings: `panel/src/shared/i18n/uz.json`, one catalogue, keys namespaced
 `analysis.*` (`CONVENTIONS.md` §12). The set needed: stage names (6), failure
 headlines (19, one per `analysis_failure` value), review-reason sentences (4,
 with `{}` params), block labels (4), red-flag labels (6), sentiment (3),
-quality (3), plus buttons and section headings — roughly 55 keys. Colours come
-from CSS tokens; no hex, and all three theme cases written out (§3).
-
-Files touched outside the new module — each a one- or two-line edit, listed here
-because they are shared and therefore sequential (§10):
-`panel/src/modules/calls/CallDetailPage.tsx` (one import, one element),
-`panel/src/shared/auth/permissions.ts` (two constants),
-`panel/src/shared/i18n/uz.json`, `panel/src/shared/api/types.gen.ts` (generated).
-**No route and no nav entry** — phase 1 adds no page, so
-`panel/src/app/router.tsx` and `AppShell.tsx` are untouched.
+quality (3), plus the three page titles, table headers, filters and buttons —
+roughly 75 keys. Colours come from CSS tokens; no hex, and all three theme
+cases written out (§3).
 
 ---
 
