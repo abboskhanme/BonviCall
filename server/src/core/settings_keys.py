@@ -86,6 +86,114 @@ class SettingKey:
     #: a receiver should get it back with a setting rather than a release.
     ENROLMENT_CALLBACK_ENABLED: Final = "enrolment.callback_enabled"
 
+    # --- Call analysis (SPEC-ANALYTICS §4.6) ------------------------------
+    #
+    # Every value here is an int, a bool or a string: ``value_type`` decides
+    # which editor the panel renders, and it has no float. BonviZvonki held
+    # four of these as floats read from the environment; their defaults were
+    # already whole numbers, so they are whole seconds here.
+    #
+    # The vendor API keys are NOT in this list and never will be.
+    # ``settings:read`` is granted to manager, so a key in ``app_settings`` is
+    # a key every manager can read — they live in ``core/config.py`` beside the
+    # MoiZvonki credentials, for the reason stated there (§4.2).
+
+    #: The feature flag, and the rollback. Seeded ``false``: deploying phase 1
+    #: must be a no-op on the running system until somebody decides otherwise.
+    #: With it off both jobs return 0 immediately and the run endpoint answers
+    #: 409; rows already written stay readable.
+    ANALYSIS_ENABLED: Final = "analysis.enabled"
+
+    #: Registry key and model per role. An empty model falls back to the
+    #: registry's default for that provider; an empty language means "provider,
+    #: you detect it", which is deliberately legal for a multilingual fleet.
+    ANALYSIS_ASR_PROVIDER: Final = "analysis.asr_provider"
+    ANALYSIS_ASR_MODEL: Final = "analysis.asr_model"
+    ANALYSIS_ASR_LANGUAGE: Final = "analysis.asr_language"
+    ANALYSIS_LLM_PROVIDER: Final = "analysis.llm_provider"
+    ANALYSIS_LLM_MODEL: Final = "analysis.llm_model"
+
+    #: Below this many seconds a call is skipped as ``call_too_short``. Read in
+    #: **both** the dispatch gate and the pre-run check, from this one key:
+    #: BonviZvonki had two sources (30 from the environment, 10 from settings)
+    #: and the button reported "0 calls" while the setting looked applied.
+    ANALYSIS_MIN_DURATION_SEC: Final = "analysis.min_duration_sec"
+
+    #: Are colleague-to-colleague calls transcribed? Off: phase 1 has no
+    #: transcript search, so it would be an ASR bill for a feature that does
+    #: not exist. Turning it on needs no deploy (§2.6, Q2).
+    ANALYSIS_TRANSCRIBE_INTERNAL: Final = "analysis.transcribe_internal"
+
+    #: How far back dispatch looks, on ``calls.received_at``. Seven days, not
+    #: two: audio arrives after the call row (R7) and a handset that spent a
+    #: weekend out of coverage has ``upload.session_ttl_days`` to deliver it. A
+    #: 48-hour window would miss those recordings permanently and silently.
+    ANALYSIS_LOOKBACK_HOURS: Final = "analysis.lookback_hours"
+
+    #: Ceiling on one dispatch tick, so a backlog is not swallowed whole.
+    ANALYSIS_MAX_CALLS_PER_RUN: Final = "analysis.max_calls_per_run"
+
+    #: Calls in flight inside one ``analysis_run``.
+    ANALYSIS_CONCURRENCY: Final = "analysis.concurrency"
+
+    #: Requests per minute per role; ``0`` disables the limiter. The window is
+    #: in-process and therefore exact rather than approximate, because the
+    #: worker's advisory lock guarantees one ``analysis_run`` at a time (§5).
+    ANALYSIS_ASR_RPM: Final = "analysis.asr_rpm"
+    ANALYSIS_LLM_RPM: Final = "analysis.llm_rpm"
+
+    #: Transient retries per provider call, and the exponential wait between
+    #: them. A vendor-stated ``Retry-After`` always beats the guess.
+    ANALYSIS_MAX_RETRIES: Final = "analysis.max_retries"
+    ANALYSIS_BACKOFF_BASE_SEC: Final = "analysis.backoff_base_sec"
+    ANALYSIS_BACKOFF_MAX_SEC: Final = "analysis.backoff_max_sec"
+
+    #: A vendor asking for longer than this stops the stage instead of
+    #: sleeping. Sleeping ten minutes inside a worker slot stalls the queue and
+    #: reads from outside as a hung worker.
+    ANALYSIS_MAX_WAIT_SEC: Final = "analysis.max_wait_sec"
+
+    #: How long a role sits out after a **daily** quota. Half an hour rather
+    #: than "until tomorrow": an admin may raise the tier or swap a key, and
+    #: the system should notice that by itself.
+    ANALYSIS_QUOTA_COOLDOWN_SEC: Final = "analysis.quota_cooldown_sec"
+
+    #: Re-asks when the model's own arithmetic fails validation, with the error
+    #: text appended. Two, not one: cheap models miscount block totals and
+    #: usually fix it on the second ask, and the alternative is a paid-for call
+    #: with no score at all.
+    ANALYSIS_INVALID_RETRIES: Final = "analysis.invalid_retries"
+
+    #: End-to-end ceiling for one call. ``analysis_stale_reset`` closes a row
+    #: stuck in a running stage for twice this.
+    ANALYSIS_CALL_TIMEOUT_SEC: Final = "analysis.call_timeout_sec"
+
+    #: How far back the nightly transient retry reaches. BonviZvonki's window
+    #: was the nightly run's own 48 hours, and 885 rate-limited calls stayed
+    #: failed for ever because the quota reset the next day and nothing ever
+    #: looked at them again.
+    ANALYSIS_RETRY_TRANSIENT_DAYS: Final = "analysis.retry_transient_days"
+
+    #: Two caps, because one of them can be zero (§4.5). The money cap is
+    #: measured units x an admin-entered price, and that price starts unset —
+    #: so on day one it is the call count that actually protects the account.
+    ANALYSIS_MONTHLY_COST_CAP_MICRO_USD: Final = "analysis.monthly_cost_cap_micro_usd"
+    ANALYSIS_MONTHLY_MAX_CALLS: Final = "analysis.monthly_max_calls"
+
+    #: The vendors' prices, in micro-USD, entered by an admin after task 12
+    #: measures real calls. ``0`` means **not priced**, never "free": while
+    #: they are zero the status endpoint reports measured units and says so,
+    #: rather than showing $0.00 (§11.1).
+    ANALYSIS_PRICE_ASR_MICRO_USD_PER_MINUTE: Final = (
+        "analysis.price_asr_micro_usd_per_minute"
+    )
+    ANALYSIS_PRICE_LLM_MICRO_USD_PER_1K_INPUT_TOKENS: Final = (
+        "analysis.price_llm_micro_usd_per_1k_input_tokens"
+    )
+    ANALYSIS_PRICE_LLM_MICRO_USD_PER_1K_OUTPUT_TOKENS: Final = (
+        "analysis.price_llm_micro_usd_per_1k_output_tokens"
+    )
+
     @classmethod
     def all(cls) -> frozenset[str]:
         return frozenset(

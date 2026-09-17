@@ -11,9 +11,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
 from src.core import clock
-from src.core.enums import CallDisposition, InstallationStatus
+from src.core.enums import (
+    AiRole,
+    AnalysisFailure,
+    AnalysisStage,
+    CallDisposition,
+    InstallationStatus,
+)
 from src.core.permissions import Perm
 
 pytestmark = pytest.mark.asyncio
@@ -97,6 +104,70 @@ async def test_audio_factory_writes_real_bytes(audio_factory, audio_root) -> Non
     assert path.stat().st_size == audio.bytes == 1028
 
 
+async def test_transcript_factory_keeps_its_counts_honest(transcript_factory) -> None:
+    """A fixture whose ``char_count`` disagrees with its text is a fixture every
+    later assertion about size has to distrust."""
+    transcript = await transcript_factory(text="[00:00] SPEAKER_0: Hello there.")
+    assert transcript.char_count == len("[00:00] SPEAKER_0: Hello there.")
+    assert transcript.word_count == 4
+
+
+async def test_score_factory_blocks_sum_to_the_overall_score(score_factory) -> None:
+    """Two views of one number. The panel draws both, so they cannot differ."""
+    score = await score_factory()
+    assert score.overall_score == sum(score.blocks.values())
+    assert all(isinstance(value, int) for value in score.blocks.values())
+    assert score.rubric_version == "v1"
+
+
+async def test_score_factory_satisfies_the_range_checks(db, score_factory) -> None:
+    """0-100 is a database fact; a 167 % bar reached a manager once."""
+    await score_factory(overall_score=100, confidence_pct=0)
+    with pytest.raises(IntegrityError) as caught:
+        await score_factory(overall_score=101)
+    assert "overall_score_range" in str(caught.value)
+    await db.rollback()
+
+
+async def test_analysis_state_factory_satisfies_the_check_constraints(
+    analysis_state_factory,
+) -> None:
+    """A stopped call always carries a reason; a running one never does."""
+    queued = await analysis_state_factory()
+    assert queued.stage is AnalysisStage.QUEUED and queued.failure_code is None
+
+    skipped = await analysis_state_factory(stage=AnalysisStage.SKIPPED)
+    assert skipped.failure_code is not None
+
+    failed = await analysis_state_factory(stage=AnalysisStage.FAILED)
+    assert failed.failure_code is not None
+    assert failed.asr_calls == 0 and failed.llm_calls == 0
+
+
+async def test_a_running_stage_cannot_carry_a_failure_code(
+    db, analysis_state_factory
+) -> None:
+    """The other half of the constraint, asserted against the database."""
+    with pytest.raises(IntegrityError) as caught:
+        await analysis_state_factory(
+            stage=AnalysisStage.TRANSCRIBING, failure_code=AnalysisFailure.TIMEOUT
+        )
+    assert "stopped_has_reason" in str(caught.value)
+    await db.rollback()
+
+
+async def test_provider_cooldown_factory_is_keyed_by_the_role(
+    db, provider_cooldown_factory
+) -> None:
+    """At most two rows, ever: the role is the identity."""
+    cooldown = await provider_cooldown_factory()
+    assert cooldown.role is AiRole.ASR
+    assert cooldown.until_at > cooldown.started_at
+    with pytest.raises(IntegrityError):
+        await provider_cooldown_factory(role=AiRole.ASR)
+    await db.rollback()
+
+
 async def test_frozen_clock_pins_now(frozen_clock) -> None:
     moment = datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
     frozen_clock(moment)
@@ -109,4 +180,4 @@ async def test_truncate_all_leaves_the_seeded_settings(db, truncate_all) -> None
     """Truncation must not delete the migration's seed, or every later test lies."""
     await truncate_all()
     remaining = await db.scalar(sa.text("SELECT count(*) FROM app_settings"))
-    assert remaining == 30
+    assert remaining == 56

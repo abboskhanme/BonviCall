@@ -21,6 +21,12 @@ from __future__ import annotations
 from src.core.database import Base
 from src.modules.agents.models import AgentModel  # noqa: F401
 from src.modules.alerts.models import AlertModel  # noqa: F401
+from src.modules.analysis.models import (  # noqa: F401
+    AiProviderCooldownModel,
+    CallAnalysisStateModel,
+    CallScoreModel,
+    CallTranscriptModel,
+)
 from src.modules.audio.models import (  # noqa: F401
     AudioUploadSessionModel,
     CallAudioModel,

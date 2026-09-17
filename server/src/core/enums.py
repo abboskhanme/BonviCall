@@ -514,6 +514,107 @@ class EnrolmentOutcome(StrEnum):
     REJECTED = "rejected"
 
 
+class AnalysisStage(StrEnum):
+    """Where one call stands in the analysis pipeline (SPEC-ANALYTICS §2.4).
+
+    The state row *is* the status: there is no ``calls.status`` column and
+    nothing on ``calls`` is written by the analysis module.
+
+    BonviZvonki's ``locked`` is deliberately absent. Locking is the claim query
+    (``FOR UPDATE SKIP LOCKED``) plus the worker's advisory lock, and neither
+    survives a crash — a persisted ``locked`` would, leaving a row that no
+    dispatch picks up and no operator can explain.
+    """
+
+    QUEUED = "queued"
+    TRANSCRIBING = "transcribing"
+    SCORING = "scoring"
+    COMPLETED = "completed"
+
+    #: Deliberately not analysed. **Not a failure**, and the panel must not
+    #: paint it as one: an internal call or a call with no recording is a
+    #: normal outcome, and two of the reasons are re-checked by dispatch once
+    #: the line directory fills.
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+class AnalysisFailure(StrEnum):
+    """Why a call stopped. Closed, and ``NOT NULL`` whenever the stage is
+    ``skipped`` or ``failed`` (a CHECK on ``call_analysis_state``).
+
+    ``stage`` says whether the row is terminal; this says why. The three groups
+    below are not decoration — only the transient ones are re-queued by
+    ``analysis_retry_transient``, and getting that membership wrong is how 885
+    rate-limited calls stayed permanently failed in BonviZvonki after the quota
+    they were waiting on had reset.
+    """
+
+    # --- Not analysable: a fact about the call, not about the run ----------
+    NO_AUDIO = "no_audio"
+    AUDIO_EXPIRED = "audio_expired"
+    CALL_TOO_SHORT = "call_too_short"
+    CALL_TYPE_UNKNOWN = "call_type_unknown"
+    CALL_TYPE_INTERNAL = "call_type_internal"
+
+    # --- Transient: the same call will succeed later -----------------------
+    PROVIDER_RATE_LIMIT = "provider_rate_limit"
+    PROVIDER_COOLDOWN = "provider_cooldown"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+    PROVIDER_NETWORK = "provider_network"
+    INTERRUPTED = "interrupted"
+    TIMEOUT = "timeout"
+
+    # --- Permanent: retrying buys the same answer at the same price --------
+    TRANSCRIPT_EMPTY = "transcript_empty"
+    SCORE_INVALID = "score_invalid"
+    AI_NOT_CONFIGURED = "ai_not_configured"
+    PROVIDER_AUTH = "provider_auth"
+    PROVIDER_MODEL = "provider_model"
+    SDK_MISSING = "sdk_missing"
+    AUDIO_TOO_LARGE = "audio_too_large"
+
+    #: The mapping of last resort for an exception nobody foresaw; the class
+    #: name goes in ``failure_detail``. A closed enum with no such member would
+    #: turn a surprise into a write error, which is the opposite of what a
+    #: failure column is for.
+    INTERNAL = "internal"
+
+
+class AiRole(StrEnum):
+    """Which half of the pipeline a provider is being asked to do.
+
+    The primary key of ``ai_provider_cooldowns``, and therefore the unit a
+    cooldown applies to: one account can serve both roles against different
+    models and different quotas, and an exhausted ASR quota must not stop
+    scoring transcripts that already exist.
+    """
+
+    ASR = "asr"
+    LLM = "llm"
+
+
+class CallSentiment(StrEnum):
+    """The model's reading of how the conversation went."""
+
+    POSITIVE = "positive"
+    NEUTRAL = "neutral"
+    NEGATIVE = "negative"
+
+
+class TranscriptQuality(StrEnum):
+    """The model's own assessment of the transcript it was handed.
+
+    A column rather than a derived value because the review rule reads it: a
+    score computed from a transcript the model itself called ``low`` is one a
+    person should look at before it reaches an employee's average.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 #: Every enum that becomes a PostgreSQL type, and the type name it takes.
 #: The migration creates exactly these; a test asserts the two lists agree.
 PG_ENUM_TYPES: dict[str, type[StrEnum]] = {
@@ -547,6 +648,11 @@ PG_ENUM_TYPES: dict[str, type[StrEnum]] = {
     "network_type": NetworkType,
     "enrolment_attempt_kind": EnrolmentAttemptKind,
     "enrolment_outcome": EnrolmentOutcome,
+    "analysis_stage": AnalysisStage,
+    "analysis_failure": AnalysisFailure,
+    "ai_role": AiRole,
+    "call_sentiment": CallSentiment,
+    "transcript_quality": TranscriptQuality,
 }
 
 __all__ = ["PG_ENUM_TYPES", "pg_enum", *[cls.__name__ for cls in PG_ENUM_TYPES.values()]]

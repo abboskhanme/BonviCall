@@ -77,6 +77,26 @@ class Settings(BaseSettings):
     token of ours — so it must be long and random, and a mismatch answers 404
     rather than 401 (never confirm the endpoint exists)."""
 
+    # --- AI providers (call analysis, SPEC-ANALYTICS §4.2) -----------------
+    #
+    # Same decision as the MoiZvonki key above, for the same reason and with
+    # one more piece of evidence: ``app_settings`` is served by
+    # ``GET /api/v1/settings`` behind ``settings:read``, which the registry
+    # grants to **manager** as well as admin. A vendor key in that table is a
+    # key every manager can read — so BonviZvonki's ``ai.<vendor>_api_key``
+    # rows are the one place phase 1 deliberately departs from it.
+    #
+    # Read through ``get_settings()``, never ``os.environ``: this class is the
+    # whole configuration surface, and a key read around it would be missing
+    # from ``.env.example`` and invisible when the value arrives from a Compose
+    # ``env_file``.
+    #
+    # One key, because phase 1 has one provider: Gemini does both ASR and LLM
+    # (§4.1). No ``ai_openai_api_key`` — the client ruled OpenAI out — and
+    # ``ai_anthropic_api_key`` arrives with Claude in phase 2. A key with no
+    # provider row is a secret sitting in a ``.env`` for no reason.
+    ai_gemini_api_key: SecretStr = SecretStr("")
+
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False

@@ -43,6 +43,9 @@ from src.core.config import get_settings
 from src.core.deps import Principal, get_current_principal, get_session
 from src.core.enums import (
     PG_ENUM_TYPES,
+    AiRole,
+    AnalysisFailure,
+    AnalysisStage,
     AppVariant,
     AudioCodec,
     AudioContainer,
@@ -52,6 +55,7 @@ from src.core.enums import (
     CallSource,
     CaptureRoute,
     InstallationStatus,
+    TranscriptQuality,
     UserRole,
 )
 from src.core.permissions import Role, permissions_for
@@ -59,6 +63,12 @@ from src.core.security import hash_password
 from src.core.storage import LocalFsAudioStorage, build_audio_key, sha256_of
 from src.main import create_app
 from src.modules.agents.models import AgentModel
+from src.modules.analysis.models import (
+    AiProviderCooldownModel,
+    CallAnalysisStateModel,
+    CallScoreModel,
+    CallTranscriptModel,
+)
 from src.modules.audio.models import CallAudioModel
 from src.modules.auth.models import ServiceTokenModel
 from src.modules.calls.models import CallModel
@@ -697,6 +707,168 @@ def audio_factory(
         db.add(audio)
         await db.flush()
         return audio
+
+    return _create
+
+
+#: One transcript, in the shape the prompt demands: '[MM:SS] SPEAKER_n: ...'.
+#: English on purpose — Uzbek in a ``.py`` file is legal only in
+#: ``core/messages_uz.py`` (CONVENTIONS.md §14), and nothing here depends on
+#: the language of the speech.
+TRANSCRIPT_TEXT = (
+    "[00:00] SPEAKER_0: Good afternoon, this is Bonvi.\n"
+    "[00:03] SPEAKER_1: Hello, I am calling about the order.\n"
+    "[00:07] SPEAKER_0: Of course, let me check it for you.\n"
+)
+
+
+@pytest.fixture
+def transcript_factory(db: AsyncSession, call_factory) -> Callable[..., Any]:
+    """Create a transcript row, with the call behind it if none is supplied.
+
+    ``char_count`` defaults to the real length of the text, because a fixture
+    that lets the two disagree makes every later assertion about size
+    untrustworthy. ``word_count`` is a plain token count and is **not**
+    ``rules.count_words()``, which strips '[MM:SS]' and 'SPEAKER_n:' first — a
+    test that exercises the short-transcript review rule passes the number it
+    computed itself (§13).
+    """
+
+    async def _create(**overrides: Any) -> CallTranscriptModel:
+        call = overrides.pop("call", None) or await call_factory(
+            has_audio=True, audio_missing_reason=None
+        )
+        text = overrides.pop("text", TRANSCRIPT_TEXT)
+        transcript = CallTranscriptModel(
+            call_id=call.id,
+            text=text,
+            language=overrides.pop("language", "uz"),
+            provider=overrides.pop("provider", "gemini"),
+            model=overrides.pop("model", "gemini-3.1-flash-lite"),
+            char_count=overrides.pop("char_count", len(text)),
+            word_count=overrides.pop("word_count", len(text.split())),
+            audio_bytes=overrides.pop("audio_bytes", 4096),
+            audio_duration_ms=overrides.pop("audio_duration_ms", 120_000),
+            asr_ms=overrides.pop("asr_ms", 3_400),
+            transcribed_at=overrides.pop("transcribed_at", datetime.now(UTC)),
+            **overrides,
+        )
+        db.add(transcript)
+        await db.flush()
+        return transcript
+
+    return _create
+
+
+@pytest.fixture
+def score_factory(db: AsyncSession, call_factory) -> Callable[..., Any]:
+    """Create a score row that the CHECK constraints accept.
+
+    The default ``blocks`` sum to the default ``overall_score``: they are two
+    views of one number and a fixture where they differ would let a panel test
+    pass while rendering bars that do not add up — which is exactly the defect
+    (a 167 % bar) that made the rubric derive its maxima in one place.
+
+    ``blocks`` stays **flat** ``{key: int}``; the per-criterion evidence lives
+    in ``block_details`` and never leaks into it.
+    """
+
+    async def _create(**overrides: Any) -> CallScoreModel:
+        call = overrides.pop("call", None) or await call_factory()
+        blocks = overrides.pop(
+            "blocks", {"opening": 18, "needs": 24, "presentation": 22, "closing": 14}
+        )
+        score = CallScoreModel(
+            call_id=call.id,
+            overall_score=overrides.pop("overall_score", sum(blocks.values())),
+            blocks=blocks,
+            block_details=overrides.pop(
+                "block_details", {"blocks": {}, "meta": {"applicable_max": 100}}
+            ),
+            red_flags=overrides.pop("red_flags", []),
+            outcome_signal=overrides.pop("outcome_signal", None),
+            sentiment=overrides.pop("sentiment", None),
+            transcript_quality=overrides.pop(
+                "transcript_quality", TranscriptQuality.HIGH
+            ),
+            coaching_note=overrides.pop("coaching_note", None),
+            confidence_pct=overrides.pop("confidence_pct", 85),
+            needs_review=overrides.pop("needs_review", False),
+            review_reasons=overrides.pop("review_reasons", []),
+            rubric_version=overrides.pop("rubric_version", "v1"),
+            provider=overrides.pop("provider", "gemini"),
+            model=overrides.pop("model", "gemini-3.1-flash-lite"),
+            llm_calls=overrides.pop("llm_calls", 1),
+            prompt_tokens=overrides.pop("prompt_tokens", 7_200),
+            completion_tokens=overrides.pop("completion_tokens", 900),
+            cost_micro_usd=overrides.pop("cost_micro_usd", None),
+            scored_at=overrides.pop("scored_at", datetime.now(UTC)),
+            **overrides,
+        )
+        db.add(score)
+        await db.flush()
+        return score
+
+    return _create
+
+
+#: A stopped stage needs a reason or the CHECK rejects the row. ``failed``
+#: defaults to a **permanent** code on purpose: a transient one would make a
+#: retry test that forgot to name its own code pass for the wrong reason.
+_DEFAULT_FAILURE: dict[AnalysisStage, AnalysisFailure] = {
+    AnalysisStage.FAILED: AnalysisFailure.INTERNAL,
+    AnalysisStage.SKIPPED: AnalysisFailure.NO_AUDIO,
+}
+
+
+@pytest.fixture
+def analysis_state_factory(db: AsyncSession, call_factory) -> Callable[..., Any]:
+    """Create a pipeline state row that satisfies ``stopped_has_reason``.
+
+    A stopped stage gets a failure code and a running one gets none, so the
+    twenty tests that only need "a call that is queued" do not have to think
+    about the constraint. A test proving the constraint rejects something
+    builds that row itself.
+    """
+
+    async def _create(**overrides: Any) -> CallAnalysisStateModel:
+        call = overrides.pop("call", None) or await call_factory()
+        stage = overrides.pop("stage", AnalysisStage.QUEUED)
+        state = CallAnalysisStateModel(
+            call_id=call.id,
+            stage=stage,
+            attempts=overrides.pop("attempts", 0),
+            asr_calls=overrides.pop("asr_calls", 0),
+            llm_calls=overrides.pop("llm_calls", 0),
+            queued_at=overrides.pop("queued_at", datetime.now(UTC)),
+            failure_code=overrides.pop("failure_code", _DEFAULT_FAILURE.get(stage)),
+            **overrides,
+        )
+        db.add(state)
+        await db.flush()
+        return state
+
+    return _create
+
+
+@pytest.fixture
+def provider_cooldown_factory(db: AsyncSession) -> Callable[..., Any]:
+    """Put one role in cooldown. At most two rows exist, keyed by the role."""
+
+    async def _create(**overrides: Any) -> AiProviderCooldownModel:
+        started_at = overrides.pop("started_at", datetime.now(UTC))
+        cooldown = AiProviderCooldownModel(
+            role=overrides.pop("role", AiRole.ASR),
+            started_at=started_at,
+            until_at=overrides.pop("until_at", started_at + timedelta(minutes=30)),
+            reason_code=overrides.pop(
+                "reason_code", AnalysisFailure.PROVIDER_RATE_LIMIT
+            ),
+            **overrides,
+        )
+        db.add(cooldown)
+        await db.flush()
+        return cooldown
 
     return _create
 

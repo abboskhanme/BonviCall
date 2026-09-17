@@ -95,6 +95,12 @@ class Perm:
     SETTINGS_READ = "settings:read"
     SETTINGS_WRITE = "settings:write"
 
+    # Reading a score is reviewing work; running one spends money at a vendor
+    # (SPEC-ANALYTICS §6.1). Both segments are one alphabetic word because
+    # `test_permission_names_follow_the_convention` asserts `isalpha()`.
+    ANALYSIS_READ = "analysis:read"
+    ANALYSIS_RUN = "analysis:run"
+
     APPVERSIONS_READ = "appversions:read"
     APPVERSIONS_WRITE = "appversions:write"
 
@@ -152,6 +158,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.SETTINGS_WRITE,
             Perm.APPVERSIONS_READ,
             Perm.APPVERSIONS_WRITE,
+            Perm.ANALYSIS_READ,
+            Perm.ANALYSIS_RUN,
             Perm.EXPORT_READ,
             Perm.EXPORT_AUDIO,
             # Not granted: *:*:own — an admin sees everything, so an own-scope
@@ -177,6 +185,11 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.REPORTS_EXPORT,
             Perm.SETTINGS_READ,
             Perm.APPVERSIONS_READ,
+            Perm.ANALYSIS_READ,
+            # Not granted: analysis:run — a manager reviews calls, and pressing
+            # that button sends a recording to a vendor and spends money. Same
+            # line the registry already draws at settings:write and
+            # installations:revoke.
             # Not granted: agents:write / numbers:write / enrolment:write —
             # the rollout is the admin's job; a manager reviews calls.
             # Not granted: installations:revoke — revoking wipes an employee's
@@ -198,6 +211,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             # Not granted: audio:download — playing is transparency, taking a
             # copy of a customer conversation off the system is not.
             # Not granted: reports:* — every report is fleet-wide by shape.
+            # Not granted: analysis:read — a decision, not an oversight
+            # (SPEC-ANALYTICS §12 Q1). N41 promises an employee their own calls
+            # and their own phone's health; an unreviewed machine score of
+            # their own work is a different thing, and showing it before any
+            # human has calibrated the rubric invites a dispute the tool cannot
+            # win. Reversing it is this line plus a :own scope in the query.
         }
     ),
     Role.SERVICE: frozenset(
@@ -207,6 +226,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[str]] = {
             Perm.CALLBACK_REPORT,
             # Cannot read users, cannot read the audit log, cannot write
             # anything (UC-29). Token scopes are checked in addition to this.
+            # Not granted: analysis:* — the export contract (SPEC §4.9) is
+            # frozen and additive-only, and analysis is not in it.
         }
     ),
 }

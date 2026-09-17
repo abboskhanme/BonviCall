@@ -20,12 +20,8 @@ from src.core.enums import PG_ENUM_TYPES
 from src.core.models import metadata
 
 MODULES_DIR = Path(__file__).resolve().parents[1] / "src" / "modules"
-MIGRATION = (
-    Path(__file__).resolve().parents[1]
-    / "migrations"
-    / "versions"
-    / "001_create_release1_schema.py"
-)
+VERSIONS_DIR = Path(__file__).resolve().parents[1] / "migrations" / "versions"
+MIGRATION = VERSIONS_DIR / "001_create_release1_schema.py"
 
 
 def _declared_model_classes() -> dict[str, str]:
@@ -145,28 +141,42 @@ ADD_VALUE = re.compile(
     r"ALTER TYPE (\w+) ADD VALUE (?:IF NOT EXISTS )?'([\w]+)'"
 )
 
+#: The literal table a revision that creates enum types declares at the top of
+#: itself, so the values are in the diff a reviewer reads.
+PG_ENUMS_BLOCK = re.compile(
+    r"PG_ENUMS: dict\[str, tuple\[str, \.\.\.\]\] = \{(.*?)\n\}", re.S
+)
+
 
 def _enum_values_from_migrations() -> dict[str, list[str]]:
     """What the database's enums hold after every revision has run.
 
-    The baseline's ``PG_ENUMS`` table plus every later ``ADD VALUE``. Reading
-    only the baseline was correct while there was one revision and became a
-    false failure the moment a value was added in a second — and "the test
-    broke, edit the baseline" is precisely the habit that would put a column
-    back into 001.
-    """
-    source = MIGRATION.read_text(encoding="utf-8")
-    block = re.search(
-        r"PG_ENUMS: dict\[str, tuple\[str, \.\.\.\]\] = \{(.*?)\n\}", source, re.S
-    )
-    assert block, "PG_ENUMS table not found in the migration"
-    namespace: dict[str, object] = {}
-    exec("PG_ENUMS = {" + block.group(1) + "\n}", namespace)  # noqa: S102
-    values = {name: list(items) for name, items in namespace["PG_ENUMS"].items()}
+    Every revision's ``PG_ENUMS`` table, merged, plus every ``ADD VALUE``.
 
-    for path in sorted(MIGRATION.parent.glob("*.py")):
-        if path == MIGRATION:
+    It read the baseline alone twice over: once while there was one revision,
+    and again after ``ADD VALUE`` was layered on top of it. Both readings were
+    blind to a revision that *creates a type of its own* — 010 does, and the
+    baseline is frozen, so the values would have been invisible here and the
+    assertion below would have failed for a schema that was entirely correct.
+    "The test broke, edit the baseline" is the habit that would then put an
+    analysis table back into 001.
+    """
+    values: dict[str, list[str]] = {}
+    for path in sorted(VERSIONS_DIR.glob("*.py")):
+        block = PG_ENUMS_BLOCK.search(path.read_text(encoding="utf-8"))
+        if block is None:
             continue
+        namespace: dict[str, object] = {}
+        exec("PG_ENUMS = {" + block.group(1) + "\n}", namespace)  # noqa: S102
+        for name, items in namespace["PG_ENUMS"].items():
+            assert name not in values, (
+                f"{path.name} re-declares the enum type {name}. A type is created "
+                "by exactly one revision; a later one adds values to it."
+            )
+            values[name] = list(items)
+    assert values, "no revision declares a PG_ENUMS table — the parser is broken"
+
+    for path in sorted(VERSIONS_DIR.glob("*.py")):
         for enum_name, value in ADD_VALUE.findall(path.read_text(encoding="utf-8")):
             assert enum_name in values, f"{path.name} alters unknown enum {enum_name}"
             if value not in values[enum_name]:
@@ -198,7 +208,15 @@ def test_migration_creates_the_extensions_it_declares() -> None:
 
 
 def test_the_migration_has_no_drop_in_upgrade() -> None:
-    """Autogenerate emits spurious DROPs; this one was read (§10, T102)."""
-    source = MIGRATION.read_text(encoding="utf-8")
-    upgrade = source.split("def upgrade() -> None:")[1].split("def downgrade")[0]
-    assert "op.drop_" not in upgrade
+    """Autogenerate emits spurious DROPs; every revision was read (§10, T102).
+
+    Walks the whole history rather than the baseline alone: the rule is about
+    the habit of committing autogenerate's output unread, and that habit is
+    most dangerous on the revisions written after the schema had real data in
+    it. A deliberate drop is still possible — it goes in its own revision with
+    the reason in the docstring, and it fails here first.
+    """
+    for path in sorted(VERSIONS_DIR.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        upgrade = source.split("def upgrade() -> None:")[1].split("def downgrade")[0]
+        assert "op.drop_" not in upgrade, path.name

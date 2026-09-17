@@ -492,6 +492,43 @@ async def test_every_settings_key_is_seeded_with_its_documented_default(db) -> N
         # led with a red "nobody can enrol" banner over a rollout that was
         # working. A fleet that installs a receiver turns it back on here.
         "enrolment.callback_enabled": False,
+        # Migration 010, the call-analysis keys (SPEC-ANALYTICS §4.6). OFF by
+        # default: deploying the feature must be a no-op on the running system
+        # until an admin decides otherwise, and turning it off again is the
+        # same row, which is why it is a setting and not an environment
+        # variable.
+        "analysis.enabled": False,
+        # One vendor in phase 1 — Gemini does both roles, so there is one SDK,
+        # one key and one bill to attribute the first measured cost to.
+        "analysis.asr_provider": "gemini",
+        "analysis.asr_model": "gemini-3.1-flash-lite",
+        "analysis.asr_language": "uz",
+        "analysis.llm_provider": "gemini",
+        "analysis.llm_model": "gemini-3.1-flash-lite",
+        "analysis.min_duration_sec": 30,
+        "analysis.transcribe_internal": False,
+        "analysis.lookback_hours": 168,
+        "analysis.max_calls_per_run": 200,
+        "analysis.concurrency": 2,
+        "analysis.asr_rpm": 60,
+        "analysis.llm_rpm": 120,
+        "analysis.max_retries": 4,
+        "analysis.backoff_base_sec": 2,
+        "analysis.backoff_max_sec": 60,
+        "analysis.max_wait_sec": 60,
+        "analysis.quota_cooldown_sec": 1800,
+        "analysis.invalid_retries": 2,
+        "analysis.call_timeout_sec": 900,
+        "analysis.retry_transient_days": 7,
+        "analysis.monthly_cost_cap_micro_usd": 50000000,
+        "analysis.monthly_max_calls": 3000,
+        # 0 means "not priced", never "free": while these are zero the status
+        # endpoint reports measured units rather than $0.00, and the money cap
+        # cannot trip — which is why the call-count cap above is the one that
+        # actually protects the account on day one.
+        "analysis.price_asr_micro_usd_per_minute": 0,
+        "analysis.price_llm_micro_usd_per_1k_input_tokens": 0,
+        "analysis.price_llm_micro_usd_per_1k_output_tokens": 0,
     }
     rows = await db.execute(sa.text("SELECT key, value FROM app_settings"))
     seeded = {key: value for key, value in rows}
