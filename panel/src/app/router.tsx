@@ -78,6 +78,9 @@ const GroupsPage = lazy(() =>
 const SurveysPage = lazy(() =>
   import('@/modules/surveys/SurveysPage').then((m) => ({ default: m.SurveysPage })),
 )
+const SalesPage = lazy(() =>
+  import('@/modules/sales/SalesPage').then((m) => ({ default: m.SalesPage })),
+)
 const AnalyticsPage = lazy(() =>
   import('@/modules/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })),
 )
@@ -209,6 +212,17 @@ export const ROUTES: readonly RouteSpec[] = [
   // it shows an admin anything to press, and the server refuses the PUT either
   // way.
   { path: '/rubric', element: <RubricPage />, anyOf: [Perm.ANALYSIS_READ] },
+  //
+  // One route, not three. The page's three sections — regular customers,
+  // walk-ins, and the customers taken out of control — live in the query
+  // string, because they are the screen's state and CONVENTIONS-CLIENT.md §2
+  // puts screen state in the URL. Three route lines for one page would be three
+  // chances for the table and the page to disagree about what is being shown.
+  //
+  // `reports:read` and not an analysis permission: this is a fleet-wide report,
+  // and the `sales` role deliberately holds no `reports:*` — the list is a
+  // check carried out ON a salesperson, so it is not a page they open.
+  { path: '/sales', element: <SalesPage />, anyOf: [Perm.REPORTS_READ] },
   //
   // What the customer said, as opposed to what the machine scored. A
   // salesperson reaches their own ratings here and their own scores nowhere —

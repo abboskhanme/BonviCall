@@ -94,13 +94,14 @@ afterEach(() => {
 })
 
 describe('the TAHLIL nav group', () => {
-  it('carries exactly the five entries the section has, in that order', () => {
+  it('carries exactly the six entries the section has, in that order', () => {
     const group = NAV.filter((item) => item.group === 'nav.groupAnalysis')
     expect(group.map((item) => item.to)).toEqual([
       '/analytics',
       '/analysis',
       '/analysis/queue',
       '/rubric',
+      '/sales',
       '/surveys',
     ])
     expect(group.map((item) => t(item.labelKey))).toEqual([
@@ -108,6 +109,7 @@ describe('the TAHLIL nav group', () => {
       'Baholashlar',
       'Tahlil navbati',
       'Baholash mezonlari',
+      'Savdo nazorati',
       'Mijoz baholari',
     ])
   })
@@ -120,11 +122,15 @@ describe('the TAHLIL nav group', () => {
   })
 
   it('gates the four analysis entries on analysis:read and never on analysis:run', () => {
-    // `/surveys` is in this group and is deliberately NOT on `analysis:read`:
-    // it carries the customer's own rating, which a salesperson may see, where
-    // a machine score of the same call is withheld from them.
+    // Two entries in this group are deliberately NOT on `analysis:read`:
+    // `/surveys` carries the customer's own rating, which a salesperson may
+    // see where a machine score of the same call is withheld from them, and
+    // `/sales` is a fleet-wide report on `reports:read`.
     const analysisEntries = NAV.filter(
-      (entry) => entry.group === 'nav.groupAnalysis' && entry.to !== '/surveys',
+      (entry) =>
+        entry.group === 'nav.groupAnalysis' &&
+        entry.to !== '/surveys' &&
+        entry.to !== '/sales',
     )
     expect(analysisEntries).toHaveLength(4)
     for (const item of analysisEntries) {
@@ -135,6 +141,17 @@ describe('the TAHLIL nav group', () => {
   it('gates the ratings on the surveys permissions, not on analysis:read', () => {
     const surveys = NAV.find((item) => item.to === '/surveys')
     expect(surveys?.anyOf).toEqual([Perm.SURVEYS_READ, Perm.SURVEYS_READ_OWN])
+  })
+
+  it('gates sales control on reports:read, which no salesperson holds', () => {
+    // The point of the page: it is a check carried out ON a salesperson, so
+    // the role it examines must not be able to open it.
+    const sales = NAV.find((item) => item.to === '/sales')
+    expect(sales?.anyOf).toEqual([Perm.REPORTS_READ])
+    const visible = visibleNav(
+      new Set([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.SURVEYS_READ_OWN]),
+    ).map((item) => item.to)
+    expect(visible).not.toContain('/sales')
   })
 
   it('does not put the detail route in the menu — it is reached from the list', () => {

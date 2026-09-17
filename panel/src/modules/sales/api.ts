@@ -27,6 +27,7 @@ import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query'
 
 import { api, type Query } from '@/shared/api/client'
 import { moduleKey, queryKey } from '@/shared/api/queryKeys'
+import type { MessageKey } from '@/shared/i18n'
 import type { components, operations } from '@/shared/api/types.gen'
 
 export type ComplianceList = components['schemas']['ComplianceListResponse']
@@ -113,6 +114,162 @@ export const REVIEW_REASONS: readonly SaleReviewReason[] = [
   'contract',
   'other',
 ]
+
+/* ══════════════════════════════════════════════════════════════
+   What each machine value is CALLED.
+
+   `MessageKey` maps rather than string building: the catalogue key is a
+   literal union, so `t('sales.verdict.' + verdict)` does not compile and a
+   value the server adds tomorrow is a TypeScript error here instead of a
+   dotted identifier printed on screen. The same shape `contacts/api.ts` uses,
+   and in the same place — the filter, the badge and the card all render these,
+   and a second copy is how two of them end up disagreeing.
+   ══════════════════════════════════════════════════════════════ */
+
+export const VERDICT_LABEL: Record<Verdict, MessageKey> = {
+  ok: 'sales.verdict.ok',
+  suspicious: 'sales.verdict.suspicious',
+  not_checkable: 'sales.verdict.not_checkable',
+}
+
+export const VERDICT_HINT: Record<Verdict, MessageKey> = {
+  ok: 'sales.verdictHint.ok',
+  suspicious: 'sales.verdictHint.suspicious',
+  not_checkable: 'sales.verdictHint.not_checkable',
+}
+
+/**
+ * ⚠️ `skip_reason` is a plain `string` on the wire, not an enum, so these two
+ * maps are looked up and may MISS. They carry the closed set the server
+ * documents (`generic_code`, `no_phone`); anything else falls back to the
+ * verdict's own hint rather than printing a raw identifier.
+ */
+export const SKIP_LABEL: Record<string, MessageKey> = {
+  generic_code: 'sales.skipShort.generic_code',
+  no_phone: 'sales.skipShort.no_phone',
+}
+
+export const SKIP_HINT: Record<string, MessageKey> = {
+  generic_code: 'sales.skip.generic_code',
+  no_phone: 'sales.skip.no_phone',
+}
+
+export const RULE_LABEL: Record<Rule, MessageKey> = {
+  R1: 'sales.rule.R1',
+  R2: 'sales.rule.R2',
+  R3: 'sales.rule.R3',
+}
+
+/** The one-clause form, for the legend under the table header. */
+export const RULE_SHORT: Record<Rule, MessageKey> = {
+  R1: 'sales.ruleShort.R1',
+  R2: 'sales.ruleShort.R2',
+  R3: 'sales.ruleShort.R3',
+}
+
+export const REVIEW_LABEL: Record<ReviewState, MessageKey> = {
+  new: 'sales.review.new',
+  justified: 'sales.review.justified',
+  confirmed: 'sales.review.confirmed',
+  all: 'sales.review.all',
+}
+
+export const REASON_LABEL: Record<SaleReviewReason, MessageKey> = {
+  walk_in: 'sales.reason.walk_in',
+  telegram: 'sales.reason.telegram',
+  visit: 'sales.reason.visit',
+  contract: 'sales.reason.contract',
+  other: 'sales.reason.other',
+}
+
+export const KIND_LABEL: Record<ClientKind, MessageKey> = {
+  regular: 'sales.kind.regular',
+  walk_in: 'sales.kind.walk_in',
+}
+
+/** The three SAP exports, named by what they are rather than by a file name. */
+export const FILE_KIND_LABEL: Record<ImportPreview['kind'], MessageKey> = {
+  register: 'sales.import.kind.register',
+  catalog: 'sales.import.kind.catalog',
+  balance: 'sales.import.kind.balance',
+}
+
+/**
+ * What the `by_type` slice IS, which differs per file.
+ *
+ * In the register it is the operation type, in the catalogue a group, in the
+ * balance report a department. One heading for all three would be wrong twice.
+ */
+export const PREVIEW_SLICE_LABEL: Record<ImportPreview['kind'], MessageKey> = {
+  register: 'sales.import.preview.byType.register',
+  catalog: 'sales.import.preview.byType.catalog',
+  balance: 'sales.import.preview.byType.balance',
+}
+
+/**
+ * The operation types, translated from `PreviewTypeCount.type`.
+ *
+ * ⚠️ `PreviewTypeCount.label` IS RUSSIAN ON PURPOSE — it is the word SAP
+ * itself printed, and the reader compares the count against SAP's own report.
+ * So the translation is keyed off `type`, and `label` is the fallback for a
+ * type SAP invents tomorrow. In the catalogue and balance files this slice is
+ * a group or a department name, which is not translated at all: the lookup
+ * misses and SAP's word comes through, which is correct.
+ */
+export const OP_TYPE_LABEL: Record<string, MessageKey> = {
+  sale: 'sales.import.opType.sale',
+  payment_in: 'sales.import.opType.payment_in',
+  purchase: 'sales.import.opType.purchase',
+  payment_out: 'sales.import.opType.payment_out',
+  sale_cancel: 'sales.import.opType.sale_cancel',
+  accounting: 'sales.import.opType.accounting',
+  other: 'sales.import.opType.other',
+}
+
+/**
+ * The preview warnings.
+ *
+ * ⚠️ THE SERVER SENDS CODES, NOT SENTENCES — a deliberate change from the
+ * source, whose backend shipped ready-made Uzbek strings the panel printed
+ * blind. The wording is the panel's, which is where every other user-facing
+ * string in this product lives (CONVENTIONS.md §14). Each takes `{count}`.
+ *
+ * The closed set the server documents. A code with no entry is skipped rather
+ * than printed raw — an English identifier in a warning block is worse than a
+ * missing line, because the reader cannot act on either but only one of them
+ * looks broken.
+ */
+export const WARNING_LABEL: Record<string, MessageKey> = {
+  rows_without_date: 'sales.import.warn.rows_without_date',
+  rows_without_partner_code: 'sales.import.warn.rows_without_partner_code',
+  rows_without_amount: 'sales.import.warn.rows_without_amount',
+  duplicate_keys_in_file: 'sales.import.warn.duplicate_keys_in_file',
+  unknown_operation_types: 'sales.import.warn.unknown_operation_types',
+  contractors_without_usable_phone: 'sales.import.warn.contractors_without_usable_phone',
+  inactive_contractors: 'sales.import.warn.inactive_contractors',
+  codes_absent_from_catalogue: 'sales.import.warn.codes_absent_from_catalogue',
+}
+
+/**
+ * Why an upload was refused — `detail.reason` of a 422 `validation_error`.
+ *
+ * ⚠️ ALSO THE PANEL'S OWN COPY. `messageForError` would render the generic
+ * "validation_error" line, which tells somebody holding the wrong spreadsheet
+ * nothing at all. These say which file they picked and what to pick instead.
+ *
+ * `unrecognised_export`, `column_missing` and `wrong_export_kind` carry extra
+ * keys (`expected_headers`, `column`, `found`/`expected`); the ones worth
+ * printing are interpolated by `uploadFailure()` in `ImportModal.tsx`.
+ */
+export const UPLOAD_REASON_LABEL: Record<string, MessageKey> = {
+  not_xlsx: 'sales.import.err.not_xlsx',
+  wrong_content_type: 'sales.import.err.wrong_content_type',
+  empty_file: 'sales.import.err.empty_file',
+  unreadable_file: 'sales.import.err.unreadable_file',
+  unrecognised_export: 'sales.import.err.unrecognised_export',
+  column_missing: 'sales.import.err.column_missing',
+  wrong_export_kind: 'sales.import.err.wrong_export_kind',
+}
 
 /**
  * How long an answer is considered fresh.

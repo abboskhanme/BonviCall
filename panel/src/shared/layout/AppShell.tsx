@@ -32,6 +32,7 @@ import {
   Menu,
   MessagesSquare,
   Phone,
+  ShoppingBag,
   Smartphone,
   Sparkles,
   Star,
@@ -233,6 +234,16 @@ export const NAV: readonly NavItem[] = [
     labelKey: 'nav.rubric',
     icon: ClipboardCheck,
     anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
+  {
+    // Was the customer spoken to before the sale? A check on the work rather
+    // than a reading of it, which is why it gates on `reports:read` and not on
+    // an analysis permission — and why a salesperson sees nothing here.
+    to: '/sales',
+    labelKey: 'nav.sales',
+    icon: ShoppingBag,
+    anyOf: [Perm.REPORTS_READ],
     group: 'nav.groupAnalysis',
   },
   {
