@@ -31,6 +31,9 @@ import { useAuth } from '@/modules/auth/store'
 import { AgentDetailPage } from '@/modules/agents/AgentDetailPage'
 import { AgentsPage } from '@/modules/agents/AgentsPage'
 import { AlertsPage } from '@/modules/alerts/AlertsPage'
+import { AnalysisDetailPage } from '@/modules/analysis/AnalysisDetailPage'
+import { AnalysisListPage } from '@/modules/analysis/AnalysisListPage'
+import { AnalysisQueuePage } from '@/modules/analysis/AnalysisQueuePage'
 import { CallDetailPage } from '@/modules/calls/CallDetailPage'
 import { CallsPage } from '@/modules/calls/CallsPage'
 import { DashboardPage } from '@/modules/dashboard/DashboardPage'
@@ -114,6 +117,28 @@ export const ROUTES: readonly RouteSpec[] = [
   { path: '/agents', element: <AgentsPage />, anyOf: [Perm.AGENTS_READ] },
   { path: '/agents/:id', element: <AgentDetailPage />, anyOf: [Perm.AGENTS_READ] },
 
+  // ── Analysis (SPEC-ANALYTICS §7.1) ────────────────────────────────────
+  //
+  // A SECTION OF ITS OWN, at the client's decision of 2026-09-17. Nothing
+  // inside the existing pages changes: `/calls`, `/calls/:id` and `/dashboard`
+  // keep working exactly as they do in production today, so a mistake in this
+  // work cannot reach a screen the fleet already depends on. The cost is one
+  // extra click from a call to its analysis, and a shortcut is a phase-2
+  // decision with the client rather than a side effect of this task.
+  //
+  // All three gate on `analysis:read` and not on `analysis:run`: reading a
+  // score is reviewing work, and a `manager` holds the first and not the
+  // second (§6.1). The run button lives inside the pages and checks the second
+  // for itself; the server refuses the POST either way.
+  //
+  // `/analysis/queue` is declared ABOVE `/analysis/:callId` for the reason the
+  // server declares `/status` above `/calls/{call_id}`: the two do not collide
+  // under react-router's ranked matching, but the literal path staying above
+  // the parameterised one is the habit that keeps them from colliding the day
+  // somebody renames a path.
+  { path: '/analysis', element: <AnalysisListPage />, anyOf: [Perm.ANALYSIS_READ] },
+  { path: '/analysis/queue', element: <AnalysisQueuePage />, anyOf: [Perm.ANALYSIS_READ] },
+  { path: '/analysis/:callId', element: <AnalysisDetailPage />, anyOf: [Perm.ANALYSIS_READ] },
 
   // ── Administration ────────────────────────────────────────────────────
   { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },

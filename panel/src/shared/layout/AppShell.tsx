@@ -23,9 +23,11 @@ import {
   ChevronsLeft,
   ChevronsRight,
   LayoutDashboard,
+  ListChecks,
   Menu,
   Phone,
   Smartphone,
+  Sparkles,
   UserCog,
   Users,
   X,
@@ -135,6 +137,36 @@ export const NAV: readonly NavItem[] = [
     anyOf: [Perm.USERS_READ],
     group: 'nav.groupAdmin',
   },
+
+  // ── TAHLIL (SPEC-ANALYTICS §7.1) ──────────────────────────────────────
+  //
+  // Its own group, below MA'MURIYAT, at the client's decision of 2026-09-17:
+  // the analysis is a separate section and nothing inside the existing pages
+  // changes. Two entries, because reading a score and asking why nothing has
+  // been scored are two different jobs — the second is the one an admin opens
+  // when the queue goes quiet, and without it that question has no answer
+  // short of the database (§7.5).
+  //
+  // `/analysis/:callId` is deliberately absent, like every other detail route:
+  // it is reached from its list.
+  //
+  // Both gate on `analysis:read`, which `admin` and `manager` hold and `sales`
+  // does not (§6.1) — so a salesperson sees no group at all here, and the route
+  // gate in `app/router.tsx` turns a pasted URL away as well.
+  {
+    to: '/analysis',
+    labelKey: 'nav.analysis',
+    icon: Sparkles,
+    anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
+  {
+    to: '/analysis/queue',
+    labelKey: 'nav.analysisQueue',
+    icon: ListChecks,
+    anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
 ]
 
 /** The items this permission set may see. Pure, so the parity test can use it. */
@@ -143,6 +175,24 @@ export function visibleNav(
   nav: readonly NavItem[] = NAV,
 ): NavItem[] {
   return nav.filter((item) => !item.anyOf || item.anyOf.some((perm) => held.has(perm)))
+}
+
+/**
+ * Whether this entry highlights only on an exact match.
+ *
+ * A parent entry normally stays lit on its detail pages — `/calls` while
+ * reading `/calls/:id` is correct and is what people expect. It stops being
+ * correct when ANOTHER menu entry lives underneath it: on `/analysis/queue`
+ * both "Baholashlar" and "Tahlil navbati" would light up, and two active items
+ * is the menu failing to answer "which page am I on". Derived from NAV rather
+ * than flagged per item, so adding a nested entry later cannot forget it.
+ *
+ * `/dashboard` keeps its own exact match: it is the fallback every gate
+ * refusal lands on, and it has no children to inherit the rule from.
+ */
+function matchesExactly(item: NavItem, nav: readonly NavItem[]): boolean {
+  if (item.to === '/dashboard') return true
+  return nav.some((other) => other.to.startsWith(`${item.to}/`))
 }
 
 function NavList({
@@ -170,7 +220,7 @@ function NavList({
             ) : null}
             <NavLink
               to={item.to}
-              end={item.to === '/dashboard'}
+              end={matchesExactly(item, NAV)}
               onClick={onNavigate}
               title={collapsed ? t(item.labelKey) : undefined}
               className={({ isActive }) =>

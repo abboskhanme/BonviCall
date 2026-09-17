@@ -26,6 +26,10 @@ export const QUERY_MODULES = [
   'users',
   'settings',
   'appversions',
+  // The panel's `analysis` module reads the server's `analysis` module one to
+  // one (SPEC-ANALYTICS §7.2). The run mutation invalidates the whole module,
+  // so the list, the call and the queue page never disagree about a stage.
+  'analysis',
 ] as const
 
 export type QueryModule = (typeof QUERY_MODULES)[number]

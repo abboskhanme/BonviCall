@@ -73,6 +73,21 @@ export const Perm = {
 
   EXPORT_READ: 'export:read',
   EXPORT_AUDIO: 'export:audio',
+
+  /**
+   * Call analysis (SPEC-ANALYTICS §6.1). Two constants, and the split between
+   * them is the point: **reading a score is reviewing work, running one sends a
+   * customer recording to a vendor and spends money.**
+   *
+   * `manager` holds `analysis:read` and not `analysis:run` — the same line the
+   * server's registry already draws at `settings:write` and
+   * `installations:revoke`. `sales` holds neither, deliberately (§12 Q1). The
+   * panel does not encode that matrix: `can()` reads the list `GET /auth/me`
+   * resolved, so the button simply is not rendered for whoever lacks the
+   * permission, and the server refuses the POST regardless.
+   */
+  ANALYSIS_READ: 'analysis:read',
+  ANALYSIS_RUN: 'analysis:run',
 } as const
 
 export type Permission = (typeof Perm)[keyof typeof Perm]
