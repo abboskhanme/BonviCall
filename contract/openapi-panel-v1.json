@@ -1,6 +1,152 @@
 {
   "components": {
     "schemas": {
+      "ActivityDayRow": {
+        "description": "One local day's volume. Empty days are present, never trimmed.",
+        "properties": {
+          "day": {
+            "format": "date",
+            "type": "string"
+          },
+          "inbound": {
+            "type": "integer"
+          },
+          "inbound_answered": {
+            "type": "integer"
+          },
+          "missed": {
+            "type": "integer"
+          },
+          "outbound": {
+            "type": "integer"
+          },
+          "outbound_no_answer": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "inbound",
+          "inbound_answered",
+          "missed",
+          "outbound",
+          "outbound_no_answer"
+        ],
+        "title": "ActivityDayRow",
+        "type": "object"
+      },
+      "ActivityHourRow": {
+        "description": "One hour of the LOCAL day, summed across the window.\n\nAsia/Tashkent, never UTC: \"customers cannot get through at lunchtime\" is\nvisible at 12:00 and becomes a meaningless 07:00 in UTC. Identical shape to\nthe daily row, because one chart draws both cuts.",
+        "properties": {
+          "hour": {
+            "type": "integer"
+          },
+          "inbound": {
+            "type": "integer"
+          },
+          "inbound_answered": {
+            "type": "integer"
+          },
+          "missed": {
+            "type": "integer"
+          },
+          "missed_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outbound": {
+            "type": "integer"
+          },
+          "outbound_no_answer": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hour",
+          "inbound",
+          "inbound_answered",
+          "missed",
+          "outbound",
+          "outbound_no_answer",
+          "missed_rate"
+        ],
+        "title": "ActivityHourRow",
+        "type": "object"
+      },
+      "ActivityResponse": {
+        "description": "The whole report: window, chart series, per-agent rows and the total.",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentActivityRow"
+            },
+            "type": "array"
+          },
+          "callback_median_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Company-wide median minutes to contact. Computed over calls, never as an average of the agents' medians — a median of medians ignores volume."
+          },
+          "callback_window_hours": {
+            "description": "A later call counts as a callback only inside this many hours.",
+            "type": "integer"
+          },
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "description": "Inclusive: the last day the window covers.",
+            "format": "date",
+            "type": "string"
+          },
+          "days": {
+            "description": "Calendar days covered, Asia/Tashkent.",
+            "type": "integer"
+          },
+          "days_series": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityDayRow"
+            },
+            "type": "array"
+          },
+          "hours_series": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityHourRow"
+            },
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/AgentActivityRow",
+            "description": "The company row. Its customer counts are computed separately, not summed: one customer who called two employees is one person."
+          }
+        },
+        "required": [
+          "days",
+          "date_from",
+          "date_to",
+          "callback_window_hours",
+          "callback_median_minutes",
+          "days_series",
+          "hours_series",
+          "agents",
+          "total"
+        ],
+        "title": "ActivityResponse",
+        "type": "object"
+      },
       "ActorType": {
         "description": "Who did the audited thing (SPEC §3.8).",
         "enum": [
@@ -11,6 +157,124 @@
         ],
         "title": "ActorType",
         "type": "string"
+      },
+      "AgentActivityRow": {
+        "description": "One employee over the window. The company total uses the same shape.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "callback_median_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long this employee keeps a customer waiting (median minutes). A different question from the rate: 100 % returned three hours later is a good rate and a bad service."
+          },
+          "callback_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reached as a percent of unreached customers, per CUSTOMER."
+          },
+          "clients_reached": {
+            "type": "integer"
+          },
+          "clients_unreached": {
+            "description": "THE HEADLINE: lost business, counted in people rather than calls.",
+            "type": "integer"
+          },
+          "inbound_answered": {
+            "type": "integer"
+          },
+          "inbound_total": {
+            "description": "Calls customers made to the employee.",
+            "type": "integer"
+          },
+          "missed": {
+            "description": "INCOMING and not answered — the company's responsibility, and the point of this report. `rejected` counts here with `missed`: the phone rang and there was no conversation.",
+            "type": "integer"
+          },
+          "missed_addressable": {
+            "description": "Missed events carrying a usable number. `missed_open` divides by this, because a number nobody has cannot be called back.",
+            "type": "integer"
+          },
+          "missed_called_back": {
+            "description": "Missed EVENTS followed by contact.",
+            "type": "integer"
+          },
+          "missed_clients": {
+            "description": "Distinct customers who could not get through; repeat attempts count once. Measured: 1.8 attempts per customer on average.",
+            "type": "integer"
+          },
+          "missed_open": {
+            "type": "integer"
+          },
+          "missed_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Missed as a percent of incoming. Null when there were none."
+          },
+          "outbound_answered": {
+            "type": "integer"
+          },
+          "outbound_no_answer": {
+            "description": "The customer did not pick up. NOT a missed call and never added to one: measured over 7 days, 983 incoming unanswered against 1047 outgoing, so combining them doubles the figure and blames the employee for it.",
+            "type": "integer"
+          },
+          "outbound_total": {
+            "description": "Calls the employee made to customers.",
+            "type": "integer"
+          },
+          "talk_seconds": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_name",
+          "outbound_total",
+          "outbound_answered",
+          "outbound_no_answer",
+          "inbound_total",
+          "inbound_answered",
+          "missed",
+          "missed_called_back",
+          "missed_addressable",
+          "missed_open",
+          "missed_clients",
+          "clients_reached",
+          "clients_unreached",
+          "missed_rate",
+          "callback_rate",
+          "callback_median_minutes",
+          "total",
+          "talk_seconds"
+        ],
+        "title": "AgentActivityRow",
+        "type": "object"
       },
       "AgentListResponse": {
         "properties": {
@@ -29,6 +293,96 @@
           "total"
         ],
         "title": "AgentListResponse",
+        "type": "object"
+      },
+      "AgentRankRowOut": {
+        "description": "One agent's standing over the window.",
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "ai_score": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avg_duration_sec": {
+            "type": "integer"
+          },
+          "calls": {
+            "type": "integer"
+          },
+          "rank": {
+            "description": "1 is the highest average score.",
+            "type": "integer"
+          },
+          "rank_delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Places gained against the previous period; positive means moved up. Null for an agent who scored nothing in that period."
+          },
+          "red_flags": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_name",
+          "rank",
+          "rank_delta",
+          "calls",
+          "ai_score",
+          "red_flags",
+          "avg_duration_sec"
+        ],
+        "title": "AgentRankRowOut",
+        "type": "object"
+      },
+      "AgentRankingResponse": {
+        "description": "The leaderboard (BonviZvonki ``GET /analytics/agents``).",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRankRowOut"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Agents with at least one scored call.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "items",
+          "total"
+        ],
+        "title": "AgentRankingResponse",
         "type": "object"
       },
       "AgentResponse": {
@@ -842,6 +1196,117 @@
         "title": "AnalysisStatusResponse",
         "type": "object"
       },
+      "AnalyticsOverviewResponse": {
+        "description": "The KPI cards (BonviZvonki ``GET /analytics/overview``).",
+        "properties": {
+          "ai_score": {
+            "$ref": "#/components/schemas/ScoreMetricOut"
+          },
+          "avg_duration_sec": {
+            "description": "Mean call length over the scored calls, rounded half up.",
+            "type": "integer"
+          },
+          "call_types": {
+            "$ref": "#/components/schemas/CallTypeCountsOut"
+          },
+          "calls": {
+            "$ref": "#/components/schemas/CountMetricOut",
+            "description": "**Scored** calls — the join to call_scores is an inner one. A call the pipeline skipped or has not reached is not in it; call_types below is what accounts for the difference."
+          },
+          "calls_total": {
+            "description": "Every call in the window, scored or not.",
+            "type": "integer"
+          },
+          "compared_with": {
+            "$ref": "#/components/schemas/AnalyticsWindow",
+            "description": "The window every delta_percent above is measured against."
+          },
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "red_flags": {
+            "$ref": "#/components/schemas/CountMetricOut",
+            "description": "Scored calls carrying at least one red flag, not flags found."
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "calls",
+          "calls_total",
+          "call_types",
+          "ai_score",
+          "red_flags",
+          "avg_duration_sec",
+          "compared_with"
+        ],
+        "title": "AnalyticsOverviewResponse",
+        "type": "object"
+      },
+      "AnalyticsTimeseriesResponse": {
+        "description": "The trend (BonviZvonki ``GET /analytics/timeseries``).",
+        "properties": {
+          "bucket": {
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "type": "string"
+          },
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "filled": {
+            "description": "True when every period in the window is present, empty ones included. False past the 550-period ceiling, where only periods with data are returned — the panel then draws what it was given rather than pretending the axis is complete.",
+            "type": "boolean"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/TimeseriesPointOut"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "bucket",
+          "filled",
+          "points"
+        ],
+        "title": "AnalyticsTimeseriesResponse",
+        "type": "object"
+      },
+      "AnalyticsWindow": {
+        "description": "The window a report was computed over, echoed back.\n\nOn every response, because five of the six are opened without naming a\nwindow at all — the caller asked for \"the last 30 days\" and the page has to\nbe able to say which days those were.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to"
+        ],
+        "title": "AnalyticsWindow",
+        "type": "object"
+      },
       "AppVariant": {
         "description": "The ``targetSdk`` product flavour (D-06).\n\nReported on every heartbeat, stored on every call, so capture rate is\nmeasurable per variant and not only per handset model.",
         "enum": [
@@ -1241,6 +1706,67 @@
           "user_agent"
         ],
         "title": "AuditResponse",
+        "type": "object"
+      },
+      "BlockBreakdownResponse": {
+        "description": "The radar chart (BonviZvonki ``GET /analytics/blocks``).\n\nA block the rubric does not name is **left out** rather than sent with a\nnull percentage: we do not know what to divide it by, and a bar with no\nscale is worse than a missing one.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BlockScoreOut"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "items"
+        ],
+        "title": "BlockBreakdownResponse",
+        "type": "object"
+      },
+      "BlockScoreOut": {
+        "description": "One rubric block, averaged over the window.",
+        "properties": {
+          "block": {
+            "description": "The rubric's own key. An open vocabulary on purpose: scores are written under a pinned rubric_version, so a block a later rubric adds must still be readable. The panel renders an unknown key as the key.",
+            "type": "string"
+          },
+          "max": {
+            "description": "From the rubric, never a second constant. The two were once typed separately, diverged 25 against 15, and the radar chart drew 106 % in front of a manager.",
+            "type": "integer"
+          },
+          "percent": {
+            "description": "score/max. The radar chart's axis, which is why it is bounded.",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "type": "string"
+          },
+          "scored_calls": {
+            "description": "Calls this block's average is taken over.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "block",
+          "score",
+          "max",
+          "percent",
+          "scored_calls"
+        ],
+        "title": "BlockScoreOut",
         "type": "object"
       },
       "Body_upload_version_api_v1_app_versions_post": {
@@ -1817,6 +2343,25 @@
         "title": "CallType",
         "type": "string"
       },
+      "CallTypeCountsOut": {
+        "description": "Calls by type, over the window. **Every key is always present.**\n\nA fixed object rather than a map, so a type with nothing in it is a visible\nzero instead of an absent key the panel defaults for itself — which is how\nthe two lists drift apart. The fields are pinned against ``CallType`` by a\ntest.\n\n**Deliberately not narrowed to scored calls.** This is the breakdown that\nexplains the headline: the ``calls`` metric counts *scored* conversations,\nand without this row a manager who sees \"6\" in a month of 22,000 calls\nconcludes the system lost the rest. Measured in BonviZvonki: 72 against\n22,026 for the same period.",
+        "properties": {
+          "external": {
+            "default": 0,
+            "type": "integer"
+          },
+          "internal": {
+            "default": 0,
+            "type": "integer"
+          },
+          "unknown": {
+            "default": 0,
+            "type": "integer"
+          }
+        },
+        "title": "CallTypeCountsOut",
+        "type": "object"
+      },
       "Capability": {
         "description": "One row per installation per capability (UC-03, §7.8).\n\nEvery one of these is verified by exercising it, never by reading a\npermission flag — that is what makes ``granted_not_working`` expressible.",
         "enum": [
@@ -2111,6 +2656,32 @@
         ],
         "title": "CommandStatus",
         "type": "string"
+      },
+      "CountMetricOut": {
+        "description": "A count, with its change against the previous period of equal length.",
+        "properties": {
+          "delta_percent": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Percent change. Null when the previous period was zero or has no value — 'up from nothing' is not a percentage."
+          },
+          "value": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value",
+          "delta_percent"
+        ],
+        "title": "CountMetricOut",
+        "type": "object"
       },
       "CreateAgentRequest": {
         "description": "``POST /api/v1/agents``. Creating an agent never creates a login.",
@@ -4253,6 +4824,136 @@
         "title": "LoginResponse",
         "type": "object"
       },
+      "MissedClientRow": {
+        "description": "One unreached customer — the detail that proves the number.\n\nA row reading \"15 missed, 100 % called back\" looks wrong until this list\nshows the 15 events came from 9 customers and every one was spoken to.",
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "contact_inbound": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True — the customer tried again and was answered; false — somebody called them back."
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resolved on the handset from the employee's own contacts. Decoration, never identity — there is no customer catalogue."
+          },
+          "contacted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null — still not contacted."
+          },
+          "contacted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who spoke to them. May be a different employee."
+          },
+          "first_missed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "last_missed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "minutes_to_contact": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone_key": {
+            "description": "The last-9 matching key (`calls.remote_number_key`, N37).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_key",
+          "contact_name",
+          "attempts",
+          "first_missed_at",
+          "last_missed_at",
+          "contacted_at",
+          "contacted_by",
+          "contact_inbound",
+          "minutes_to_contact"
+        ],
+        "title": "MissedClientRow",
+        "type": "object"
+      },
+      "MissedClientsResponse": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "agent_name": {
+            "type": "string"
+          },
+          "callback_window_hours": {
+            "type": "integer"
+          },
+          "clients": {
+            "items": {
+              "$ref": "#/components/schemas/MissedClientRow"
+            },
+            "type": "array"
+          },
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "unreached": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_name",
+          "date_from",
+          "date_to",
+          "callback_window_hours",
+          "clients",
+          "unreached"
+        ],
+        "title": "MissedClientsResponse",
+        "type": "object"
+      },
       "NetworkType": {
         "enum": [
           "wifi",
@@ -4443,6 +5144,27 @@
         "title": "OutcomeSignalOut",
         "type": "object"
       },
+      "PromptSection": {
+        "description": "One named part of the assembled system prompt.\n\nSent with ``editable`` because the admin edits exactly one of them and has to\nsee the rest: without the surrounding context they repeat an instruction that\nis already there (and pay for the tokens) or contradict it.",
+        "properties": {
+          "editable": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "editable",
+          "text"
+        ],
+        "title": "PromptSection",
+        "type": "object"
+      },
       "ProviderCooldownResponse": {
         "description": "A role sitting out a quota or an outage.\n\nThe first thing an operator needs when the queue goes quiet, which is why\nthe cooldown is a table and not a cache key with a TTL (§1.3).",
         "properties": {
@@ -4563,6 +5285,60 @@
           "published_at"
         ],
         "title": "PublicReleaseResponse",
+        "type": "object"
+      },
+      "PublishRubricRequest": {
+        "description": "`PUT /analysis/rubric` — **publish the next version**, never edit this one.\n\nThere is no update endpoint and no rubric id in this body, and that is the\ndesign: the version that scored yesterday's calls has to stay exactly as it\nwas, or `call_scores.rubric_version` stops meaning anything.",
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/RubricBlock"
+            },
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it was published — the only place that reason survives."
+          },
+          "extra_rules": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free text, added to the prompt of EVERY call, which is why it is capped: its length converts directly into money."
+          },
+          "name": {
+            "description": "What to call this version. Required, and the server invents nothing: display text belongs to the panel's Uzbek catalogue (§14).",
+            "maxLength": 128,
+            "minLength": 2,
+            "type": "string"
+          },
+          "red_flags": {
+            "items": {
+              "$ref": "#/components/schemas/RubricRedFlag"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "blocks",
+          "red_flags"
+        ],
+        "title": "PublishRubricRequest",
         "type": "object"
       },
       "QueueCallRequest": {
@@ -4686,6 +5462,56 @@
         "title": "ReclassifyResponse",
         "type": "object"
       },
+      "RedFlagBreakdownResponse": {
+        "description": "The breach breakdown (BonviZvonki ``GET /analytics/red-flags``).",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RedFlagCountOut"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Every occurrence counted, across all types.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "items",
+          "total"
+        ],
+        "title": "RedFlagBreakdownResponse",
+        "type": "object"
+      },
+      "RedFlagCountOut": {
+        "description": "One kind of breach, and how often it was found.",
+        "properties": {
+          "count": {
+            "description": "Occurrences, not calls — one call can carry the same type twice.",
+            "type": "integer"
+          },
+          "type": {
+            "description": "The rubric's key; open, like the block keys.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "count"
+        ],
+        "title": "RedFlagCountOut",
+        "type": "object"
+      },
       "RedFlagOut": {
         "description": "One incident, with the evidence for it.\n\nEvery incident is returned, including repeats of one type: a manager\nconfirming an accusation needs the time and the quote of both. ``counted``\nmarks the one that actually moved the score — the penalty is charged once\nper type, and the array's penalties sum to the total applied.",
         "properties": {
@@ -4798,6 +5624,409 @@
           "confirmed"
         ],
         "title": "RevokeResponse",
+        "type": "object"
+      },
+      "RubricBlock": {
+        "description": "One block: a heading, a maximum, and the criteria that add up to it.",
+        "properties": {
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/RubricCriterion"
+            },
+            "type": "array"
+          },
+          "key": {
+            "description": "The key `call_scores.blocks` is keyed by. Changing it on a published rubric orphans the bars of every score written under the old one.",
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "max": {
+            "description": "Block maximum. All blocks total exactly 100.",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "max",
+          "criteria"
+        ],
+        "title": "RubricBlock",
+        "type": "object"
+      },
+      "RubricCriterion": {
+        "description": "One criterion inside a block.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What earns the points; goes into the prompt verbatim."
+          },
+          "id": {
+            "description": "Short key, e.g. `A2`. The model answers per criterion under it.",
+            "maxLength": 16,
+            "minLength": 1,
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "optional": {
+            "default": false,
+            "description": "Whether the model may mark this criterion `na` — not applicable to this conversation — and have it left out of the arithmetic entirely. **Defaults to false on purpose**: a criterion nobody thought about must be assessed, not quietly droppable. Most Bonvi customers are returning ones who state their order in a sentence; without this flag the full sales script is applied to a 30-second call and the employee scores 40 for doing everything right.",
+            "type": "boolean"
+          },
+          "points": {
+            "description": "This criterion's own maximum. The block's criteria must sum to its `max`.",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "points"
+        ],
+        "title": "RubricCriterion",
+        "type": "object"
+      },
+      "RubricPromptResponse": {
+        "description": "What is actually sent to the model, assembled from the active rubric.\n\n**Assembled by the server, never rebuilt in the panel.** Two copies of this\ntext would drift, and then the screen would show one prompt while the model\nreceived another — a bug with no symptom.",
+        "properties": {
+          "approx_tokens": {
+            "description": "A rough count paid on every call: Uzbek and Russian run at roughly 3.3 characters per token. An order of magnitude, not an invoice.",
+            "type": "integer"
+          },
+          "char_count": {
+            "type": "integer"
+          },
+          "extra_rules_limit": {
+            "description": "`prompt.MAX_EXTRA_RULES`, so the editor's counter cannot disagree with what the server accepts.",
+            "type": "integer"
+          },
+          "full_text": {
+            "type": "string"
+          },
+          "rubric_label": {
+            "type": "string"
+          },
+          "rubric_version": {
+            "type": "integer"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/PromptSection"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "rubric_version",
+          "rubric_label",
+          "sections",
+          "full_text",
+          "char_count",
+          "approx_tokens",
+          "extra_rules_limit"
+        ],
+        "title": "RubricPromptResponse",
+        "type": "object"
+      },
+      "RubricRedFlag": {
+        "description": "One rule whose breach costs points, with the penalty it costs.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "penalty": {
+            "description": "Negative, always: a red flag subtracts. Zero is legal and means 'record it, but do not charge for it'.",
+            "maximum": 0.0,
+            "minimum": -100.0,
+            "type": "integer"
+          },
+          "type": {
+            "description": "The key the model must answer with. `[a-z][a-z0-9_]{1,31}` — checked again in the service, because a key the model cannot reproduce makes every answer fail validation and stops all scoring.",
+            "maxLength": 32,
+            "minLength": 2,
+            "type": "string"
+          },
+          "zeroes_score": {
+            "default": false,
+            "description": "Whether this flag takes the whole score to 0. The heaviest sanction in the product — swearing at a customer — and the panel never sets it on a NEW flag: one miscategorised rule would zero an employee's month.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "penalty"
+        ],
+        "title": "RubricRedFlag",
+        "type": "object"
+      },
+      "RubricResponse": {
+        "description": "The active rubric, or a single version of it.",
+        "properties": {
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/RubricBlock"
+            },
+            "type": "array"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extra_rules": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The admin's own instructions, appended to the prompt as a section of their own. Versioned with the rubric, so a score can say which instructions produced it."
+          },
+          "extra_rules_limit": {
+            "description": "`prompt.MAX_EXTRA_RULES`. Sent with the rubric so the editor's counter cannot disagree with what the server accepts — BonviZvonki wrote the number into its page as well and had two copies of one limit.",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NULL when nothing has been published and this is the pinned default."
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "label": {
+            "description": "`v3` — **exactly the string `call_scores.rubric_version` holds**, so a score can be traced back to the criteria that produced it.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "red_flags": {
+            "items": {
+              "$ref": "#/components/schemas/RubricRedFlag"
+            },
+            "type": "array"
+          },
+          "stored": {
+            "description": "False means no row exists yet and this is `rubric_default.DEFAULT_RUBRIC`, which is what an unseeded database still scores with. The editor says so rather than pretending somebody published it.",
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "label",
+          "name",
+          "description",
+          "is_active",
+          "stored",
+          "blocks",
+          "red_flags",
+          "extra_rules",
+          "extra_rules_limit",
+          "created_at"
+        ],
+        "title": "RubricResponse",
+        "type": "object"
+      },
+      "RubricVersionListResponse": {
+        "description": "Every published version, newest first (SPEC §4.0's list shape).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RubricVersionSummary"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "RubricVersionListResponse",
+        "type": "object"
+      },
+      "RubricVersionSummary": {
+        "description": "One line of the version history. Nothing is ever deleted from it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "label",
+          "name",
+          "is_active",
+          "created_at"
+        ],
+        "title": "RubricVersionSummary",
+        "type": "object"
+      },
+      "ScoreBucketOut": {
+        "description": "One ten-point band of the histogram.",
+        "properties": {
+          "calls": {
+            "type": "integer"
+          },
+          "ceiling": {
+            "description": "Inclusive. The top band is 90-100 rather than 90-99: a perfect score belongs in the highest bar, not in an eleventh one of its own.",
+            "type": "integer"
+          },
+          "floor": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "floor",
+          "ceiling",
+          "calls"
+        ],
+        "title": "ScoreBucketOut",
+        "type": "object"
+      },
+      "ScoreDistributionResponse": {
+        "description": "The histogram (BonviZvonki ``GET /analytics/distribution``).\n\nAlways ten bands, empty ones included — the same decision\n:class:`CallTypeCountsOut` makes, and for the same reason: a histogram with\nholes in it reads as a filter that ate rows.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreBucketOut"
+            },
+            "type": "array"
+          },
+          "scored_calls": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "items",
+          "scored_calls"
+        ],
+        "title": "ScoreDistributionResponse",
+        "type": "object"
+      },
+      "ScoreMetricOut": {
+        "description": "An average score out of 100, to one decimal place.",
+        "properties": {
+          "delta_percent": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when nothing was scored."
+          }
+        },
+        "required": [
+          "value",
+          "delta_percent"
+        ],
+        "title": "ScoreMetricOut",
         "type": "object"
       },
       "ScoreResponse": {
@@ -5183,6 +6412,38 @@
           "last_heartbeat_at"
         ],
         "title": "StrandedInstallationOut",
+        "type": "object"
+      },
+      "TimeseriesPointOut": {
+        "description": "One period of the trend line.\n\n``period_start`` and not BonviZvonki's ``date``: in the weekly bucket the\nvalue is the Monday and in the monthly one the first of the month, so\n\"date\" invites a reader to plot it as the day something happened.",
+        "properties": {
+          "ai_score": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null where nothing was scored in the period — a gap, not a zero."
+          },
+          "calls": {
+            "type": "integer"
+          },
+          "period_start": {
+            "description": "The period's first day, in Asia/Tashkent (Monday for a week).",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "period_start",
+          "calls",
+          "ai_score"
+        ],
+        "title": "TimeseriesPointOut",
         "type": "object"
       },
       "TranscriptQuality": {
@@ -5631,6 +6892,210 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/activity": {
+      "get": {
+        "description": "Who called whom, how many went unanswered, and who was called back.\n\n⚠️ There is no single \"unanswered\" number. An unanswered INCOMING call is\nthe company failing to pick up; an unanswered OUTGOING call is a customer\nwho was busy. Measured over 7 days of real data: 983 and 1047. Adding them\ndoubles the figure, destroys its meaning and blames the employee for it.\n\nA ``sales`` caller sees only their own row, and the ``agent_id`` filter in\nthe URL is ignored for them rather than merged.",
+        "operationId": "activity_report_api_v1_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "description": "Last N calendar days (1 / 7 / 15 / 30).",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "description": "Last N calendar days (1 / 7 / 15 / 30).",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date. Overrides `days`.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date. Overrides `days`.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Activity Report",
+        "tags": [
+          "Activity"
+        ]
+      }
+    },
+    "/api/v1/activity/missed-clients": {
+      "get": {
+        "description": "Proves the number in the table, customer by customer.\n\n⚠️ Same window and same logic as the summary — otherwise \"9 in the table,\n8 in the list\" and nobody trusts either.\n\nAn agent this caller may not read is a 404, and so is an agent that does\nnot exist: the two answers are identical on purpose.",
+        "operationId": "missed_clients_api_v1_activity_missed_clients_get",
+        "parameters": [
+          {
+            "description": "The employee to explain.",
+            "in": "query",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "description": "The employee to explain.",
+              "format": "uuid",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last N calendar days (1 / 7 / 15 / 30).",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "description": "Last N calendar days (1 / 7 / 15 / 30).",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date. Overrides `days`.",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date. Overrides `days`.",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Asia/Tashkent calendar date, INCLUSIVE.",
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissedClientsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Missed Clients",
+        "tags": [
+          "Activity"
+        ]
+      }
+    },
     "/api/v1/agents": {
       "get": {
         "operationId": "list_agents_api_v1_agents_get",
@@ -6322,6 +7787,160 @@
         ]
       }
     },
+    "/api/v1/analysis/rubric": {
+      "get": {
+        "description": "The rubric new scores are produced against.\n\nAnswers 200 even when nothing has been published: the response is then the\nrubric pinned in ``rubric_default.py`` with ``stored: false``, which is\nexactly what such a database scores with. Reading does **not** create the\nrow — BonviZvonki's version did, which made this GET a write.",
+        "operationId": "get_active_rubric_api_v1_analysis_rubric_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Active Rubric",
+        "tags": [
+          "Analysis",
+          "Rubric"
+        ]
+      },
+      "put": {
+        "description": "Publish the next version and make it active.\n\n422 ``validation_error`` with a ``reason`` in the detail when the rubric\ncannot produce a comparable score — the blocks not totalling 100 is the\nfirst of those reasons, and the rubric is **not saved**.",
+        "operationId": "publish_rubric_api_v1_analysis_rubric_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRubricRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Publish Rubric",
+        "tags": [
+          "Analysis",
+          "Rubric"
+        ]
+      }
+    },
+    "/api/v1/analysis/rubric/prompt": {
+      "get": {
+        "description": "What is actually sent to the model, assembled from the active rubric.\n\nRead-only, and the sections say which single one is editable. An admin who\ncannot see this text edits blind; an admin who could edit all of it could\nbreak the response format and stop every score from validating.",
+        "operationId": "get_rubric_prompt_api_v1_analysis_rubric_prompt_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricPromptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Rubric Prompt",
+        "tags": [
+          "Analysis",
+          "Rubric"
+        ]
+      }
+    },
+    "/api/v1/analysis/rubric/versions": {
+      "get": {
+        "description": "Every published version, newest first.\n\nNot paged: a rubric is published a handful of times a year, and the history\nis the audit trail of \"who changed how people are scored, and when\" — which\nis worth reading whole.",
+        "operationId": "list_rubric_versions_api_v1_analysis_rubric_versions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricVersionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Rubric Versions",
+        "tags": [
+          "Analysis",
+          "Rubric"
+        ]
+      }
+    },
+    "/api/v1/analysis/rubric/versions/{version}/activate": {
+      "post": {
+        "description": "Go back to an earlier version — the undo for a bad edit.\n\nThe version keeps its own number rather than being re-published under a new\none, so scores written before and after the round trip carry the same label\nand really were produced by the same criteria.",
+        "operationId": "activate_rubric_version_api_v1_analysis_rubric_versions__version__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Activate Rubric Version",
+        "tags": [
+          "Analysis",
+          "Rubric"
+        ]
+      }
+    },
     "/api/v1/analysis/status": {
       "get": {
         "description": "What is waiting, what broke, and what the month has cost (§7.5).\n\nDeclared **above** ``/calls/{call_id}``: the two do not collide, but the\nliteral route staying above the parameterised one is the habit that keeps\nthem from colliding the day a path is renamed.\n\nNot paged. ``recent_failures`` is capped at twenty server-side, and none of\nthe four fields below it is a list of rows to walk (§6.2).",
@@ -6341,6 +7960,729 @@
         "summary": "Analysis Status",
         "tags": [
           "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analytics/agents": {
+      "get": {
+        "description": "Agents by average score, with the places gained since the last period.",
+        "operationId": "analytics_agent_ranking_api_v1_analytics_agents_get",
+        "parameters": [
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRankingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Agent Ranking",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/blocks": {
+      "get": {
+        "description": "Each rubric block's average, against the maximum the rubric gives it.",
+        "operationId": "analytics_block_breakdown_api_v1_analytics_blocks_get",
+        "parameters": [
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockBreakdownResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Block Breakdown",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/distribution": {
+      "get": {
+        "description": "Scored calls per ten-point band — always ten bands, empty ones included.",
+        "operationId": "analytics_score_distribution_api_v1_analytics_distribution_get",
+        "parameters": [
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreDistributionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Score Distribution",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/overview": {
+      "get": {
+        "description": "The KPI cards, each with its change against the previous equal window.\n\n``calls`` counts **scored** conversations and ``call_types`` accounts for\nevery other one: without that pairing, \"6\" in a month of 22,000 calls reads\nas a system that lost the rest.",
+        "operationId": "analytics_overview_api_v1_analytics_overview_get",
+        "parameters": [
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Overview",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/red-flags": {
+      "get": {
+        "description": "How often each kind of breach was found, commonest first.",
+        "operationId": "analytics_red_flag_breakdown_api_v1_analytics_red_flags_get",
+        "parameters": [
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedFlagBreakdownResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Red Flag Breakdown",
+        "tags": [
+          "Analytics"
+        ]
+      }
+    },
+    "/api/v1/analytics/timeseries": {
+      "get": {
+        "description": "Calls and average score per day, week or month.\n\nEvery period in the window is returned, empty ones included: a categorical\naxis draws five points the same way over a week and over a quarter, so\nomitting the quiet days makes the period filter look broken.",
+        "operationId": "analytics_timeseries_api_v1_analytics_timeseries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "bucket",
+            "required": false,
+            "schema": {
+              "default": "day",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "title": "Bucket",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "call_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CallType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Call Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsTimeseriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation error, in the standard envelope"
+          }
+        },
+        "summary": "Analytics Timeseries",
+        "tags": [
+          "Analytics"
         ]
       }
     },

@@ -9,6 +9,60 @@
  */
 
 export interface paths {
+    "/api/v1/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity Report
+         * @description Who called whom, how many went unanswered, and who was called back.
+         *
+         *     ⚠️ There is no single "unanswered" number. An unanswered INCOMING call is
+         *     the company failing to pick up; an unanswered OUTGOING call is a customer
+         *     who was busy. Measured over 7 days of real data: 983 and 1047. Adding them
+         *     doubles the figure, destroys its meaning and blames the employee for it.
+         *
+         *     A ``sales`` caller sees only their own row, and the ``agent_id`` filter in
+         *     the URL is ignored for them rather than merged.
+         */
+        get: operations["activity_report_api_v1_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/activity/missed-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Missed Clients
+         * @description Proves the number in the table, customer by customer.
+         *
+         *     ⚠️ Same window and same logic as the summary — otherwise "9 in the table,
+         *     8 in the list" and nobody trusts either.
+         *
+         *     An agent this caller may not read is a 404, and so is an agent that does
+         *     not exist: the two answers are identical on purpose.
+         */
+        get: operations["missed_clients_api_v1_activity_missed_clients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents": {
         parameters: {
             query?: never;
@@ -199,6 +253,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/rubric": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Active Rubric
+         * @description The rubric new scores are produced against.
+         *
+         *     Answers 200 even when nothing has been published: the response is then the
+         *     rubric pinned in ``rubric_default.py`` with ``stored: false``, which is
+         *     exactly what such a database scores with. Reading does **not** create the
+         *     row — BonviZvonki's version did, which made this GET a write.
+         */
+        get: operations["get_active_rubric_api_v1_analysis_rubric_get"];
+        /**
+         * Publish Rubric
+         * @description Publish the next version and make it active.
+         *
+         *     422 ``validation_error`` with a ``reason`` in the detail when the rubric
+         *     cannot produce a comparable score — the blocks not totalling 100 is the
+         *     first of those reasons, and the rubric is **not saved**.
+         */
+        put: operations["publish_rubric_api_v1_analysis_rubric_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/rubric/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rubric Prompt
+         * @description What is actually sent to the model, assembled from the active rubric.
+         *
+         *     Read-only, and the sections say which single one is editable. An admin who
+         *     cannot see this text edits blind; an admin who could edit all of it could
+         *     break the response format and stop every score from validating.
+         */
+        get: operations["get_rubric_prompt_api_v1_analysis_rubric_prompt_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/rubric/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Rubric Versions
+         * @description Every published version, newest first.
+         *
+         *     Not paged: a rubric is published a handful of times a year, and the history
+         *     is the audit trail of "who changed how people are scored, and when" — which
+         *     is worth reading whole.
+         */
+        get: operations["list_rubric_versions_api_v1_analysis_rubric_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analysis/rubric/versions/{version}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Rubric Version
+         * @description Go back to an earlier version — the undo for a bad edit.
+         *
+         *     The version keeps its own number rather than being re-published under a new
+         *     one, so scores written before and after the round trip carry the same label
+         *     and really were produced by the same criteria.
+         */
+        post: operations["activate_rubric_version_api_v1_analysis_rubric_versions__version__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/status": {
         parameters: {
             query?: never;
@@ -218,6 +377,134 @@ export interface paths {
          *     the four fields below it is a list of rows to walk (§6.2).
          */
         get: operations["analysis_status_api_v1_analysis_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Agent Ranking
+         * @description Agents by average score, with the places gained since the last period.
+         */
+        get: operations["analytics_agent_ranking_api_v1_analytics_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Block Breakdown
+         * @description Each rubric block's average, against the maximum the rubric gives it.
+         */
+        get: operations["analytics_block_breakdown_api_v1_analytics_blocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Score Distribution
+         * @description Scored calls per ten-point band — always ten bands, empty ones included.
+         */
+        get: operations["analytics_score_distribution_api_v1_analytics_distribution_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Overview
+         * @description The KPI cards, each with its change against the previous equal window.
+         *
+         *     ``calls`` counts **scored** conversations and ``call_types`` accounts for
+         *     every other one: without that pairing, "6" in a month of 22,000 calls reads
+         *     as a system that lost the rest.
+         */
+        get: operations["analytics_overview_api_v1_analytics_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/red-flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Red Flag Breakdown
+         * @description How often each kind of breach was found, commonest first.
+         */
+        get: operations["analytics_red_flag_breakdown_api_v1_analytics_red_flags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics Timeseries
+         * @description Calls and average score per day, week or month.
+         *
+         *     Every period in the window is returned, empty ones included: a categorical
+         *     axis draws five points the same way over a week and over a quarter, so
+         *     omitting the quiet days makes the period filter look broken.
+         */
+        get: operations["analytics_timeseries_api_v1_analytics_timeseries_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1348,15 +1635,136 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * ActivityDayRow
+         * @description One local day's volume. Empty days are present, never trimmed.
+         */
+        ActivityDayRow: {
+            /** Format: date */
+            day: string;
+            inbound: number;
+            inbound_answered: number;
+            missed: number;
+            outbound: number;
+            outbound_no_answer: number;
+        };
+        /**
+         * ActivityHourRow
+         * @description One hour of the LOCAL day, summed across the window.
+         *
+         *     Asia/Tashkent, never UTC: "customers cannot get through at lunchtime" is
+         *     visible at 12:00 and becomes a meaningless 07:00 in UTC. Identical shape to
+         *     the daily row, because one chart draws both cuts.
+         */
+        ActivityHourRow: {
+            hour: number;
+            inbound: number;
+            inbound_answered: number;
+            missed: number;
+            missed_rate: number | null;
+            outbound: number;
+            outbound_no_answer: number;
+        };
+        /**
+         * ActivityResponse
+         * @description The whole report: window, chart series, per-agent rows and the total.
+         */
+        ActivityResponse: {
+            agents: components["schemas"]["AgentActivityRow"][];
+            /** @description Company-wide median minutes to contact. Computed over calls, never as an average of the agents' medians — a median of medians ignores volume. */
+            callback_median_minutes: number | null;
+            /** @description A later call counts as a callback only inside this many hours. */
+            callback_window_hours: number;
+            /** Format: date */
+            date_from: string;
+            /**
+             * Format: date
+             * @description Inclusive: the last day the window covers.
+             */
+            date_to: string;
+            /** @description Calendar days covered, Asia/Tashkent. */
+            days: number;
+            days_series: components["schemas"]["ActivityDayRow"][];
+            hours_series: components["schemas"]["ActivityHourRow"][];
+            /** @description The company row. Its customer counts are computed separately, not summed: one customer who called two employees is one person. */
+            total: components["schemas"]["AgentActivityRow"];
+        };
+        /**
          * ActorType
          * @description Who did the audited thing (SPEC §3.8).
          * @enum {string}
          */
         ActorType: "user" | "service" | "device" | "system";
+        /**
+         * AgentActivityRow
+         * @description One employee over the window. The company total uses the same shape.
+         */
+        AgentActivityRow: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            /** @description How long this employee keeps a customer waiting (median minutes). A different question from the rate: 100 % returned three hours later is a good rate and a bad service. */
+            callback_median_minutes: number | null;
+            /** @description Reached as a percent of unreached customers, per CUSTOMER. */
+            callback_rate: number | null;
+            clients_reached: number;
+            /** @description THE HEADLINE: lost business, counted in people rather than calls. */
+            clients_unreached: number;
+            inbound_answered: number;
+            /** @description Calls customers made to the employee. */
+            inbound_total: number;
+            /** @description INCOMING and not answered — the company's responsibility, and the point of this report. `rejected` counts here with `missed`: the phone rang and there was no conversation. */
+            missed: number;
+            /** @description Missed events carrying a usable number. `missed_open` divides by this, because a number nobody has cannot be called back. */
+            missed_addressable: number;
+            /** @description Missed EVENTS followed by contact. */
+            missed_called_back: number;
+            /** @description Distinct customers who could not get through; repeat attempts count once. Measured: 1.8 attempts per customer on average. */
+            missed_clients: number;
+            missed_open: number;
+            /** @description Missed as a percent of incoming. Null when there were none. */
+            missed_rate: number | null;
+            outbound_answered: number;
+            /** @description The customer did not pick up. NOT a missed call and never added to one: measured over 7 days, 983 incoming unanswered against 1047 outgoing, so combining them doubles the figure and blames the employee for it. */
+            outbound_no_answer: number;
+            /** @description Calls the employee made to customers. */
+            outbound_total: number;
+            talk_seconds: number;
+            total: number;
+        };
         /** AgentListResponse */
         AgentListResponse: {
             items: components["schemas"]["AgentResponse"][];
             total: number;
+        };
+        /**
+         * AgentRankingResponse
+         * @description The leaderboard (BonviZvonki ``GET /analytics/agents``).
+         */
+        AgentRankingResponse: {
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            items: components["schemas"]["AgentRankRowOut"][];
+            /** @description Agents with at least one scored call. */
+            total: number;
+        };
+        /**
+         * AgentRankRowOut
+         * @description One agent's standing over the window.
+         */
+        AgentRankRowOut: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            ai_score: string | null;
+            avg_duration_sec: number;
+            calls: number;
+            /** @description 1 is the highest average score. */
+            rank: number;
+            /** @description Places gained against the previous period; positive means moved up. Null for an agent who scored nothing in that period. */
+            rank_delta: number | null;
+            red_flags: number;
         };
         /** AgentResponse */
         AgentResponse: {
@@ -1642,6 +2050,57 @@ export interface components {
             waiting_retry: number;
         };
         /**
+         * AnalyticsOverviewResponse
+         * @description The KPI cards (BonviZvonki ``GET /analytics/overview``).
+         */
+        AnalyticsOverviewResponse: {
+            ai_score: components["schemas"]["ScoreMetricOut"];
+            /** @description Mean call length over the scored calls, rounded half up. */
+            avg_duration_sec: number;
+            call_types: components["schemas"]["CallTypeCountsOut"];
+            /** @description **Scored** calls — the join to call_scores is an inner one. A call the pipeline skipped or has not reached is not in it; call_types below is what accounts for the difference. */
+            calls: components["schemas"]["CountMetricOut"];
+            /** @description Every call in the window, scored or not. */
+            calls_total: number;
+            /** @description The window every delta_percent above is measured against. */
+            compared_with: components["schemas"]["AnalyticsWindow"];
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            /** @description Scored calls carrying at least one red flag, not flags found. */
+            red_flags: components["schemas"]["CountMetricOut"];
+        };
+        /**
+         * AnalyticsTimeseriesResponse
+         * @description The trend (BonviZvonki ``GET /analytics/timeseries``).
+         */
+        AnalyticsTimeseriesResponse: {
+            /** @enum {string} */
+            bucket: "day" | "week" | "month";
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            /** @description True when every period in the window is present, empty ones included. False past the 550-period ceiling, where only periods with data are returned — the panel then draws what it was given rather than pretending the axis is complete. */
+            filled: boolean;
+            points: components["schemas"]["TimeseriesPointOut"][];
+        };
+        /**
+         * AnalyticsWindow
+         * @description The window a report was computed over, echoed back.
+         *
+         *     On every response, because five of the six are opened without naming a
+         *     window at all — the caller asked for "the last 30 days" and the page has to
+         *     be able to say which days those were.
+         */
+        AnalyticsWindow: {
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+        };
+        /**
          * AppVariant
          * @description The ``targetSdk`` product flavour (D-06).
          *
@@ -1775,6 +2234,36 @@ export interface components {
             object_id: string | null;
             object_type: string;
             user_agent: string | null;
+        };
+        /**
+         * BlockBreakdownResponse
+         * @description The radar chart (BonviZvonki ``GET /analytics/blocks``).
+         *
+         *     A block the rubric does not name is **left out** rather than sent with a
+         *     null percentage: we do not know what to divide it by, and a bar with no
+         *     scale is worse than a missing one.
+         */
+        BlockBreakdownResponse: {
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            items: components["schemas"]["BlockScoreOut"][];
+        };
+        /**
+         * BlockScoreOut
+         * @description One rubric block, averaged over the window.
+         */
+        BlockScoreOut: {
+            /** @description The rubric's own key. An open vocabulary on purpose: scores are written under a pinned rubric_version, so a block a later rubric adds must still be readable. The panel renders an unknown key as the key. */
+            block: string;
+            /** @description From the rubric, never a second constant. The two were once typed separately, diverged 25 against 15, and the radar chart drew 106 % in front of a manager. */
+            max: number;
+            /** @description score/max. The radar chart's axis, which is why it is bounded. */
+            percent: string;
+            score: string;
+            /** @description Calls this block's average is taken over. */
+            scored_calls: number;
         };
         /** Body_upload_version_api_v1_app_versions_post */
         Body_upload_version_api_v1_app_versions_post: {
@@ -2005,6 +2494,29 @@ export interface components {
          */
         CallType: "internal" | "external" | "unknown";
         /**
+         * CallTypeCountsOut
+         * @description Calls by type, over the window. **Every key is always present.**
+         *
+         *     A fixed object rather than a map, so a type with nothing in it is a visible
+         *     zero instead of an absent key the panel defaults for itself — which is how
+         *     the two lists drift apart. The fields are pinned against ``CallType`` by a
+         *     test.
+         *
+         *     **Deliberately not narrowed to scored calls.** This is the breakdown that
+         *     explains the headline: the ``calls`` metric counts *scored* conversations,
+         *     and without this row a manager who sees "6" in a month of 22,000 calls
+         *     concludes the system lost the rest. Measured in BonviZvonki: 72 against
+         *     22,026 for the same period.
+         */
+        CallTypeCountsOut: {
+            /** @default 0 */
+            external: number;
+            /** @default 0 */
+            internal: number;
+            /** @default 0 */
+            unknown: number;
+        };
+        /**
          * Capability
          * @description One row per installation per capability (UC-03, §7.8).
          *
@@ -2109,6 +2621,15 @@ export interface components {
          * @enum {string}
          */
         CommandStatus: "pending" | "sent" | "acknowledged" | "failed" | "expired";
+        /**
+         * CountMetricOut
+         * @description A count, with its change against the previous period of equal length.
+         */
+        CountMetricOut: {
+            /** @description Percent change. Null when the previous period was zero or has no value — 'up from nothing' is not a percentage. */
+            delta_percent: string | null;
+            value: number;
+        };
         /**
          * CreateAgentRequest
          * @description ``POST /api/v1/agents``. Creating an agent never creates a login.
@@ -2641,6 +3162,44 @@ export interface components {
             token_type: string;
         };
         /**
+         * MissedClientRow
+         * @description One unreached customer — the detail that proves the number.
+         *
+         *     A row reading "15 missed, 100 % called back" looks wrong until this list
+         *     shows the 15 events came from 9 customers and every one was spoken to.
+         */
+        MissedClientRow: {
+            attempts: number;
+            /** @description True — the customer tried again and was answered; false — somebody called them back. */
+            contact_inbound: boolean | null;
+            /** @description Resolved on the handset from the employee's own contacts. Decoration, never identity — there is no customer catalogue. */
+            contact_name: string | null;
+            /** @description Null — still not contacted. */
+            contacted_at: string | null;
+            /** @description Who spoke to them. May be a different employee. */
+            contacted_by: string | null;
+            /** Format: date-time */
+            first_missed_at: string;
+            /** Format: date-time */
+            last_missed_at: string;
+            minutes_to_contact: number | null;
+            /** @description The last-9 matching key (`calls.remote_number_key`, N37). */
+            phone_key: string;
+        };
+        /** MissedClientsResponse */
+        MissedClientsResponse: {
+            /** Format: uuid */
+            agent_id: string;
+            agent_name: string;
+            callback_window_hours: number;
+            clients: components["schemas"]["MissedClientRow"][];
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            unreached: number;
+        };
+        /**
          * NetworkType
          * @enum {string}
          */
@@ -2702,6 +3261,19 @@ export interface components {
             type: string;
         };
         /**
+         * PromptSection
+         * @description One named part of the assembled system prompt.
+         *
+         *     Sent with ``editable`` because the admin edits exactly one of them and has to
+         *     see the rest: without the surrounding context they repeat an instruction that
+         *     is already there (and pay for the tokens) or contradict it.
+         */
+        PromptSection: {
+            editable: boolean;
+            key: string;
+            text: string;
+        };
+        /**
          * ProviderCooldownResponse
          * @description A role sitting out a quota or an outage.
          *
@@ -2758,6 +3330,24 @@ export interface components {
             variant: components["schemas"]["AppVariant"];
             version: string;
             version_code: number;
+        };
+        /**
+         * PublishRubricRequest
+         * @description `PUT /analysis/rubric` — **publish the next version**, never edit this one.
+         *
+         *     There is no update endpoint and no rubric id in this body, and that is the
+         *     design: the version that scored yesterday's calls has to stay exactly as it
+         *     was, or `call_scores.rubric_version` stops meaning anything.
+         */
+        PublishRubricRequest: {
+            blocks: components["schemas"]["RubricBlock"][];
+            /** @description Why it was published — the only place that reason survives. */
+            description?: string | null;
+            /** @description Free text, added to the prompt of EVERY call, which is why it is capped: its length converts directly into money. */
+            extra_rules?: string | null;
+            /** @description What to call this version. Required, and the server invents nothing: display text belongs to the panel's Uzbek catalogue (§14). */
+            name: string;
+            red_flags: components["schemas"]["RubricRedFlag"][];
         };
         /**
          * QueueCallRequest
@@ -2828,6 +3418,29 @@ export interface components {
             entry: components["schemas"]["DirectoryEntryResponse"];
         };
         /**
+         * RedFlagBreakdownResponse
+         * @description The breach breakdown (BonviZvonki ``GET /analytics/red-flags``).
+         */
+        RedFlagBreakdownResponse: {
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            items: components["schemas"]["RedFlagCountOut"][];
+            /** @description Every occurrence counted, across all types. */
+            total: number;
+        };
+        /**
+         * RedFlagCountOut
+         * @description One kind of breach, and how often it was found.
+         */
+        RedFlagCountOut: {
+            /** @description Occurrences, not calls — one call can carry the same type twice. */
+            count: number;
+            /** @description The rubric's key; open, like the block keys. */
+            type: string;
+        };
+        /**
          * RedFlagOut
          * @description One incident, with the evidence for it.
          *
@@ -2871,6 +3484,150 @@ export interface components {
             /** Format: date-time */
             revoked_at: string;
             status: components["schemas"]["InstallationStatus"];
+        };
+        /**
+         * RubricBlock
+         * @description One block: a heading, a maximum, and the criteria that add up to it.
+         */
+        RubricBlock: {
+            criteria: components["schemas"]["RubricCriterion"][];
+            /** @description The key `call_scores.blocks` is keyed by. Changing it on a published rubric orphans the bars of every score written under the old one. */
+            key: string;
+            label: string;
+            /** @description Block maximum. All blocks total exactly 100. */
+            max: number;
+        };
+        /**
+         * RubricCriterion
+         * @description One criterion inside a block.
+         */
+        RubricCriterion: {
+            /** @description What earns the points; goes into the prompt verbatim. */
+            description?: string | null;
+            /** @description Short key, e.g. `A2`. The model answers per criterion under it. */
+            id: string;
+            label: string;
+            /**
+             * @description Whether the model may mark this criterion `na` — not applicable to this conversation — and have it left out of the arithmetic entirely. **Defaults to false on purpose**: a criterion nobody thought about must be assessed, not quietly droppable. Most Bonvi customers are returning ones who state their order in a sentence; without this flag the full sales script is applied to a 30-second call and the employee scores 40 for doing everything right.
+             * @default false
+             */
+            optional: boolean;
+            /** @description This criterion's own maximum. The block's criteria must sum to its `max`. */
+            points: number;
+        };
+        /**
+         * RubricPromptResponse
+         * @description What is actually sent to the model, assembled from the active rubric.
+         *
+         *     **Assembled by the server, never rebuilt in the panel.** Two copies of this
+         *     text would drift, and then the screen would show one prompt while the model
+         *     received another — a bug with no symptom.
+         */
+        RubricPromptResponse: {
+            /** @description A rough count paid on every call: Uzbek and Russian run at roughly 3.3 characters per token. An order of magnitude, not an invoice. */
+            approx_tokens: number;
+            char_count: number;
+            /** @description `prompt.MAX_EXTRA_RULES`, so the editor's counter cannot disagree with what the server accepts. */
+            extra_rules_limit: number;
+            full_text: string;
+            rubric_label: string;
+            rubric_version: number;
+            sections: components["schemas"]["PromptSection"][];
+        };
+        /**
+         * RubricRedFlag
+         * @description One rule whose breach costs points, with the penalty it costs.
+         */
+        RubricRedFlag: {
+            description?: string | null;
+            label: string;
+            /** @description Negative, always: a red flag subtracts. Zero is legal and means 'record it, but do not charge for it'. */
+            penalty: number;
+            /** @description The key the model must answer with. `[a-z][a-z0-9_]{1,31}` — checked again in the service, because a key the model cannot reproduce makes every answer fail validation and stops all scoring. */
+            type: string;
+            /**
+             * @description Whether this flag takes the whole score to 0. The heaviest sanction in the product — swearing at a customer — and the panel never sets it on a NEW flag: one miscategorised rule would zero an employee's month.
+             * @default false
+             */
+            zeroes_score: boolean;
+        };
+        /**
+         * RubricResponse
+         * @description The active rubric, or a single version of it.
+         */
+        RubricResponse: {
+            blocks: components["schemas"]["RubricBlock"][];
+            created_at: string | null;
+            description: string | null;
+            /** @description The admin's own instructions, appended to the prompt as a section of their own. Versioned with the rubric, so a score can say which instructions produced it. */
+            extra_rules: string | null;
+            /** @description `prompt.MAX_EXTRA_RULES`. Sent with the rubric so the editor's counter cannot disagree with what the server accepts — BonviZvonki wrote the number into its page as well and had two copies of one limit. */
+            extra_rules_limit: number;
+            /** @description NULL when nothing has been published and this is the pinned default. */
+            id: string | null;
+            is_active: boolean;
+            /** @description `v3` — **exactly the string `call_scores.rubric_version` holds**, so a score can be traced back to the criteria that produced it. */
+            label: string;
+            name: string;
+            red_flags: components["schemas"]["RubricRedFlag"][];
+            /** @description False means no row exists yet and this is `rubric_default.DEFAULT_RUBRIC`, which is what an unseeded database still scores with. The editor says so rather than pretending somebody published it. */
+            stored: boolean;
+            version: number;
+        };
+        /**
+         * RubricVersionListResponse
+         * @description Every published version, newest first (SPEC §4.0's list shape).
+         */
+        RubricVersionListResponse: {
+            items: components["schemas"]["RubricVersionSummary"][];
+            total: number;
+        };
+        /**
+         * RubricVersionSummary
+         * @description One line of the version history. Nothing is ever deleted from it.
+         */
+        RubricVersionSummary: {
+            /** Format: date-time */
+            created_at: string;
+            is_active: boolean;
+            label: string;
+            name: string;
+            version: number;
+        };
+        /**
+         * ScoreBucketOut
+         * @description One ten-point band of the histogram.
+         */
+        ScoreBucketOut: {
+            calls: number;
+            /** @description Inclusive. The top band is 90-100 rather than 90-99: a perfect score belongs in the highest bar, not in an eleventh one of its own. */
+            ceiling: number;
+            floor: number;
+        };
+        /**
+         * ScoreDistributionResponse
+         * @description The histogram (BonviZvonki ``GET /analytics/distribution``).
+         *
+         *     Always ten bands, empty ones included — the same decision
+         *     :class:`CallTypeCountsOut` makes, and for the same reason: a histogram with
+         *     holes in it reads as a filter that ate rows.
+         */
+        ScoreDistributionResponse: {
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            items: components["schemas"]["ScoreBucketOut"][];
+            scored_calls: number;
+        };
+        /**
+         * ScoreMetricOut
+         * @description An average score out of 100, to one decimal place.
+         */
+        ScoreMetricOut: {
+            delta_percent: string | null;
+            /** @description Null when nothing was scored. */
+            value: string | null;
         };
         /**
          * ScoreResponse
@@ -2994,6 +3751,24 @@ export interface components {
             installation_id: string;
             last_heartbeat_at: string | null;
             status: components["schemas"]["InstallationStatus"];
+        };
+        /**
+         * TimeseriesPointOut
+         * @description One period of the trend line.
+         *
+         *     ``period_start`` and not BonviZvonki's ``date``: in the weekly bucket the
+         *     value is the Monday and in the monthly one the first of the month, so
+         *     "date" invites a reader to plot it as the day something happened.
+         */
+        TimeseriesPointOut: {
+            /** @description Null where nothing was scored in the period — a gap, not a zero. */
+            ai_score: string | null;
+            calls: number;
+            /**
+             * Format: date
+             * @description The period's first day, in Asia/Tashkent (Monday for a week).
+             */
+            period_start: string;
         };
         /**
          * TranscriptQuality
@@ -3178,6 +3953,81 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    activity_report_api_v1_activity_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                /** @description Asia/Tashkent calendar date. Overrides `days`. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                /** @description Last N calendar days (1 / 7 / 15 / 30). */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    missed_clients_api_v1_activity_missed_clients_get: {
+        parameters: {
+            query: {
+                /** @description The employee to explain. */
+                agent_id: string;
+                /** @description Asia/Tashkent calendar date. Overrides `days`. */
+                date_from?: string | null;
+                /** @description Asia/Tashkent calendar date, INCLUSIVE. */
+                date_to?: string | null;
+                /** @description Last N calendar days (1 / 7 / 15 / 30). */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MissedClientsResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_agents_api_v1_agents_get: {
         parameters: {
             query?: {
@@ -3543,6 +4393,130 @@ export interface operations {
             };
         };
     };
+    get_active_rubric_api_v1_analysis_rubric_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubricResponse"];
+                };
+            };
+        };
+    };
+    publish_rubric_api_v1_analysis_rubric_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishRubricRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubricResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_rubric_prompt_api_v1_analysis_rubric_prompt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubricPromptResponse"];
+                };
+            };
+        };
+    };
+    list_rubric_versions_api_v1_analysis_rubric_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubricVersionListResponse"];
+                };
+            };
+        };
+    };
+    activate_rubric_version_api_v1_analysis_rubric_versions__version__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubricResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     analysis_status_api_v1_analysis_status_get: {
         parameters: {
             query?: never;
@@ -3559,6 +4533,223 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisStatusResponse"];
+                };
+            };
+        };
+    };
+    analytics_agent_ranking_api_v1_analytics_agents_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRankingResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_block_breakdown_api_v1_analytics_blocks_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockBreakdownResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_score_distribution_api_v1_analytics_distribution_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreDistributionResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_overview_api_v1_analytics_overview_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsOverviewResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_red_flag_breakdown_api_v1_analytics_red_flags_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedFlagBreakdownResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_timeseries_api_v1_analytics_timeseries_get: {
+        parameters: {
+            query?: {
+                agent_id?: string[] | null;
+                bucket?: "day" | "week" | "month";
+                call_type?: components["schemas"]["CallType"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                /** @description Last N Asia/Tashkent calendar days, today included. Ignored once both dates are given. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsTimeseriesResponse"];
+                };
+            };
+            /** @description Validation error, in the standard envelope */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

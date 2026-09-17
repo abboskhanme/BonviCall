@@ -23,7 +23,7 @@
  * Phase 5 tasks replace page BODIES. Nobody edits this table again until the
  * wiring phase (T103) — that is the whole point of T21.
  */
-import { useEffect, type ReactElement } from 'react'
+import { Suspense, lazy, useEffect, type ReactElement } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 
 import { LoginPage } from '@/modules/auth/LoginPage'
@@ -47,6 +47,28 @@ import { Perm, type Permission } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { AppShell, NotFoundNotice } from '@/shared/layout/AppShell'
 import { Skeleton } from '@/shared/ui/primitives'
+
+/**
+ * ═══ The three pages that are fetched only when opened ══════════════════
+ * Faollik carries an Excel writer and Analitika a charting library; between
+ * them they tripled the bundle, and the panel's first screen is opened on a
+ * phone over mobile data by a salesperson who wants the call list. Splitting
+ * them out costs a skeleton the first time somebody opens one of the three and
+ * saves everybody else the download entirely.
+ *
+ * The rest of the table stays eagerly imported. Splitting a page that is a
+ * table and a filter bar buys nothing and costs a round trip.
+ * ════════════════════════════════════════════════════════════════════════
+ */
+const ActivityPage = lazy(() =>
+  import('@/modules/activity/ActivityPage').then((m) => ({ default: m.ActivityPage })),
+)
+const AnalyticsPage = lazy(() =>
+  import('@/modules/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })),
+)
+const RubricPage = lazy(() =>
+  import('@/modules/rubric/RubricPage').then((m) => ({ default: m.RubricPage })),
+)
 
 export interface RouteSpec {
   /** The URL pattern, exactly as SPEC §5.2 writes it. */
@@ -97,6 +119,15 @@ export const ROUTES: readonly RouteSpec[] = [
   // sections. The capability is not gone — `AgentDetailPage` owns it.
   { path: '/calls', element: <CallsPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
   { path: '/calls/:id', element: <CallDetailPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
+  //
+  // The activity report: the same `calls` rows asked a different question —
+  // who called whom, what went unanswered, whether anybody rang back. It gates
+  // on the CALL permissions and not on an analysis one deliberately, because
+  // that is what puts it within a salesperson's reach: `sales` holds
+  // `calls:read:own`, passes here, and `ActivityService._scope()` narrows the
+  // rows to their own agent. It sits in Kundalik ish for the same reason — this
+  // is call statistics, not scoring.
+  { path: '/activity', element: <ActivityPage />, anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN] },
   { path: '/alerts', element: <AlertsPage />, anyOf: [Perm.ALERTS_READ] },
   {
     // Own-scope passes the gate and the SERVER narrows the query to the
@@ -136,9 +167,21 @@ export const ROUTES: readonly RouteSpec[] = [
   // under react-router's ranked matching, but the literal path staying above
   // the parameterised one is the habit that keeps them from colliding the day
   // somebody renames a path.
+  //
+  // `/analytics` is the section's overview and is declared first because it is
+  // what the menu opens onto; it does not collide with `/analysis` under
+  // react-router's ranked matching, the two being different literal segments.
+  { path: '/analytics', element: <AnalyticsPage />, anyOf: [Perm.ANALYSIS_READ] },
   { path: '/analysis', element: <AnalysisListPage />, anyOf: [Perm.ANALYSIS_READ] },
   { path: '/analysis/queue', element: <AnalysisQueuePage />, anyOf: [Perm.ANALYSIS_READ] },
   { path: '/analysis/:callId', element: <AnalysisDetailPage />, anyOf: [Perm.ANALYSIS_READ] },
+  //
+  // The rubric is gated on `analysis:read`, not on the permission that edits
+  // it: every reader of a score needs to see what it was scored against, or the
+  // number is unexplainable. The page checks `settings:write` for itself before
+  // it shows an admin anything to press, and the server refuses the PUT either
+  // way.
+  { path: '/rubric', element: <RubricPage />, anyOf: [Perm.ANALYSIS_READ] },
 
   // ── Administration ────────────────────────────────────────────────────
   { path: '/users', element: <UsersPage />, anyOf: [Perm.USERS_READ] },
@@ -173,6 +216,18 @@ function FullPageLoader() {
   )
 }
 
+/** The wait while a split page's chunk arrives — inside the shell, so the menu
+ *  stays put and only the page area changes. */
+function PageLoader() {
+  return (
+    <div className="space-y-3 p-6" role="status" aria-live="polite">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-64 w-full" />
+      <span className="sr-only">{t('common.loading')}</span>
+    </div>
+  )
+}
+
 /** A token is required. Remembers where the user was, so an expiry mid-session
  *  returns them to that page after logging back in. */
 function Protected({ children }: { children: ReactElement }) {
@@ -198,7 +253,14 @@ export function Gate({ anyOf, children }: { anyOf?: readonly Permission[]; child
 }
 
 function guarded(route: RouteSpec): ReactElement {
-  return <Gate anyOf={route.anyOf}>{route.element}</Gate>
+  // `Suspense` INSIDE the gate, never around it: a user who may not open a
+  // page must be redirected without its chunk being fetched, or the network
+  // tab answers a question the gate exists to refuse.
+  return (
+    <Gate anyOf={route.anyOf}>
+      <Suspense fallback={<PageLoader />}>{route.element}</Suspense>
+    </Gate>
+  )
 }
 
 export function AppRouter() {

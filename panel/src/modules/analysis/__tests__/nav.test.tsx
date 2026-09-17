@@ -7,8 +7,8 @@
  * §7.1 asked for, because the general test passes just as happily when the
  * section is missing from both lists at once:
  *
- *   · the group exists, with exactly the two entries §7.1 names;
- *   · all three routes are registered and all three gate on `analysis:read`;
+ *   · the group exists, with exactly the four entries the section has;
+ *   · all five routes are registered and all of them gate on `analysis:read`;
  *   · `analysis:run` gates nothing at route level — it is a BUTTON permission,
  *     and a route gated on it would hide the score from the manager who is
  *     supposed to read it;
@@ -26,7 +26,13 @@ import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
 import { NAV, visibleNav } from '@/shared/layout/AppShell'
 
-const ANALYSIS_PATHS = ['/analysis', '/analysis/queue', '/analysis/:callId'] as const
+const ANALYSIS_PATHS = [
+  '/analytics',
+  '/analysis',
+  '/analysis/queue',
+  '/analysis/:callId',
+  '/rubric',
+] as const
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -88,10 +94,20 @@ afterEach(() => {
 })
 
 describe('the TAHLIL nav group', () => {
-  it('carries exactly the two entries §7.1 names, in that order', () => {
+  it('carries exactly the four entries the section has, in that order', () => {
     const group = NAV.filter((item) => item.group === 'nav.groupAnalysis')
-    expect(group.map((item) => item.to)).toEqual(['/analysis', '/analysis/queue'])
-    expect(group.map((item) => t(item.labelKey))).toEqual(['Baholashlar', 'Tahlil navbati'])
+    expect(group.map((item) => item.to)).toEqual([
+      '/analytics',
+      '/analysis',
+      '/analysis/queue',
+      '/rubric',
+    ])
+    expect(group.map((item) => t(item.labelKey))).toEqual([
+      'Analitika',
+      'Baholashlar',
+      'Tahlil navbati',
+      'Baholash mezonlari',
+    ])
   })
 
   it('sits below MA\'MURIYAT', () => {
@@ -111,10 +127,20 @@ describe('the TAHLIL nav group', () => {
     expect(NAV.map((item) => item.to)).not.toContain('/analysis/:callId')
   })
 
-  it('shows both entries to a holder of analysis:read', () => {
+  it('shows every entry to a holder of analysis:read', () => {
     const visible = visibleNav(new Set([Perm.ANALYSIS_READ])).map((item) => item.to)
-    expect(visible).toContain('/analysis')
-    expect(visible).toContain('/analysis/queue')
+    for (const path of ['/analytics', '/analysis', '/analysis/queue', '/rubric']) {
+      expect(visible, `${path} is hidden from a holder of analysis:read`).toContain(path)
+    }
+  })
+
+  it('shows the rubric to a manager who may not edit it', () => {
+    // Reading the criteria is not editing them: a score cannot be reviewed
+    // without them, and the editing controls check `settings:write` for
+    // themselves inside the page.
+    const rubric = NAV.find((item) => item.to === '/rubric')
+    expect(rubric?.anyOf).toEqual([Perm.ANALYSIS_READ])
+    expect(rubric?.anyOf).not.toContain(Perm.SETTINGS_WRITE)
   })
 
   it('hides the whole section from a sales user', () => {
@@ -123,13 +149,14 @@ describe('the TAHLIL nav group', () => {
     const visible = visibleNav(
       new Set([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.DEVICES_READ_OWN]),
     ).map((item) => item.to)
-    expect(visible).not.toContain('/analysis')
-    expect(visible).not.toContain('/analysis/queue')
+    for (const path of ['/analytics', '/analysis', '/analysis/queue', '/rubric']) {
+      expect(visible, `${path} is visible to a sales user`).not.toContain(path)
+    }
   })
 })
 
 describe('the routes behind it', () => {
-  it('registers all three, each gated on analysis:read', () => {
+  it('registers all five, each gated on analysis:read', () => {
     for (const path of ANALYSIS_PATHS) {
       const route = ROUTES.find((entry) => entry.path === path)
       expect(route, `route ${path} is not registered`).toBeDefined()
@@ -162,12 +189,20 @@ describe('the routes behind it', () => {
   it('sends a sales user back to the dashboard from every analysis URL', () => {
     signIn([Perm.CALLS_READ_OWN, Perm.AUDIO_PLAY_OWN, Perm.DEVICES_READ_OWN])
 
-    for (const path of ['/analysis', '/analysis/queue', '/analysis/some-call-id']) {
+    for (const path of [
+      '/analytics',
+      '/analysis',
+      '/analysis/queue',
+      '/analysis/some-call-id',
+      '/rubric',
+    ]) {
       const view = renderAt(path)
       expect(heading(t('page.dashboard')), `${path} rendered for a sales user`).not.toBeNull()
       expect(heading(t('page.analysis'))).toBeNull()
       expect(heading(t('page.analysisQueue'))).toBeNull()
       expect(heading(t('page.analysisDetail'))).toBeNull()
+      expect(heading(t('page.analytics'))).toBeNull()
+      expect(heading(t('page.rubric'))).toBeNull()
       view.unmount()
     }
   })

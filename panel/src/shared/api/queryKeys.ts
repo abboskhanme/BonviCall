@@ -30,6 +30,22 @@ export const QUERY_MODULES = [
   // one (SPEC-ANALYTICS §7.2). The run mutation invalidates the whole module,
   // so the list, the call and the queue page never disagree about a stage.
   'analysis',
+  // The rubric is a module of the panel's own — a page with its own state and
+  // its own modal — reading the server's `analysis` module (§2.5). Its own key
+  // rather than a slice of `analysis`: publishing a version changes nothing
+  // about the scores already produced, and invalidating them would refetch
+  // three pages to show the same numbers.
+  'rubric',
+  // The activity report: volume and answerability over a window, read from the
+  // server's `activity` module one to one. It owns no mutation, so nothing
+  // invalidates this key today — it is here because a key outside the closed
+  // union does not compile, which is the point of the union.
+  'activity',
+  // The analytics dashboard: six aggregates over the scores, read from the
+  // server's `analytics` module one to one. Six queries share one filter, so
+  // they share one module key and the whole page moves together when the
+  // window changes. Read-only, like `activity`.
+  'analytics',
 ] as const
 
 export type QueryModule = (typeof QUERY_MODULES)[number]

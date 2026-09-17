@@ -11,9 +11,11 @@ from fastapi import APIRouter
 
 from src.api import PANEL_API_PREFIX
 from src.api.panel import (
+    activity,
     agents,
     alerts,
     analysis,
+    analytics,
     app_versions,
     audio,
     audit,
@@ -50,3 +52,5 @@ router.include_router(audit.router)
 router.include_router(settings.router)
 router.include_router(calls.router)
 router.include_router(analysis.router)
+router.include_router(activity.router)
+router.include_router(analytics.router)

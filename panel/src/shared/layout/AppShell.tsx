@@ -18,10 +18,13 @@
  * ════════════════════════════════════════════════════════════════════════
  */
 import {
+  Activity,
   AlertTriangle,
+  BarChart3,
   BellRing,
   ChevronsLeft,
   ChevronsRight,
+  ClipboardCheck,
   LayoutDashboard,
   ListChecks,
   Menu,
@@ -98,6 +101,18 @@ export const NAV: readonly NavItem[] = [
     group: 'nav.groupOperations',
   },
   {
+    // Directly after Qo'ng'iroqlar, because it answers the question the list
+    // raises: the list says what happened, this says whether anybody was left
+    // waiting. Same permissions as the list — a salesperson sees their own row
+    // and the server narrows the query, which is why it is here in Kundalik ish
+    // and not in Tahlil.
+    to: '/activity',
+    labelKey: 'nav.activity',
+    icon: Activity,
+    anyOf: [Perm.CALLS_READ, Perm.CALLS_READ_OWN],
+    group: 'nav.groupOperations',
+  },
+  {
     to: '/alerts',
     labelKey: 'nav.alerts',
     icon: BellRing,
@@ -154,6 +169,16 @@ export const NAV: readonly NavItem[] = [
   // does not (§6.1) — so a salesperson sees no group at all here, and the route
   // gate in `app/router.tsx` turns a pasted URL away as well.
   {
+    // First in the group: the overview is what somebody opens the section to
+    // see. The three below it answer "which call?", "why is nothing scored?"
+    // and "scored against what?" — each of them a follow-up to a number here.
+    to: '/analytics',
+    labelKey: 'nav.analytics',
+    icon: BarChart3,
+    anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
+  {
     to: '/analysis',
     labelKey: 'nav.analysis',
     icon: Sparkles,
@@ -164,6 +189,17 @@ export const NAV: readonly NavItem[] = [
     to: '/analysis/queue',
     labelKey: 'nav.analysisQueue',
     icon: ListChecks,
+    anyOf: [Perm.ANALYSIS_READ],
+    group: 'nav.groupAnalysis',
+  },
+  {
+    // Last, and visible to every reader of a score rather than only to the
+    // admin who may change it: a score is not reviewable without the criteria
+    // it was given against. The editing controls inside check `settings:write`
+    // for themselves.
+    to: '/rubric',
+    labelKey: 'nav.rubric',
+    icon: ClipboardCheck,
     anyOf: [Perm.ANALYSIS_READ],
     group: 'nav.groupAnalysis',
   },

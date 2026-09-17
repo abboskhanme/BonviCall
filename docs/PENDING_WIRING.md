@@ -10,7 +10,34 @@ wiring is mechanical.
 
 ---
 
-## Nothing is pending.
+## The three ported analytics menus — WIRED 2026-09-17
+
+`Faollik`, `Analitika` and `Baholash mezonlari` were built in parallel by three
+units, each forbidden from touching a shared panel file so they could not
+overwrite one another. The wiring pass applied all of it in one go:
+
+| File | What landed |
+|---|---|
+| `panel/src/app/router.tsx` | `/activity` (`calls:read` / `calls:read:own`), `/analytics` and `/rubric` (`analysis:read`). The three pages are `lazy()`, and `Suspense` sits INSIDE `Gate` so a refused user never fetches the chunk. |
+| `panel/src/shared/layout/AppShell.tsx` | `/activity` in **Kundalik ish** right after `/calls`; `/analytics` first and `/rubric` last in **Tahlil**. Icons `Activity`, `BarChart3`, `ClipboardCheck` — `ListChecks` was already the queue's. |
+| `panel/src/shared/i18n/uz.json` | `nav.activity`, `nav.rubric`, `common.loading` and the 86 `activity.*` keys. `modules/activity/labels.ts` — the temporary module-local catalogue — is **deleted**, and its four importers now take `t` from `@/shared/i18n`. |
+| `docs/ASSUMPTIONS.md` | The eight lines the units owed, including both `core/reads.py` §2.1 exceptions. |
+
+Two things the wiring pass fixed rather than recorded:
+
+- **`AnalyticsService._block_max()` now reads the active rubric**, with the
+  pinned constant as the fallback. The analytics unit divided block scores by a
+  constant; the rubric unit made the rubric a table in the same hour. An admin
+  moving five points between blocks would have left the radar chart dividing by
+  a maximum nobody scores against — a bar past 100 %, which is the defect
+  BonviZvonki shipped.
+- **Three KPI cards on Faollik share their wording with a column of the table
+  below** (one metric shown twice, deliberately). The cards are now labelled
+  groups, so a reader — and a test — can tell the card from the column.
+
+---
+
+## Nothing else is pending.
 
 Phase 6's server-side wiring is complete as of 2026-09-05. What was here:
 

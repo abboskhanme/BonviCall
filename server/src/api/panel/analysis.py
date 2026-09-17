@@ -25,6 +25,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from src.api.panel.rubric import router as rubric_router
 from src.core.deps import PrincipalDep, SessionDep
 from src.core.enums import AnalysisStage
 from src.core.pagination import MAX_LIMIT, Cursor, clamp_limit
@@ -41,6 +42,13 @@ from src.modules.analysis.schemas import (
 from src.modules.analysis.service import AnalysisService
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
+
+# The rubric lives under this prefix — ``/api/v1/analysis/rubric`` — because it
+# is the criteria this section scores against, not a section of its own: the
+# reader who disagrees with a score goes from that score to these criteria.
+# Included here rather than in ``api/panel/__init__.py`` so the rubric arrives
+# without editing a file two other units are appending to at the same time.
+router.include_router(rubric_router)
 
 _read = require_permission(Perm.ANALYSIS_READ)
 _run = require_permission(Perm.ANALYSIS_RUN)

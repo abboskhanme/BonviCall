@@ -439,15 +439,35 @@ first's daily one.
 `skipped` is not a failure, and the panel must not paint it as one. That
 distinction is the reason BonviZvonki grew `SKIPPED` in the first place.
 
-### 2.5 The rubric is code in phase 1
+### 2.5 The rubric — code in phase 1, a table from revision 012
 
-`rubric_default.DEFAULT_RUBRIC` is the rubric; `RUBRIC_VERSION = "v1"` is stamped
-on every score. Changing it needs a deploy, and the version string must be bumped
-in the same change — a modified rubric under an unchanged version makes two
-scores incomparable while claiming they are comparable. Phase 2 ports
-`rubric_models.py` + `rubric_service.py` verbatim and reads the active row
-instead; every phase-1 score already carries `"v1"`, so nothing needs
-back-filling.
+**Phase 1, as shipped.** `rubric_default.DEFAULT_RUBRIC` is the rubric and
+`RUBRIC_VERSION = "v1"` is stamped on every score. Changing it needs a deploy,
+and the version string must be bumped in the same change — a modified rubric
+under an unchanged version makes two scores incomparable while claiming they are
+comparable.
+
+**What migration `012_create_rubrics` changed, and what it did not.** The
+`rubrics` table now exists, seeded with `DEFAULT_RUBRIC` as version 1, and
+`RubricService.active()` reads the active row. `rubric_default.py` stays exactly
+where it is and keeps both jobs: it is the migration's seed, and it is the
+**fallback when the table is empty**, so a database nobody seeded still scores —
+with the same criteria, under the same `"v1"`. Every phase-1 score therefore
+points at the row that really did produce it and nothing needed back-filling.
+
+The versioning rule is the one BonviZvonki's `rubric_service.py` already had and
+is why the table is worth having: **editing publishes a new version and never
+touches the old one**, so `call_scores.rubric_version` keeps meaning what it
+says. Its validation came with it — the blocks must total exactly 100, each
+block must total its own maximum, and a red-flag key must be one the model can
+echo back — and a rubric that fails any of those is refused with 422 and not
+saved. `extra_rules` (the admin's free-text additions) lives on the rubric row
+rather than in `app_settings` for the same reason: it is part of what produced a
+score, so it is versioned with it.
+
+Reading is `analysis:read`; publishing is `settings:write`, which is admin-only.
+Endpoints are in `server/src/api/panel/rubric.py`, mounted under `/analysis`
+(`/api/v1/analysis/rubric`), and the panel page is `panel/src/modules/rubric/`.
 
 ### 2.6 Which calls are analysed
 

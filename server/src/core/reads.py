@@ -32,6 +32,20 @@ from __future__ import annotations
 #: SELECTs. Read-only. Adding an entry needs a line in docs/ASSUMPTIONS.md;
 #: a module that later gains a table loses the exception.
 CROSS_MODULE_READS: dict[str, frozenset[str]] = {
+    # The activity report (ported from BonviZvonki ``modules/analytics``): who
+    # called whom, how many went unanswered, which customers were never reached
+    # and how long a callback took. It is one grouped aggregate per cut over
+    # ``calls`` joined to ``agents``, plus a LATERAL for "the first contact
+    # after this customer's last missed attempt" — assembling any of that from
+    # per-row service calls would be a query per employee per day, and the
+    # report would be rewritten as raw SQL by the first person who timed it.
+    # Owns no table: everything it reports is derived.
+    "activity": frozenset(
+        {
+            "calls.CallModel",
+            "agents.AgentModel",
+        }
+    ),
     "gaps": frozenset(
         {
             "calls.CallModel",
@@ -54,6 +68,23 @@ CROSS_MODULE_READS: dict[str, frozenset[str]] = {
             "agents.AgentModel",
             "numbers.RegisteredNumberModel",
             "numbers.NumberAssignmentModel",
+        }
+    ),
+    # The analytics dashboard (SPEC-ANALYTICS phase 2): six aggregates over the
+    # calls this product has already scored — KPI overview, trend, agent
+    # ranking, rubric blocks, breaches, score histogram. It owns no table and
+    # never will: everything it reports is recomputed from the two it reads,
+    # which is the same decision §10 makes about the gap report.
+    #
+    # ``analysis.CallScoreModel`` rather than a call into ``AnalysisService``:
+    # the answer is four GROUP BYs over every score in a window, and assembling
+    # that from per-row service calls is the case this exception exists for —
+    # fine over fifty scored calls, fatal over fifty thousand.
+    "analytics": frozenset(
+        {
+            "calls.CallModel",
+            "agents.AgentModel",
+            "analysis.CallScoreModel",
         }
     ),
 }
