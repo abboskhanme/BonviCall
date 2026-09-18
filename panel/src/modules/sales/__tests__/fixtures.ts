@@ -180,7 +180,10 @@ export function makeTimeline(overrides: Partial<ComplianceTimeline> = {}): Compl
             at: '2026-08-12T04:14:00Z',
             call_id: '33333333-3333-4333-8333-333333333333',
             agent_name: 'Zuhriddin Rasulov',
-            direction: 'outbound',
+            // `outgoing`/`incoming` — this product's own vocabulary
+            // (`core/enums.py::CallDirection`), never BonviZvonki's
+            // `inbound`/`outbound`, which the server cannot send.
+            direction: 'outgoing',
             answered: true,
             duration_sec: 96,
             has_audio: true,

@@ -48,6 +48,7 @@ import {
   CircleHelp,
   FilterX,
   Send,
+  Sheet as SheetIcon,
   ShieldCheck,
   Store,
   TriangleAlert,
@@ -97,6 +98,10 @@ import {
 import { ReviewBadge, RuleBadges, RuleLegend, SkipBadge, VerdictBadge } from './badges'
 import { BranchesModal } from './BranchesModal'
 import { DigestModal } from './DigestModal'
+import { exportCompliance } from './export'
+import { exportOverLimitSales } from './exportOverLimit'
+import { exportSuspiciousSales } from './exportSuspicious'
+import { fetchAllCompliance, fetchComplianceTimeline, MAX_ROWS } from './fetchAll'
 import { ImportModal } from './ImportModal'
 import { ReviewModal } from './ReviewModal'
 import { SaleCardModal } from './SaleCardModal'
@@ -700,6 +705,180 @@ export function SalesPage() {
     setSearchParams(next)
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     THE EXCEL EXPORTS
+
+     ⚠️ THE WHOLE SELECTION, NOT THE PAGE ON SCREEN. The table shows 50 rows
+     and the file gets every row the filter holds (`fetchAll.ts`): a one-page
+     file would state "12 suspicious sales" for a filter holding 451, and it is
+     read by somebody who never saw this screen.
+
+     The reason the file has to exist at all is the contract's §4 — "the
+     manager wants to re-count the figure by hand" — so it carries every
+     evidence column, not the seven this table has room for.
+     ══════════════════════════════════════════════════════════════ */
+
+  const [exporting, setExporting] = useState(false)
+  const [exportFailed, setExportFailed] = useState(false)
+
+  const agentName = agentsQuery.data?.items.find((agent) => agent.id === agentId)?.full_name
+
+  /**
+   * The "which coverage was this taken with" line written into the file.
+   *
+   * A file loses its context the moment it is emailed, and in THIS report that
+   * is dangerous: "45 suspicious sales" with no period or filter beside it
+   * reads as a statement about the whole year.
+   *
+   * Only the COVERAGE is here — section, employee, branch, search. What
+   * NARROWS the list (class, rule, decision) is added per button: the section
+   * exports set those themselves.
+   */
+  function describeCoverage(): string[] {
+    return [
+      t(KIND_LABEL[kind]),
+      outOfScope ? t('sales.kind.excluded') : null,
+      agentName ? t('sales.export.agent', { value: agentName }) : null,
+      branch ? t('sales.export.branch', { value: branch }) : null,
+      search ? t('sales.export.search', { value: search }) : null,
+    ].filter((part): part is string => Boolean(part))
+  }
+
+  /** The header button: the file is the filter that is ON SCREEN. */
+  function describeScope(): string {
+    return [
+      ...describeCoverage(),
+      !walkIn && verdict ? t(VERDICT_LABEL[verdict]) : null,
+      /* The bare code, as the file's own "broken rules" column prints it —
+         the sentence behind it is in the section reports' glossary. */
+      !walkIn && rule ? rule : null,
+      t(REVIEW_LABEL[review]),
+      walkIn && overLimit
+        ? t('sales.kind.tiles.overLimit', {
+            limit: formatUsd(summaryQuery.data?.walk_in_limit ?? null),
+          })
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+
+  async function runExport() {
+    if (exporting) return
+    setExporting(true)
+    setExportFailed(false)
+    try {
+      /* `query` carries the reader's cursor and page size; the walker
+         overwrites both — the file starts at the first row of the filter. */
+      const { rows, truncated } = await fetchAllCompliance(query)
+      setExportCut(truncated)
+      await exportCompliance({
+        rows,
+        summary: summaryQuery.data,
+        since: dateFrom,
+        until: dateTo,
+        scope: describeScope(),
+        windowDays,
+        truncated,
+      })
+    } catch {
+      /* The cause tells the reader nothing — the chunk failed to load, a page
+         of the walk 500ed. What matters is that it does not fail silently: a
+         button that does nothing gets pressed again and again. */
+      setExportFailed(true)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  /* ── THE SECTION REPORT ───────────────────────────────────────
+     The header button gives the list AS FILTERED ON SCREEN. These two answer
+     the SECTION's own question and therefore set the filter themselves:
+
+       · regular customers → the SUSPICIOUS sales (`verdict=suspicious`);
+       · walk-ins          → the sales over the ticket limit.
+
+     ⚠️ `review` is forced to `all`. In the list it defaults to "undecided",
+     and left that way the file would hold only undecided sales — a file called
+     "suspicious sales" quietly hiding the justified ones, and a decision sheet
+     reading 100 % "Ko'rilmagan", which is a fact about the query and not about
+     the work. Period, employee, branch and search stay as they are on screen:
+     those are the coverage the reader chose. */
+
+  const [sectionExporting, setSectionExporting] = useState(false)
+  const [sectionFailed, setSectionFailed] = useState(false)
+  /** The walk hit its row cap — said on screen, because two of the three files
+   *  have no line of their own for it. */
+  const [exportCut, setExportCut] = useState(false)
+
+  /**
+   * How many rows the section file would hold — and what disables the button.
+   *
+   * Out of scope there is no section report at all: those sales are precisely
+   * the ones NOT being checked, so "the suspicious ones among them" is not a
+   * question this product asks.
+   */
+  const sectionCount = outOfScope
+    ? undefined
+    : walkIn
+      ? summaryQuery.data?.over_limit
+      : summaryQuery.data?.suspicious
+
+  async function runSectionExport() {
+    if (sectionExporting || !sectionCount) return
+    setSectionExporting(true)
+    setSectionFailed(false)
+    try {
+      const base: ComplianceQuery = { ...scope, review: 'all' }
+      if (walkIn) {
+        const { rows, truncated } = await fetchAllCompliance({ ...base, over_limit: true })
+        setExportCut(truncated)
+        await exportOverLimitSales({
+          rows,
+          summary: summaryQuery.data,
+          since: dateFrom,
+          until: dateTo,
+          scope: [
+            ...describeCoverage(),
+            t('sales.kind.tiles.overLimit', {
+              limit: formatUsd(summaryQuery.data?.walk_in_limit ?? null),
+            }),
+          ].join(' · '),
+          limit: summaryQuery.data?.walk_in_limit ?? 0,
+        })
+      } else {
+        /* Both reads go together so the two halves of the file describe the
+           same moment. ⚠️ THE CHAIN IS ALLOWED TO FAIL: the figures matter
+           more than the sequence, and without it the report simply comes out
+           with five sheets instead of six (`exportSuspicious.ts` says why an
+           EMPTY chain sheet would be worse — it would show the worst possible
+           conclusion for a request that was never made). */
+        const [list, timeline] = await Promise.all([
+          fetchAllCompliance({ ...base, verdict: 'suspicious' }),
+          fetchComplianceTimeline(scope).catch(() => undefined),
+        ])
+        setExportCut(list.truncated)
+        await exportSuspiciousSales({
+          rows: list.rows,
+          timeline,
+          summary: summaryQuery.data,
+          since: dateFrom,
+          until: dateTo,
+          scope: [
+            ...describeCoverage(),
+            t('sales.verdict.suspicious'),
+            t('sales.review.all'),
+          ].join(' · '),
+          windowDays,
+        })
+      }
+    } catch {
+      setSectionFailed(true)
+    } finally {
+      setSectionExporting(false)
+    }
+  }
+
   function switchKind(next: ClientKind) {
     if (next === kind) return
     // The list filters belonged to the other set, and so did the cursor. Left
@@ -720,6 +899,18 @@ export function SalesPage() {
         description={t('sales.subtitle')}
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              title={t('sales.export.hint')}
+              /* Nothing to export until the first page has arrived: an empty
+                 file is indistinguishable from a broken button. */
+              disabled={!total || exporting}
+              onClick={() => void runExport()}
+            >
+              <SheetIcon className="size-4" aria-hidden />
+              {exporting ? t('sales.export.running') : t('sales.export.button')}
+            </Button>
             <Button
               variant="secondary"
               size="sm"
@@ -749,6 +940,21 @@ export function SalesPage() {
           </div>
         }
       />
+
+      {exportFailed || sectionFailed ? (
+        <p className="rounded-md bg-bad/10 px-3 py-2 text-xs text-bad" role="alert">
+          {t('sales.export.failed')}
+        </p>
+      ) : null}
+
+      {/* ⚠️ Said on SCREEN as well as in the archive file: the two section
+          reports have no line of their own for a cut selection, and a file
+          that under-reports in silence is the worst kind. */}
+      {exportCut ? (
+        <p className="rounded-md bg-warn/10 px-3 py-2 text-xs text-warn" role="status">
+          {t('sales.export.truncated', { count: MAX_ROWS })}
+        </p>
+      ) : null}
 
       {/* ══════════════════════════════════════════════════════
           TWO SECTIONS, AND A SEPARATE SWITCH
@@ -822,6 +1028,30 @@ export function SalesPage() {
             />
           )}
         </QueryBoundary>
+      )}
+
+      {/* ── The section report ────────────────────────────────
+          One button, two files, because the two sections ask different
+          questions (`runSectionExport`). Out of scope there is none: those
+          sales are the ones not being checked. */}
+      {outOfScope ? null : (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            title={t(walkIn ? 'sales.exportOverLimit.hint' : 'sales.exportSuspicious.hint')}
+            /* Nothing to write until the counts have arrived, and nothing
+               worth writing when the section is empty: an empty file is
+               indistinguishable from a broken button. */
+            disabled={!sectionCount || sectionExporting}
+            onClick={() => void runSectionExport()}
+          >
+            <SheetIcon className="size-4" aria-hidden />
+            {sectionExporting
+              ? t('sales.export.running')
+              : t(walkIn ? 'sales.exportOverLimit.button' : 'sales.exportSuspicious.button')}
+          </Button>
+        </div>
       )}
 
       {/* ── Filters ──────────────────────────────────────────── */}

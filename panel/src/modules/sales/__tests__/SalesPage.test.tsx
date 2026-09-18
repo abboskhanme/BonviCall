@@ -31,6 +31,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuth } from '@/modules/auth/store'
+import { exportCompliance } from '@/modules/sales/export'
+import { exportOverLimitSales } from '@/modules/sales/exportOverLimit'
+import { exportSuspiciousSales } from '@/modules/sales/exportSuspicious'
 import { SalesPage } from '@/modules/sales/SalesPage'
 import { Perm } from '@/shared/auth/permissions'
 import { t } from '@/shared/i18n'
@@ -43,6 +46,22 @@ import {
   makeTimeline,
   makeWalkInSummary,
 } from './fixtures'
+
+/**
+ * The workbook writer is stubbed: this file is about what the PAGE asks for,
+ * and the file's own layout is checked in `export.test.ts` without a browser.
+ * Left real, the click would load `write-excel-file` and try to save a file
+ * from jsdom.
+ */
+vi.mock('@/modules/sales/export', () => ({
+  exportCompliance: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/modules/sales/exportSuspicious', () => ({
+  exportSuspiciousSales: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/modules/sales/exportOverLimit', () => ({
+  exportOverLimitSales: vi.fn().mockResolvedValue(undefined),
+}))
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -498,5 +517,205 @@ describe('the sale card', () => {
       await screen.findByRole('button', { name: t('sales.exclusion.include') }),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: t('sales.exclusion.action') })).toBeNull()
+  })
+})
+
+describe('the export button', () => {
+  it('asks for the WHOLE selection, from its first row', async () => {
+    // ⚠️ The table shows 50 rows and the file must hold every row the filter
+    // holds. A file built from the page on screen would state "12 suspicious
+    // sales" for a filter holding 451 — and it is read by somebody who never
+    // saw the screen.
+    serving()
+    renderPage('/sales?cursor=page-five')
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(screen.getByRole('button', { name: t('sales.export.button') }))
+
+    await waitFor(() => expect(exportCompliance).toHaveBeenCalled())
+    const walk = listCalls().at(-1)
+    // The largest page the server will serve, from the beginning — never the
+    // cursor the reader happens to be standing on.
+    expect(walk?.get('limit')).toBe('200')
+    expect(walk?.get('cursor')).toBeNull()
+  })
+
+  it('writes the coverage into the file, so an emailed sheet keeps its context', async () => {
+    serving()
+    renderPage('/sales?search=%D0%9A02711&date_from=2026-07-22&date_to=2026-08-20')
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(screen.getByRole('button', { name: t('sales.export.button') }))
+
+    await waitFor(() => expect(exportCompliance).toHaveBeenCalled())
+    const options = vi.mocked(exportCompliance).mock.calls.at(-1)?.[0]
+    expect(options?.since).toBe('2026-07-22')
+    expect(options?.until).toBe('2026-08-20')
+    expect(options?.scope).toContain(t('sales.kind.regular'))
+    expect(options?.scope).toContain('К02711')
+    // The queue's own default is part of what the file covers, not a detail
+    // to leave out: a file of undecided sales is not a file of all of them.
+    expect(options?.scope).toContain(t('sales.review.new'))
+    expect(options?.rows).toHaveLength(1)
+  })
+
+  it('stays disabled until there is something to write', async () => {
+    serving({ list: makeList([], { total: 0 }) })
+    renderPage()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: t('sales.export.button') })).toBeDisabled(),
+    )
+  })
+})
+
+describe('the section report', () => {
+  /** Every query string sent to the chain endpoint. */
+  function timelineCalls(): URLSearchParams[] {
+    return fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/sales/compliance/timeline'))
+      .map((url) => new URLSearchParams(url.split('?')[1] ?? ''))
+  }
+
+  it('takes the decided sales too, not just the queue', async () => {
+    // ⚠️ The list defaults to "undecided". Left that way, a file called
+    // "suspicious sales" would quietly hide the justified ones and its
+    // decision sheet would read 100 % "Ko'rilmagan" — a fact about the query
+    // that reads as a fact about the work.
+    serving()
+    renderPage()
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('sales.exportSuspicious.button') }),
+    )
+
+    await waitFor(() => expect(exportSuspiciousSales).toHaveBeenCalled())
+    const walk = listCalls().at(-1)
+    expect(walk?.get('verdict')).toBe('suspicious')
+    expect(walk?.get('review')).toBe('all')
+  })
+
+  it('asks the chain for the CLEAN customers as well', async () => {
+    // Without them the "customers" column can only repeat the suspicious
+    // count, which is the column answering a question it was not asked.
+    serving()
+    renderPage()
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('sales.exportSuspicious.button') }),
+    )
+
+    await waitFor(() => expect(exportSuspiciousSales).toHaveBeenCalled())
+    const chain = timelineCalls().at(-1)
+    expect(chain?.get('only_suspicious')).toBe('false')
+    expect(chain?.get('max_clients')).toBe('1000')
+  })
+
+  it('still writes the file when the chain request fails', async () => {
+    // The figures matter more than the sequence: the file comes out with five
+    // sheets instead of six rather than not at all.
+    fetchMock.mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('/sales/compliance/summary')) {
+        return Promise.resolve(jsonResponse(200, makeSummary()))
+      }
+      if (url.includes('/sales/compliance/timeline')) return Promise.reject(new Error('down'))
+      if (url.includes('/sales/compliance')) return Promise.resolve(jsonResponse(200, makeList()))
+      if (url.includes('/sales/branches')) {
+        return Promise.resolve(jsonResponse(200, makeBranches()))
+      }
+      return Promise.resolve(jsonResponse(200, { items: [], total: 0 }))
+    })
+    renderPage()
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('sales.exportSuspicious.button') }),
+    )
+
+    await waitFor(() => expect(exportSuspiciousSales).toHaveBeenCalled())
+    expect(vi.mocked(exportSuspiciousSales).mock.calls.at(-1)?.[0].timeline).toBeUndefined()
+    expect(screen.queryByText(t('sales.export.failed'))).toBeNull()
+  })
+
+  it('writes the over-limit file in the walk-in section, with the limit it used', async () => {
+    serving({ summary: makeWalkInSummary() })
+    renderPage('/sales?client_kind=walk_in')
+    await screen.findByText('№ 88681')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('sales.exportOverLimit.button') }),
+    )
+
+    await waitFor(() => expect(exportOverLimitSales).toHaveBeenCalled())
+    const walk = listCalls().at(-1)
+    expect(walk?.get('over_limit')).toBe('true')
+    expect(walk?.get('review')).toBe('all')
+    const options = vi.mocked(exportOverLimitSales).mock.calls.at(-1)?.[0]
+    // The threshold is stated in the file, so an old report says which basis
+    // produced it after somebody changes the setting.
+    expect(options?.limit).toBe(makeWalkInSummary().walk_in_limit)
+  })
+
+  it('offers no section report out of scope', async () => {
+    // Those sales are precisely the ones NOT being checked, so "the suspicious
+    // ones among them" is not a question this product asks.
+    serving()
+    renderPage('/sales?out_of_scope=1')
+    await screen.findByText('№ 88681')
+
+    expect(screen.queryByRole('button', { name: t('sales.exportSuspicious.button') })).toBeNull()
+    expect(screen.queryByRole('button', { name: t('sales.exportOverLimit.button') })).toBeNull()
+  })
+})
+
+describe('the chain reads the direction this product actually sends', () => {
+  it('shows an unanswered INCOMING call as ours that went unanswered', async () => {
+    /* ⚠️ A live bug until 2026-09-18: the card compared against `inbound`,
+       which is BonviZvonki's word — `core/enums.py::CallDirection` sends
+       `incoming`/`outgoing`. The comparison was always false, so every call
+       was drawn as outgoing and an unanswered incoming call said "the customer
+       did not pick up" when it was ours. */
+    const timeline = makeTimeline()
+    const client = timeline.clients?.[0]
+    if (!client) throw new Error('the fixture has no customer')
+    serving({})
+    fetchMock.mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('/sales/compliance/summary')) {
+        return Promise.resolve(jsonResponse(200, makeSummary()))
+      }
+      if (url.includes('/sales/compliance/timeline')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            ...timeline,
+            clients: [
+              {
+                ...client,
+                events: (client.events ?? []).map((event) =>
+                  event.kind === 'call'
+                    ? { ...event, direction: 'incoming', answered: false }
+                    : event,
+                ),
+              },
+            ],
+          }),
+        )
+      }
+      if (url.includes('/sales/compliance')) return Promise.resolve(jsonResponse(200, makeList()))
+      if (url.includes('/sales/branches')) {
+        return Promise.resolve(jsonResponse(200, makeBranches()))
+      }
+      return Promise.resolve(jsonResponse(200, { items: [], total: 0 }))
+    })
+
+    renderPage()
+    await userEvent.click(await screen.findByText('№ 88681'))
+    const chain = await screen.findByRole('list')
+
+    expect(within(chain).getByText(new RegExp(t('sales.card.dirInbound')))).toBeInTheDocument()
+    expect(within(chain).getByText(new RegExp(t('sales.card.noAnswer')))).toBeInTheDocument()
   })
 })

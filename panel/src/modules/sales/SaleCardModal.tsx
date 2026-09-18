@@ -123,8 +123,19 @@ function Line({
 }
 
 function CallLine({ event, canOpenCall }: { event: TimelineEvent; canOpenCall: boolean }) {
-  const inbound = event.direction === 'inbound'
-  const Icon = inbound ? PhoneIncoming : PhoneOutgoing
+  /* ⚠️ `incoming`, NOT `inbound`. The wire vocabulary is this product's own
+     (`core/enums.py::CallDirection`, "Ours, not BonviZvonki's"), and the
+     service export is the ONE place the two are mapped onto each other. The
+     port carried the old word across and the comparison was therefore always
+     false: every call on this card was drawn as outgoing — the icon, the
+     colour and the word — and an unanswered INCOMING call said "the customer
+     did not pick up" when it was ours that went unanswered.
+
+     `TimelineEvent.direction` is a plain string on the wire, because on a SALE
+     row the same field carries SAP's product line, so neither spelling is a
+     compile error here. The test below is what holds it. */
+  const incoming = event.direction === 'incoming'
+  const Icon = incoming ? PhoneIncoming : PhoneOutgoing
 
   return (
     <Line
@@ -132,7 +143,7 @@ function CallLine({ event, canOpenCall }: { event: TimelineEvent; canOpenCall: b
       className="bg-surface-2"
       mark={
         <Icon
-          className={cn('mt-0.5 size-4 shrink-0', inbound ? 'text-accent' : 'text-good')}
+          className={cn('mt-0.5 size-4 shrink-0', incoming ? 'text-accent' : 'text-good')}
           aria-hidden
         />
       }
@@ -152,12 +163,12 @@ function CallLine({ event, canOpenCall }: { event: TimelineEvent; canOpenCall: b
       <div className="truncate text-2xs tabular-nums text-muted">
         {formatTime(event.at)}
         {' · '}
-        {inbound ? t('sales.card.dirInbound') : t('sales.card.dirOutbound')}
+        {incoming ? t('sales.card.dirInbound') : t('sales.card.dirOutbound')}
         {' · '}
         {/* An unanswered call lasted 0 seconds and printing "00:00" would read
             as a conversation that happened and said nothing. */}
         {event.answered === false
-          ? inbound
+          ? incoming
             ? t('sales.card.noAnswer')
             : t('sales.card.notPicked')
           : formatDuration(event.duration_sec)}

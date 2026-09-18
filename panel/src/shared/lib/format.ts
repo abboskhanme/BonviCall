@@ -82,8 +82,14 @@ function toDate(value: DateLike): Date {
  * Built from `formatToParts` rather than `toLocaleString('uz-UZ')` for the
  * reason BonviZvonki documents: V8's `uz-UZ` locale renders months as `M04`.
  * Numeric parts in a fixed order sidestep the locale entirely.
+ *
+ * Exported for `shared/lib/xlsx.ts` alone, which needs the NUMBERS and not a
+ * formatted string: Excel stores an instant as a serial number and carries no
+ * time zone of its own, so an exported file has to be built from the same
+ * Tashkent wall clock the screen showed. Everything else formats with
+ * `formatDate` / `formatDateTime`.
  */
-function zonedParts(value: DateLike, options: Intl.DateTimeFormatOptions): Record<string, string> {
+export function zonedParts(value: DateLike, options: Intl.DateTimeFormatOptions): Record<string, string> {
   const formatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: DISPLAY_TIME_ZONE,
     hour12: false,
